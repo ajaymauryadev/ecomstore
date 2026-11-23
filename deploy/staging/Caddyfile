@@ -1,0 +1,24 @@
+{$STAGING_HOST} {
+	root * /srv
+	encode zstd gzip
+
+	@backend path /api /api/* /uploads /uploads/* /socket.io /socket.io/* /health /ready
+	handle @backend {
+		reverse_proxy {$STAGING_UPSTREAM:api:5000}
+	}
+
+	handle /assets/* {
+		@fingerprinted {
+			file
+			path_regexp ^/assets/.+-[A-Za-z0-9_-]{8,}\.[A-Za-z0-9]+$
+		}
+		header @fingerprinted Cache-Control "public, max-age=31536000, immutable"
+		file_server
+	}
+
+	handle {
+		header Cache-Control "no-cache"
+		try_files {path} /index.html
+		file_server
+	}
+}

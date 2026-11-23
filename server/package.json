@@ -1,0 +1,61 @@
+{
+  "name": "smart-kirana-server",
+  "version": "1.0.0",
+  "description": "Smart Kirana SaaS API Server",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "deploy:check": "node scripts/check-deployment.js",
+    "test": "vitest run --pool=forks --poolOptions.forks.singleFork=true",
+    "test:watch": "vitest",
+    "perf:smoke": "node scripts/performance-smoke.js",
+    "images:verify": "node scripts/imagekit.js verify",
+    "images:migrate": "node scripts/imagekit.js migrate",
+    "images:status": "node scripts/imagekit.js status",
+    "demo:reset": "node scripts/demo.js",
+    "demo:seed": "node scripts/demo.js",
+    "demo:workflow": "node scripts/demo.js",
+    "demo:verify": "node scripts/demo.verify.js",
+    "refunds:review": "node scripts/review-refunds.js",
+    "closings:date-review": "node scripts/review-closing-dates.js"
+  },
+  "dependencies": {
+    "@imagekit/nodejs": "^7.15.0",
+    "bcryptjs": "^2.4.3",
+    "compression": "^1.8.2",
+    "cookie-parser": "^1.4.6",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.22.3",
+    "express-mongo-sanitize": "^2.2.0",
+    "express-rate-limit": "^7.1.5",
+    "express-validator": "^7.0.1",
+    "helmet": "^7.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.24.10",
+    "morgan": "^1.12.1",
+    "multer": "^2.5.0",
+    "sharp": "^0.35.5",
+    "socket.io": "^4.8.4",
+    "winston": "^3.11.0"
+  },
+  "devDependencies": {
+    "mongodb-memory-server": "^10.2.0",
+    "nodemon": "^3.0.2",
+    "socket.io-client": "^4.8.4",
+    "supertest": "^7.1.4",
+    "vitest": "^2.1.9"
+  },
+  "overrides": {
+    "body-parser": "~1.20.9",
+    "engine.io": "~6.6.10",
+    "proxy-addr": "~2.0.8",
+    "socket.io-parser": "~4.2.7",
+    "ws": "^8.21.0"
+  },
+  "engines": {
+    "node": ">=20.9.0"
+  }
+}

@@ -1,0 +1,15 @@
+[Unit]
+Description=Check Smart Kirana encrypted backup freshness
+
+[Service]
+Type=oneshot
+User=smart-kirana-backup
+Group=smart-kirana-backup
+WorkingDirectory=/opt/smart-kirana/server
+EnvironmentFile=/etc/smart-kirana/backup.env
+ExecStart=/usr/bin/node scripts/backup.js status
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+TimeoutStartSec=5min

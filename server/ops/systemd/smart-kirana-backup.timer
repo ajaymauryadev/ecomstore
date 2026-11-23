@@ -1,0 +1,10 @@
+[Unit]
+Description=Run Smart Kirana tenant backups hourly
+
+[Timer]
+OnCalendar=hourly
+Persistent=true
+Unit=smart-kirana-backup.service
+
+[Install]
+WantedBy=timers.target

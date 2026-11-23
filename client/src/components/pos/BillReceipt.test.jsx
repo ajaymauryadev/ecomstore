@@ -1,0 +1,27 @@
+import { render, screen } from '@testing-library/react';
+import { expect, test } from 'vitest';
+import { ReceiptContent } from './BillReceipt';
+
+const order = {
+  orderNumber: 'BILL-001', createdAt: '2026-11-22T19:00:00Z', paymentMethod: 'counter', paymentStatus: 'paid',
+  customerInfo: { name: 'Ajay' }, items: [{ name: 'Rusk', variantName: '250g', quantity: 3, price: 53, total: 159 }],
+  pricing: { subtotal: 204, couponDiscount: 5, tax: 0, grandTotal: 199 },
+};
+
+test('prints saved totals and a store-local date without recomputing the bill or adding GST', () => {
+  render(<ReceiptContent order={order} store={{ name: 'Kirana', settings: { timezone: 'Asia/Kolkata' } }} />);
+  expect(screen.getByLabelText('Bill totals')).toHaveTextContent('₹204.00');
+  expect(screen.getByLabelText('Bill totals')).toHaveTextContent('-₹5.00');
+  expect(screen.getByLabelText('Bill totals')).toHaveTextContent('₹199.00');
+  expect(screen.getByText(/23 Nov 2026/)).toBeInTheDocument();
+  expect(screen.queryByText('Tax')).toBeNull();
+  expect(screen.getByText('Paid', { exact: true })).toBeInTheDocument();
+});
+
+test('shows a credit purchase clearly and safely renders customer-provided text', () => {
+  render(<ReceiptContent order={{ ...order, paymentMethod: 'credit', paymentStatus: 'pending', customerInfo: { name: '<script>alert(1)</script>' } }} store={{ name: 'Kirana' }} paper="thermal" />);
+  expect(screen.getByText('On credit')).toBeInTheDocument();
+  expect(screen.getByText('<script>alert(1)</script>')).toBeInTheDocument();
+  expect(document.querySelector('script')).toBeNull();
+  expect(screen.getByText(/Refer to the account ledger/)).toBeInTheDocument();
+});

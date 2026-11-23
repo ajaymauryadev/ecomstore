@@ -1,0 +1,38 @@
+# Dependencies and generated builds (at every level)
+node_modules/
+dist/
+build/
+# Keep examples, never credentials or machine-specific environment files
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.credentials.json
+*.log
+.DS_Store
+Thumbs.db
+coverage/
+.nyc_output/
+.cache/
+.vite/
+playwright-report/
+test-results/
+*.skbackup
+
+# Runtime/customer data, backup archives and local review artifacts
+/uploads/
+/backups/
+/tmp/
+/output/
+/server/audit/*.json
+*.tar
+*.tar.gz
+*.tgz
+*.zip
+__pycache__/
+.idea/
+.vscode/

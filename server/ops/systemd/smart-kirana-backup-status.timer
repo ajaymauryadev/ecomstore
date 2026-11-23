@@ -1,0 +1,10 @@
+[Unit]
+Description=Check Smart Kirana backup freshness every 15 minutes
+
+[Timer]
+OnCalendar=*:0/15
+Persistent=true
+Unit=smart-kirana-backup-status.service
+
+[Install]
+WantedBy=timers.target
