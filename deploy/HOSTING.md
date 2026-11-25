@@ -1,5 +1,16 @@
 # Hosting and performance
 
+## Northflank setup — 25 November 2026
+
+For the connected Northflank Free team, use the
+[Northflank deployment guide](northflank/README.md). It includes a dedicated
+Dockerfile serving the frontend and API on one HTTPS origin, production
+configuration validation, readiness/liveness endpoints, safe public-ingress
+client-IP forwarding, and external MongoDB/ImageKit storage. Select only the
+account's free compute allocation. Deployment and live checks must be verified
+separately; adding these files does not publish the app. The earlier Oracle
+review below remains an alternative with greater VM administration needs.
+
 ## Free-host deployment review — 23 November 2026
 
 For this store's Node/Express API, Socket.IO, MongoDB transactions and media,
