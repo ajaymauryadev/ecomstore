@@ -98,34 +98,37 @@ test('parent categories include descendants and stock/offers use active variants
   expect((await request.get(endpoint, { params: { categoryId: 'invalid' } })).status()).toBe(400);
 });
 
-test('storefront shows 50 products per page and changing filters resets the page', async ({ page, storefront }) => {
+test('storefront shows five products per page on every device and filters reset the page', async ({ page, storefront }) => {
   const { store } = await storefront.seedStore('catalog-pagination');
-  await storefront.Product.create(Array.from({ length: 55 }, (_, index) => ({
+  await storefront.Product.create(Array.from({ length: 10 }, (_, index) => ({
     tenantId: store._id, name: `Catalog item ${String(index).padStart(2, '0')}`, isOnline: true,
     variants: [{ name: 'Pack', unit: 'piece', purchasePrice: 1, retailPrice: index + 1, stock: 5 }],
   })));
   await page.goto(`${storefront.origin}/s/catalog-pagination?sort=name`);
   const cards = page.locator('.storefront-product');
-  await expect(page.getByRole('navigation', { name: 'products pagination' })).toContainText('Page 1 of 2');
-  await expect(cards).toHaveCount(50);
+  await expect(page.getByRole('navigation', { name: 'products pagination' })).toContainText('Page 1 of 3');
+  await expect(cards).toHaveCount(5);
   const first = await cards.first().innerText();
   await page.getByRole('navigation', { name: 'products pagination' }).getByRole('button', { name: 'Next', exact: true }).click();
-  await expect(cards).toHaveCount(6);
+  await expect(cards).toHaveCount(5);
   await expect(cards.first()).not.toHaveText(first);
   await expect(page.getByRole('navigation', { name: 'products pagination' })).toContainText('Page 2 of');
   await page.setViewportSize({ width: 375, height: 812 });
-  await expect(cards).toHaveCount(6);
-  await expect(page.getByRole('navigation', { name: 'products pagination' })).toContainText('Page 2 of 2');
+  await expect(cards).toHaveCount(5);
+  await expect(page.getByRole('navigation', { name: 'products pagination' })).toContainText('Page 2 of 3');
   await page.getByRole('navigation', { name: 'products pagination' }).getByRole('button', { name: 'Previous', exact: true }).click();
-  await expect(cards).toHaveCount(50);
+  await expect(cards).toHaveCount(5);
   await page.getByRole('navigation', { name: 'products pagination' }).getByRole('button', { name: 'Next', exact: true }).click();
-  await expect(cards).toHaveCount(6);
+  await expect(cards).toHaveCount(5);
+  await page.getByRole('navigation', { name: 'products pagination' }).getByRole('button', { name: 'Next', exact: true }).click();
+  await expect(cards).toHaveCount(1);
+  await expect(page.getByRole('navigation', { name: 'products pagination' })).toContainText('Page 3 of 3');
   await page.getByRole('button', { name: 'Offers', exact: true }).click();
   await expect(page.getByText('No products match your search and filters')).toBeVisible();
   await expect(cards).toHaveCount(0);
   await page.getByRole('group', { name: 'Product filters' }).getByRole('button', { name: 'Offers', exact: true }).click();
-  await expect(cards).toHaveCount(50);
-  await expect(page.getByRole('navigation', { name: 'products pagination' })).toContainText('Page 1 of 2');
+  await expect(cards).toHaveCount(5);
+  await expect(page.getByRole('navigation', { name: 'products pagination' })).toContainText('Page 1 of 3');
 });
 
 test('modern search and filter sheets support keyboard, draft changes, previews and cancel', async ({ page, storefront }) => {

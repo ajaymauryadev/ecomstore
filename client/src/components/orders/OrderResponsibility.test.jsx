@@ -46,7 +46,7 @@ describe('Order responsibility', () => {
     await user.click(screen.getByRole('button', { name: 'Next staff' }));
     await user.selectOptions(screen.getByRole('combobox'), 'packer');
     await user.type(screen.getByRole('textbox'), 'Second');
-    await waitFor(() => expect(roster).toHaveBeenLastCalledWith({ page: 1, limit: 25, search: 'Second' }));
+    await waitFor(() => expect(roster).toHaveBeenLastCalledWith({ page: 1, limit: 5, search: 'Second' }));
     expect(screen.getByRole('combobox')).toHaveValue('packer');
     await user.click(screen.getByRole('button', { name: 'Assign' }));
     expect(save).toHaveBeenLastCalledWith('packer');

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useGetSupplierReconciliationQuery } from '../../features/suppliers/supplierApi';
 import { ROUTES } from '../../constants/routes';
+import { PAGE_SIZE } from '../../constants/pagination';
 import { formatCurrency } from '../../utils/formatters';
 import Button from '../ui/Button';
 import Modal from '../ui/Modal';
@@ -14,7 +15,7 @@ const fields = [
 
 export default function SupplierReconciliationDialog({ onClose }) {
   const [page, setPage] = useState(1);
-  const { currentData, isFetching, error } = useGetSupplierReconciliationQuery({ page });
+  const { currentData, isFetching, error } = useGetSupplierReconciliationQuery({ page, limit: PAGE_SIZE });
   const rows = currentData?.data ?? [];
   const meta = currentData?.meta;
 

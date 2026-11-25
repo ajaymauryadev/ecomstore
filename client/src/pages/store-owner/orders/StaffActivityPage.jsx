@@ -30,7 +30,7 @@ const ACTION_META = {
 const TABS = ['Activity Log', 'Missing Report', 'High-Value Alerts'];
 
 function ActivityLog() {
-  const [filters, setFilters] = useState({ page: 1, limit: 25, highValueOnly: false });
+  const [filters, setFilters] = useState({ highValueOnly: false });
   const [showFilters, setShowFilters] = useState(false);
   const paging = usePagination(JSON.stringify({ ...filters, page: undefined, limit: undefined }));
   const { data, isLoading, isFetching } = useGetStaffActivityLogsQuery({ ...filters, page: paging.page, limit: paging.limit });

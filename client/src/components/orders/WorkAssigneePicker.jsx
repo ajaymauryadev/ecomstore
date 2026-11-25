@@ -5,6 +5,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { actorLabel } from '../../utils/orderResponsibility';
 import Button from '../ui/Button';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
+import { PAGE_SIZE } from '../../constants/pagination';
 
 export default function WorkAssigneePicker({ kind, current, snapshot, onSave, saving, disabled, draft = false }) {
   const { user } = useAuth();
@@ -19,7 +20,7 @@ export default function WorkAssigneePicker({ kind, current, snapshot, onSave, sa
     setSelected(currentId ? { ...(typeof current === 'object' ? current : snapshot), _id: currentId } : null);
   }, [current, snapshot, currentId]);
   const settledSearch = useDebouncedValue(search.trim());
-  const { data, isFetching, isError, refetch } = useGetStaffQuery({ page, limit: 25, search: settledSearch || undefined });
+  const { data, isFetching, isError, refetch } = useGetStaffQuery({ page, limit: PAGE_SIZE, search: settledSearch || undefined });
   const permission = kind === 'packing' ? PERMISSIONS.PACKING_PERFORM : PERMISSIONS.DELIVERY_UPDATE;
   const term = search.trim().toLowerCase();
   const candidates = [user, ...(data?.data || [])].filter((member) => member && member.isActive !== false && hasPermission(member, permission)

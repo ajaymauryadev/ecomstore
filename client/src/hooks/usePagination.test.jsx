@@ -1,13 +1,21 @@
 import { act, renderHook } from '@testing-library/react';
 import { expect, test } from 'vitest';
-import { pageCapacity, useClientPagination, usePagination } from './usePagination';
+import { usePageSize, useClientPagination, usePagination } from './usePagination';
 
-test('capacity fits smaller screens and grows with available list space', () => {
-  expect(pageCapacity({ width: 360, height: 700, mode: 'products' })).toBe(1);
-  expect(pageCapacity({ width: 1200, height: 1000, mode: 'products' })).toBe(4);
-  expect(pageCapacity({ width: 1200, height: 1200, mode: 'compact' })).toBeGreaterThan(pageCapacity({ width: 1200, height: 700, mode: 'compact' }));
+test.each(['rows', 'compact', 'cards', 'products', 'storefront'])('uses five items for %s on every device', (mode) => {
+  const { result } = renderHook(() => usePageSize(mode));
+  const original = { width: window.innerWidth, height: window.innerHeight };
+  try {
+    for (const [width, height] of [[320, 568], [768, 1024], [1440, 900], [2560, 1440]]) {
+      act(() => { window.innerWidth = width; window.innerHeight = height; window.dispatchEvent(new Event('resize')); });
+      expect(result.current.limit).toBe(5);
+    }
+  } finally {
+    window.innerWidth = original.width;
+    window.innerHeight = original.height;
+  }
 });
-test('filter and viewport changes reset to the first page', () => {
+test('filter changes reset the page while viewport changes preserve it', () => {
   const { result, rerender } = renderHook(({ scope }) => usePagination(scope), { initialProps: { scope: 'all' } });
   act(() => result.current.setPage(4));
   expect(result.current.page).toBe(4);
@@ -16,7 +24,7 @@ test('filter and viewport changes reset to the first page', () => {
   act(() => result.current.setPage(3));
   const original = window.innerHeight;
   act(() => { window.innerHeight = 1400; window.dispatchEvent(new Event('resize')); });
-  expect(result.current.page).toBe(1);
+  expect(result.current.page).toBe(3);
   act(() => { window.innerHeight = original; window.dispatchEvent(new Event('resize')); });
 });
 test('every record remains reachable and deleting the last page clamps the local list', () => {

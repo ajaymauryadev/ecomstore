@@ -1,38 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
+import { PAGE_SIZE } from '../constants/pagination';
 
-export function pageCapacity({ width, height, top = 320, mode = 'rows', gridColumns }) {
-  // Customers browse a scrolling catalog, rather than one screen of products.
-  if (mode === 'storefront') return 50;
-  const available = Math.max(120, height - Math.max(0, top) - 88);
-  const cards = ['cards', 'products'].includes(mode);
-  const columns = gridColumns || (cards ? Math.max(1, Math.min(mode === 'products' ? 4 : 3, Math.floor((width + 16) / (mode === 'products' ? 270 : 300)))) : 1);
-  const rowHeight = cards ? (mode === 'products' ? 420 : 260) : width < 640 ? 190 : mode === 'compact' ? 56 : 90;
-  return Math.max(columns, Math.min(50, Math.floor(available / rowHeight) * columns));
-}
-
-// Measure the actual list when a ref is attached; otherwise use the workspace width.
-export function usePageSize(mode = 'rows') {
+// Every list uses the same page size, regardless of layout or viewport.
+export function usePageSize() {
   const contentRef = useRef(null);
-  const [size, setSize] = useState(() => pageCapacity({ width: typeof window === 'undefined' ? 1000 : Math.max(320, window.innerWidth - (window.innerWidth >= 1024 ? 304 : 32)), height: typeof window === 'undefined' ? 800 : window.innerHeight, mode }));
-  useEffect(() => {
-    const measure = () => {
-      const element = contentRef.current;
-      const main = element || document.querySelector('main');
-      const rect = main?.getBoundingClientRect();
-      // Scroll position must not alter capacity when a resize happens mid-page.
-      const top = element ? Math.min(450, Math.max(120, rect.top + window.scrollY)) : 320;
-      const template = element ? window.getComputedStyle(element).gridTemplateColumns : '';
-      const gridColumns = template && template !== 'none' ? template.split(' ').filter(Boolean).length : undefined;
-      setSize(pageCapacity({ width: rect?.width || window.innerWidth - 32, height: window.innerHeight, top, mode, gridColumns }));
-    };
-    measure();
-    window.addEventListener('resize', measure);
-    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
-    const main = document.querySelector('main');
-    if (main) observer?.observe(main);
-    return () => { window.removeEventListener('resize', measure); observer?.disconnect(); };
-  }, [mode]);
-  return { limit: size, contentRef };
+  return { limit: PAGE_SIZE, contentRef };
 }
 
 export function usePageState(limit) {

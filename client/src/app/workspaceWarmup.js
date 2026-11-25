@@ -3,6 +3,7 @@ import { useSelector, useStore } from 'react-redux';
 import { hasPermission, PERMISSIONS } from '../constants/permissions';
 import { selectSessionEpoch } from '../features/auth/authSlice';
 import { POS_CATALOG_PARAMS } from '../features/pos/catalog';
+import { PAGE_SIZE } from '../constants/pagination';
 
 export const loadPOS = () => import('../pages/store-owner/pos/POSPage');
 export const loadProducts = () => import('../pages/store-owner/products/ProductList');
@@ -34,14 +35,14 @@ export function useWorkspaceWarmup() {
       if (hasPermission(user, PERMISSIONS.PRODUCTS_VIEW)) {
         void loadProducts().catch(() => {});
         void import('../features/products/productApi').then(({ productApi }) => {
-          if (active()) store.dispatch(productApi.util.prefetch('getProducts', { page: 1, limit: 20 }, { ifOlderThan: 30 }));
+          if (active()) store.dispatch(productApi.util.prefetch('getProducts', { page: 1, limit: PAGE_SIZE }, { ifOlderThan: 30 }));
         }).catch(() => {});
       }
       if (slug && hasPermission(user, PERMISSIONS.ORDERS_VIEW)) {
         void (owner ? loadOwnerOrders() : loadStaffOrders()).catch(() => {});
         void import('../features/orders/orderApi').then(({ orderApi }) => {
           if (active()) store.dispatch(orderApi.util.prefetch('getAdminOrders', {
-            slug, ...(owner && { status: '' }), page: 1, limit: 20,
+            slug, ...(owner && { status: '' }), page: 1, limit: PAGE_SIZE,
           }, { ifOlderThan: 30 }));
         }).catch(() => {});
       }
