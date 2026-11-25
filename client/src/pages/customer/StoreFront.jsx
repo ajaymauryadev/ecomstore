@@ -260,7 +260,7 @@ function ProductResults({ storeSlug, filters, title, onReset, hasFilters }) {
         <div ref={paging.contentRef} className={cn('grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3', isFetching && 'opacity-80')}>
           {products.map((product) => <ProductCard key={product._id} product={product} />)}
         </div>
-        <Pagination meta={meta} page={paging.page} onPageChange={paging.setPage} isFetching={isFetching} label="products" />
+        <Pagination meta={meta} page={paging.page} onPageChange={paging.setPage} isFetching={isFetching} label="products" hideOnSinglePage />
       </>}
     </section>
   );

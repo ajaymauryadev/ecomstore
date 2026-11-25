@@ -1,13 +1,13 @@
 import { useEffect } from 'react';
 import Button from './Button';
 
-export default function Pagination({ meta, page, onPageChange, isFetching = false, label = 'records' }) {
+export default function Pagination({ meta, page, onPageChange, isFetching = false, label = 'records', hideOnSinglePage = false }) {
   const total = meta?.total ?? 0;
   const pages = meta?.totalPages ?? 0;
   useEffect(() => {
     if (!isFetching && meta && page > Math.max(1, pages)) onPageChange(Math.max(1, pages));
   }, [page, pages, isFetching, meta, onPageChange]);
-  if (!meta || !total) return null;
+  if (!meta || !total || (hideOnSinglePage && pages <= 1)) return null;
   const limit = meta.limit || Math.ceil(total / (pages || 1));
   return <nav aria-label={`${label} pagination`} className="flex flex-wrap items-center justify-between gap-3 py-3">
     <p role="status" className="text-xs text-slate-500">{Math.min(total, (page - 1) * limit + 1)}–{Math.min(total, page * limit)} of {total} {label} · Page {page} of {Math.max(1, pages)}</p>

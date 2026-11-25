@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 
 export function pageCapacity({ width, height, top = 320, mode = 'rows', gridColumns }) {
+  // Customers browse a scrolling catalog, rather than one screen of products.
+  if (mode === 'storefront') return 50;
   const available = Math.max(120, height - Math.max(0, top) - 88);
-  const cards = ['cards', 'products', 'storefront'].includes(mode);
-  const columns = gridColumns || (mode === 'storefront' ? (width < 640 ? 2 : width < 768 ? 3 : 4) : cards ? Math.max(1, Math.min(mode === 'products' ? 4 : 3, Math.floor((width + 16) / (mode === 'products' ? 270 : 300)))) : 1);
-  const rowHeight = cards ? (mode === 'products' ? 420 : mode === 'storefront' ? 360 : 260) : width < 640 ? 190 : mode === 'compact' ? 56 : 90;
+  const cards = ['cards', 'products'].includes(mode);
+  const columns = gridColumns || (cards ? Math.max(1, Math.min(mode === 'products' ? 4 : 3, Math.floor((width + 16) / (mode === 'products' ? 270 : 300)))) : 1);
+  const rowHeight = cards ? (mode === 'products' ? 420 : 260) : width < 640 ? 190 : mode === 'compact' ? 56 : 90;
   return Math.max(columns, Math.min(50, Math.floor(available / rowHeight) * columns));
 }
 

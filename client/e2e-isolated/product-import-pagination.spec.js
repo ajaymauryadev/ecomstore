@@ -49,7 +49,7 @@ test('owner downloads, previews and imports Excel, then pages products on deskto
   expect(errors).toEqual([]);
 });
 
-test('storefront pages stay bounded and filters reset to page one', async ({ page, storefront }) => {
+test('small storefront catalogs show every product without pagination on mobile and desktop', async ({ page, storefront }) => {
   const { store } = await storefront.seedStore('paged-storefront');
   await storefront.Product.create(Array.from({ length: 18 }, (_, index) => ({
     tenantId: store._id, name: `Browse ${String(index).padStart(2, '0')}`,
@@ -59,13 +59,15 @@ test('storefront pages stay bounded and filters reset to page one', async ({ pag
   await page.goto(storefront.origin + '/s/paged-storefront');
   const results = page.getByRole('region', { name: 'Product results' });
   const nav = results.getByRole('navigation', { name: 'products pagination' });
-  await expect(nav).toContainText('Page 1 of');
-  const cards = results.locator('a').filter({ has: page.locator('h3') });
-  const count = await cards.count();
-  await nav.getByRole('button', { name: 'Next', exact: true }).click();
-  await expect(nav).toContainText('Page 2 of');
-  await expect.poll(() => cards.count()).toBe(count);
+  const cards = results.locator('.storefront-product');
+  await expect(cards).toHaveCount(19);
+  await expect(nav).toHaveCount(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await expect(cards).toHaveCount(19);
+  await expect(nav).toHaveCount(0);
   await page.getByRole('textbox', { name: 'Search store products' }).fill('Pickup Test Rice');
   await expect(results.getByRole('link', { name: 'Pickup Test Rice', exact: true })).toBeVisible();
-  await expect(nav).toContainText('Page 1 of 1');
+  await expect(cards).toHaveCount(1);
+  await expect(nav).toHaveCount(0);
 });
