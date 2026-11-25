@@ -5,6 +5,25 @@ one combined service. The browser uses `/api/v1` and same-origin Socket.IO, so
 there is one HTTPS address for cookies, API calls, images and live updates.
 MongoDB and uploaded media stay outside the ephemeral application container.
 
+## Connected account status — 25 November 2026
+
+The connected Free team permits **Europe West (London)** and **US Central**.
+India and Singapore are disabled behind a paid upgrade. London was selected.
+The creation form permits `nf-compute-20` (0.2 shared vCPU, 512 MB), one instance.
+Despite the public pricing page's "No card needed" statement, this account's
+service form requires card verification and says this service will not be
+charged. Complete verification yourself while keeping the team on Free.
+
+A service **draft**, not a created deployment, was prepared for `smart-kirana`
+using branch `codex/northflank-deploy`. Northflank loaded and verified this
+Dockerfile, detected public HTTP port 8080, and generated a provisional hostname.
+The draft contains production mode, that origin's CORS setting, ImageKit storage
+mode/folder, HTTP `/ready` and `/health` probes on 8080 (120-second initial delay),
+and a 30-second termination grace period. Database/media credentials and three
+independent signing secrets still need configuring. The generated address is
+**not a live website**. The form is not a saved service and may be lost on refresh;
+the repository settings below allow it to be recreated.
+
 ## Northflank dashboard settings
 
 1. Keep the team on **Free / Sandbox**. Choose Northflank Cloud. Check **All**
