@@ -1,8 +1,10 @@
 import { useEffect } from 'react';
 import { useSelector, useStore } from 'react-redux';
 import { hasPermission, PERMISSIONS } from '../constants/permissions';
-import { selectSessionEpoch } from '../features/auth/authSlice';
+import { selectSessionEpoch, selectCurrentUser } from '../features/auth/authSlice';
 import { POS_CATALOG_PARAMS } from '../features/pos/catalog';
+import { scheduleBackgroundTasks } from './backgroundTasks';
+import { prefetchQuery, queriesSettled } from './queryWarmup';
 import { PAGE_SIZE } from '../constants/pagination';
 
 export const loadPOS = () => import('../pages/store-owner/pos/POSPage');
@@ -13,46 +15,39 @@ export const loadStaffOrders = () => import('../pages/staff/OperationalOrdersPag
 export function useWorkspaceWarmup() {
   const store = useStore();
   const epoch = useSelector(selectSessionEpoch);
+  const user = useSelector(selectCurrentUser);
+  const authenticated = useSelector((state) => Boolean(state.auth.accessToken));
 
   useEffect(() => {
-    const { user, accessToken } = store.getState().auth;
-    const connection = navigator.connection;
-    if (!accessToken || !['store_owner', 'staff', 'packer'].includes(user?.role) ||
-        connection?.saveData || ['slow-2g', '2g'].includes(connection?.effectiveType)) return;
+    if (!authenticated || !['store_owner', 'staff', 'packer'].includes(user?.role)) return;
     let disposed = false;
     const active = () => !disposed && selectSessionEpoch(store.getState()) === epoch;
-
-    const warm = () => {
-      if (!active() || document.visibilityState === 'hidden') return;
-      const owner = user.role === 'store_owner';
-      const slug = store.getState().auth.store?.slug;
-      if (hasPermission(user, PERMISSIONS.POS_ACCESS)) {
-        void loadPOS().catch(() => {});
-        void import('../features/products/productApi').then(({ productApi }) => {
-          if (active()) store.dispatch(productApi.util.prefetch('getProducts', POS_CATALOG_PARAMS, { ifOlderThan: 30 }));
-        }).catch(() => {});
-      }
-      if (hasPermission(user, PERMISSIONS.PRODUCTS_VIEW)) {
-        void loadProducts().catch(() => {});
-        void import('../features/products/productApi').then(({ productApi }) => {
-          if (active()) store.dispatch(productApi.util.prefetch('getProducts', { page: 1, limit: PAGE_SIZE }, { ifOlderThan: 30 }));
-        }).catch(() => {});
-      }
-      if (slug && hasPermission(user, PERMISSIONS.ORDERS_VIEW)) {
-        void (owner ? loadOwnerOrders() : loadStaffOrders()).catch(() => {});
-        void import('../features/orders/orderApi').then(({ orderApi }) => {
-          if (active()) store.dispatch(orderApi.util.prefetch('getAdminOrders', {
-            slug, ...(owner && { status: '' }), page: 1, limit: PAGE_SIZE,
-          }, { ifOlderThan: 30 }));
-        }).catch(() => {});
-      }
-    };
-    const idle = typeof window.requestIdleCallback === 'function';
-    const scheduled = idle ? window.requestIdleCallback(warm, { timeout: 2000 }) : window.setTimeout(warm, 350);
-    return () => {
-      disposed = true;
-      if (idle) window.cancelIdleCallback(scheduled);
-      else window.clearTimeout(scheduled);
-    };
-  }, [epoch, store]);
+    const owner = user.role === 'store_owner';
+    const slug = store.getState().auth.store?.slug;
+    const tasks = [];
+    if (hasPermission(user, PERMISSIONS.POS_ACCESS)) {
+      tasks.push(loadPOS, async () => {
+        await import('../features/products/productApi');
+        if (active()) return prefetchQuery(store, 'getProducts', POS_CATALOG_PARAMS);
+      });
+    }
+    if (hasPermission(user, PERMISSIONS.PRODUCTS_VIEW)) {
+      tasks.push(loadProducts, async () => {
+        await import('../features/products/productApi');
+        if (active()) return prefetchQuery(store, 'getProducts', { page: 1, limit: PAGE_SIZE });
+      });
+    }
+    if (slug && hasPermission(user, PERMISSIONS.ORDERS_VIEW)) {
+      tasks.push(owner ? loadOwnerOrders : loadStaffOrders, async () => {
+        await import('../features/orders/orderApi');
+        if (active()) return prefetchQuery(store, 'getAdminOrders', {
+          slug, ...(owner && { status: '' }), page: 1, limit: PAGE_SIZE,
+        });
+      });
+    }
+    const cancel = scheduleBackgroundTasks(tasks, {
+      isCurrent: active, isReady: () => queriesSettled(store),
+    });
+    return () => { disposed = true; cancel(); };
+  }, [epoch, store, user, authenticated]);
 }

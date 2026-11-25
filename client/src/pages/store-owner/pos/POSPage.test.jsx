@@ -3,6 +3,7 @@ import { beforeEach, expect, test, vi } from 'vitest';
 import POSPage from './POSPage';
 
 const { createOrder, getProducts, getAccounts } = vi.hoisted(() => ({ createOrder: vi.fn(), getProducts: vi.fn(), getAccounts: vi.fn() }));
+vi.mock('../../../hooks/useNextPagePrefetch', () => ({ useNextPagePrefetch: vi.fn() }));
 
 vi.mock('../../../hooks/useAuth', () => ({
   useAuth: () => ({ store: { _id: 'shop' }, user: { _id: 'cashier' } }),

@@ -1,5 +1,6 @@
+import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
 import Pagination from '../../../components/ui/Pagination';
-import { usePageSize, usePageState } from '../../../hooks/usePagination';
+import { usePagination } from '../../../hooks/usePagination';
 import { useState } from 'react';
 import { Plus, Search, TrendingDown, CreditCard, Clock, CheckCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -23,10 +24,10 @@ function formatDate(str) {
 export default function PurchaseList() {
   const [search, setSearch] = useState('');
   const [paymentStatus, setPaymentStatus] = useState('');
-  const { limit } = usePageSize('compact');
-  const [page, setPage] = usePageState(limit);
+  const settledSearch = useDebouncedValue(search.trim(), 250);
+  const { page, setPage, limit } = usePagination(JSON.stringify([settledSearch, paymentStatus]), 'compact');
 
-  const { data, isLoading, isFetching } = useGetPurchasesQuery({ search, paymentStatus, page, limit });
+  const { data, isLoading, isFetching } = useGetPurchasesQuery({ search: settledSearch, paymentStatus, page, limit });
   const { data: statsData } = useGetPurchaseStatsQuery({});
 
   const purchases = data?.data?.purchases || [];
@@ -71,7 +72,7 @@ export default function PurchaseList() {
             type="text"
             placeholder="Search invoice, supplier..."
             value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+            onChange={(e) => { setSearch(e.target.value); }}
             className="input pl-8 w-full"
           />
         </div>

@@ -81,12 +81,16 @@ export const getProducts = asyncHandler(async (req, res) => {
   };
   const sort = sortMap[req.query.sortBy] || { updatedAt: -1 };
 
+  const productQuery = Product.find(filter).sort({ ...sort, _id: 1 }).skip(skip).limit(limit);
+  if (req.query.view === 'pos') {
+    // Billing needs selling prices and stock, not category joins, purchase costs
+    // or hydrated Mongoose virtuals.
+    productQuery.select('name brand tags images isActive variants._id variants.name variants.unit variants.retailPrice variants.offerPrice variants.stock variants.isActive variants.sku variants.barcode').lean();
+  } else {
+    productQuery.populate('categoryId', 'name emoji');
+  }
   const [products, total] = await Promise.all([
-    Product.find(filter)
-      .sort({ ...sort, _id: 1 })
-      .skip(skip)
-      .limit(limit)
-      .populate('categoryId', 'name emoji'),
+    productQuery,
     Product.countDocuments(filter),
   ]);
 

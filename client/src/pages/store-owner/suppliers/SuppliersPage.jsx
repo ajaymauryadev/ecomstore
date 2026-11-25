@@ -1,3 +1,4 @@
+import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
 import { usePagination } from '../../../hooks/usePagination';
 import Pagination from '../../../components/ui/Pagination';
 import { useRef, useState } from 'react';
@@ -92,6 +93,7 @@ function SupplierCard({ supplier, onEdit, onDelete, onPayment }) {
 
 export default function SuppliersPage() {
   const [search, setSearch] = useState('');
+  const settledSearch = useDebouncedValue(search.trim(), 250);
   const supplierNameInput = useRef(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -99,8 +101,8 @@ export default function SuppliersPage() {
   const [paymentTarget, setPaymentTarget] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
 
-  const paging = usePagination(search, 'cards');
-  const { data, isLoading, isFetching } = useGetSuppliersQuery({ search, page: paging.page, limit: paging.limit });
+  const paging = usePagination(settledSearch, 'cards');
+  const { data, isLoading, isFetching } = useGetSuppliersQuery({ search: settledSearch, page: paging.page, limit: paging.limit });
   const [createSupplier, { isLoading: isCreating }] = useCreateSupplierMutation();
   const [updateSupplier, { isLoading: isUpdating }] = useUpdateSupplierMutation();
   const [deleteSupplier, { isLoading: isDeleting }] = useDeleteSupplierMutation();

@@ -154,6 +154,9 @@ productSchema.index({ tenantId: 1, 'variants.sku': 1 });
 // entire tenant's catalog before returning its first 20–24 products.
 productSchema.index({ tenantId: 1, updatedAt: -1 }, { name: 'catalog_recent' });
 productSchema.index({ tenantId: 1, isActive: 1, name: 1 }, { name: 'catalog_counter' });
+// Include the actual tie-breaker used by paginated product queries.
+productSchema.index({ tenantId: 1, updatedAt: -1, _id: 1 }, { name: 'catalog_recent_page' });
+productSchema.index({ tenantId: 1, isActive: 1, name: 1, _id: 1 }, { name: 'catalog_counter_page' });
 productSchema.index(
   { tenantId: 1, isActive: 1, isOnline: 1, isFeatured: -1, updatedAt: -1, _id: 1 },
   { name: 'catalog_storefront' }

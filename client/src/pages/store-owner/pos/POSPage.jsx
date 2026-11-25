@@ -18,6 +18,7 @@ import CounterCatalog from '../../../components/products/CounterCatalog';
 import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
 import { POS_CATALOG_PARAMS, EMPTY_PRODUCTS, mergeCatalog } from '../../../features/pos/catalog';
 import WorkAssigneePicker from '../../../components/orders/WorkAssigneePicker';
+import { useNextPagePrefetch } from '../../../hooks/useNextPagePrefetch';
 
 function displayedLineTotal(item) {
   const lineTotal = +(item.price * item.qty).toFixed(2);
@@ -29,14 +30,14 @@ const CartRow = memo(function CartRow({ item, onQty, onRemove, onDiscount, onSet
 
   return (
     <div className="card pos-cart-item p-3 sm:p-4">
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <div className="min-w-0 basis-[calc(100%_-_7rem)] sm:basis-auto sm:flex-1">
+      <div className="pos-cart-main">
+        <div className="pos-cart-description min-w-0">
           <p className="text-sm font-semibold text-slate-200 break-words">{item.name}</p>
           <p className="text-xs text-slate-500">
             {item.variantName} · ₹{item.price} each
           </p>
         </div>
-        <div className="order-2 flex shrink-0 items-center gap-1 sm:order-none">
+        <div className="pos-cart-quantity flex shrink-0 items-center gap-1">
           <button type="button" disabled={item.qty <= 1} aria-label={`Decrease quantity of ${item.name} ${item.variantName}`} onClick={() => onQty(item.id, -1)} className="workspace-row-action bg-navy-700 text-slate-300">
             <Minus size={12} />
           </button>
@@ -48,15 +49,15 @@ const CartRow = memo(function CartRow({ item, onQty, onRemove, onDiscount, onSet
             <Plus size={12} />
           </button>
         </div>
-        <div className="text-right shrink-0 min-w-[64px]">
+        <div className="pos-cart-amount text-right shrink-0 min-w-[64px]">
           <p className="text-sm font-semibold text-slate-100 tabular-nums">₹{displayedLineTotal(item).toFixed(2)}</p>
           {item.discount > 0 && <p className="text-[10px] text-emerald-400">-{item.discount}%</p>}
         </div>
-        <button type="button" aria-label={`Remove ${item.name}`} onClick={() => onRemove(item.id)} className="workspace-row-action order-2 ml-auto text-red-400 sm:order-none sm:ml-0">
+        <button type="button" aria-label={`Remove ${item.name}`} onClick={() => onRemove(item.id)} className="workspace-row-action pos-cart-remove text-red-400">
           <Trash2 size={14} />
         </button>
       </div>
-      {item.qty >= Math.min(item.maxStock, 1000) && <p className="mt-2 text-xs text-amber-600">{item.maxStock <= 1000 ? 'Available stock reached.' : 'You can add up to 1,000 of this pack per bill.'}</p>}
+      {item.qty >= Math.min(item.maxStock, 1000) && <p className="pos-stock-note mt-2 text-xs text-amber-600">{item.maxStock <= 1000 ? 'Available stock reached.' : 'You can add up to 1,000 of this pack per bill.'}</p>}
       <label className="pos-item-discount mt-1.5 flex items-center gap-2 text-xs text-slate-500">
         Discount %
         <input type="number" inputMode="decimal" aria-label={`Discount percentage for ${item.name}`} min="0" max="100"
@@ -102,15 +103,19 @@ export default function POSPage() {
   const retrySeconds = useRetryCountdown(retryAt);
   const draftLocked = submitting || Boolean(retryAt);
 
-  const catalogQuery = useGetProductsQuery({ ...POS_CATALOG_PARAMS, limit: catalogLimit, ...(catalogPage > 1 && { page: catalogPage }) });
+  const catalogArgs = { ...POS_CATALOG_PARAMS, limit: catalogLimit, ...(!search.trim() && catalogPage > 1 && { page: catalogPage }) };
+  const searchArgs = { ...POS_CATALOG_PARAMS, search: debouncedSearch, limit: catalogLimit, page: catalogPage };
+  const catalogQuery = useGetProductsQuery(catalogArgs);
   const searchQuery = useGetProductsQuery(
-    { search: debouncedSearch, isActive: true, limit: catalogLimit, page: catalogPage, sortBy: 'name' },
+    searchArgs,
     { skip: !debouncedSearch }
   );
   const remote = debouncedSearch && debouncedSearch === deferredSearch ? searchQuery.currentData?.data ?? EMPTY_PRODUCTS : EMPTY_PRODUCTS;
   const products = useMemo(() => mergeCatalog(catalogQuery.currentData?.data ?? EMPTY_PRODUCTS, remote, deferredSearch),
     [catalogQuery.currentData, remote, deferredSearch]);
   const activeQuery = search.trim() ? searchQuery : catalogQuery;
+  useNextPagePrefetch('getProducts', search.trim() ? searchArgs : catalogArgs, activeQuery.currentData?.meta,
+    { skip: activeQuery.isFetching || search.trim() !== debouncedSearch });
   const { error: searchError, refetch: retrySearch, isFetching: searching } = activeQuery;
   const searchRetrySeconds = useRetryCountdown(searchError?.data?.retryAt);
   const searchPending = search.trim() !== debouncedSearch || searching;
@@ -286,9 +291,10 @@ export default function POSPage() {
 
   return (
     <div className="pos-workspace">
+      <div className="pos-content" role="region" aria-label="Sale items and payment" tabIndex={0}>
 <header className="page-header"><div><h1>Point of sale</h1><p className="text-sm text-slate-500 mt-1">Select items, choose payment and create the bill.</p></div></header>
       <p className="sr-only" aria-live="polite">{announcement}</p>
-      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,23rem)]">
+      <div className="pos-layout grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,23rem)]">
       {/* Left: Search + results */}
       <fieldset className="pos-items flex flex-col gap-3 min-w-0" disabled={draftLocked} aria-label="Bill items">
         {/* Search bar */}
@@ -315,7 +321,7 @@ export default function POSPage() {
           )}
           </div>
         </div>
-        <a href="#pos-payment" className="workspace-link pos-mobile-summary">View bill and payment · ₹{grandTotal.toFixed(2)}</a>
+        <a href={cart.length ? '#pos-bill' : '#pos-payment'} className="workspace-link pos-mobile-summary">View bill · ₹{grandTotal.toFixed(2)}</a>
 
         <section className="pos-catalog-section space-y-3" aria-label="Choose items">
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -344,7 +350,7 @@ export default function POSPage() {
 
         {/* Cart */}
         {cart.length > 0 && (
-          <div className="pos-cart-section space-y-2">
+          <div id="pos-bill" className="pos-cart-section space-y-2" tabIndex={-1}>
             <h2 className="text-base font-bold">
               Bill Items ({cart.length})
             </h2>
@@ -372,18 +378,18 @@ export default function POSPage() {
         )}
       </fieldset>
 
-      {/* Right: only overflowing content scrolls; checkout stays outside it. */}
+      {/* Mobile uses one content scroller; checkout has its own layout space. */}
       <aside className="pos-summary" aria-label="Bill and payment">
         <div className="pos-summary-scroll">
         <fieldset className="pos-summary-details" disabled={draftLocked} aria-label="Bill details">
           <section className="card pos-summary-card" aria-labelledby="receipt-preview">
-            <h2 id="receipt-preview" className="text-base font-bold">Receipt preview</h2>
-            {cart.length > 0 ? <ul className="pos-receipt-lines text-sm" aria-label="Receipt items">
+            <h2 id="receipt-preview" className="text-base font-bold">Bill summary</h2>
+            {cart.length > 0 ? <details className="pos-receipt-details"><summary>View receipt items ({cart.length})</summary><ul className="pos-receipt-lines text-sm" aria-label="Receipt items">
               {cart.map((item) => <li key={item.id} className="flex items-start justify-between gap-3">
                 <span className="min-w-0 break-words text-slate-400">{item.qty} × {item.name} · {item.variantName}</span>
                 <span className="shrink-0 tabular-nums">₹{displayedLineTotal(item).toFixed(2)}</span>
               </li>)}
-            </ul> : <p className="text-sm text-slate-500">Items appear here as you add them.</p>}
+            </ul></details> : <p className="text-sm text-slate-500">Items appear here as you add them.</p>}
             <div className="flex justify-between text-sm text-slate-400"><span>Subtotal</span><span>₹{subtotal.toFixed(2)}</span></div>
             <label className="pos-bill-discount flex items-center justify-between gap-2 text-sm text-slate-400">
               Discount ₹
@@ -467,6 +473,9 @@ export default function POSPage() {
           </section>
         </fieldset>
         </div>
+      </aside>
+      </div>
+      </div>
         <div className="pos-checkout">
           {isSplit && <div className="flex justify-between gap-2 text-sm"><span className="text-slate-500">Receiving now</span><strong>₹{((cashMinor + upiMinor) / 100).toFixed(2)}</strong></div>}
           <div className="flex justify-between gap-2 text-sm"><span className="text-slate-500">Amount to {isUdhar ? 'add to Udhar' : 'collect'}</span><strong>₹{(isUdhar ? pendingAmount : grandTotal).toFixed(2)}</strong></div>
@@ -475,11 +484,9 @@ export default function POSPage() {
           <a href="#pos-payment" className="workspace-link pos-payment-link">Payment <span className="font-normal text-slate-400">{PAYMENT_OPTIONS.find((option) => option.value === paymentMethod).label}</span></a>
           <button disabled={(!cart.length && !retryPending) || submitting || retrySeconds > 0} onClick={handleSubmit} className="btn-primary w-full min-h-12 text-base tabular-nums">
             {submitting ? <div role="status" aria-label="Saving bill" className="w-5 h-5 border-2 border-navy-700/30 border-t-navy-700 rounded-full animate-spin" />
-              : <><CheckCircle2 size={18} />{retrySeconds > 0 ? `Retry bill in ${retrySeconds}s` : retryPending ? 'Retry original bill' : isUdhar ? 'Create Udhar Bill' : 'Collect Payment'}{!retryPending && grandTotal > 0 && ` · ₹${grandTotal.toFixed(2)}`}</>}
+              : <><CheckCircle2 size={18} /><span>{retrySeconds > 0 ? `Retry bill in ${retrySeconds}s` : retryPending ? 'Retry original bill' : isUdhar ? 'Create Udhar Bill' : 'Collect Payment'}{!retryPending && grandTotal > 0 && <span className="pos-checkout-button-total"> · ₹{grandTotal.toFixed(2)}</span>}</span></>}
           </button>
         </div>
-      </aside>
-      </div>
 
       {/* Bill modal */}
       {billOrder && (

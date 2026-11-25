@@ -1,3 +1,4 @@
+import { useNextPagePrefetch } from '../../hooks/useNextPagePrefetch';
 import { usePagination } from '../../hooks/usePagination';
 import Pagination from '../../components/ui/Pagination';
 import { useState, useEffect, useMemo } from 'react';
@@ -235,7 +236,9 @@ function SkeletonCard() {
 /* ─── Main StoreFront ───────────────────────────────────── */
 function ProductResults({ storeSlug, filters, title, onReset, hasFilters }) {
   const paging = usePagination(JSON.stringify([storeSlug, filters]), 'storefront');
-  const { currentData, isFetching, isError, refetch } = useGetPublicProductsQuery({ slug: storeSlug, page: paging.page, limit: paging.limit, ...filters });
+  const args = { slug: storeSlug, page: paging.page, limit: paging.limit, ...filters };
+  const { currentData, isFetching, isError, refetch } = useGetPublicProductsQuery(args);
+  useNextPagePrefetch('getPublicProducts', args, currentData?.meta, { skip: isFetching || isError });
   const meta = currentData?.meta || {};
   const products = currentData?.data || [];
 

@@ -1,7 +1,7 @@
 import { PAGE_SIZE } from '../../constants/pagination';
 
 // RTK Query reuses this exact request on warmup.
-export const POS_CATALOG_PARAMS = Object.freeze({ isActive: true, limit: PAGE_SIZE, sortBy: 'name' });
+export const POS_CATALOG_PARAMS = Object.freeze({ isActive: true, limit: PAGE_SIZE, sortBy: 'name', view: 'pos' });
 export const EMPTY_PRODUCTS = Object.freeze([]);
 
 export function matchesProduct(product, search) {

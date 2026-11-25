@@ -7,7 +7,7 @@ import { MongoMemoryServer } from 'mongodb-memory-server';
 import Product from '../src/models/Product.js';
 
 process.env.MONGOMS_DOWNLOAD_IGNORE_MISSING_HEADER = 'true';
-const improvedIndexes = new Set(['catalog_recent', 'catalog_counter', 'catalog_storefront']);
+const improvedIndexes = new Set(['catalog_recent', 'catalog_counter', 'catalog_storefront', 'catalog_recent_page', 'catalog_counter_page']);
 const mongo = await MongoMemoryServer.create();
 try {
   await mongoose.connect(mongo.getUri(), { autoIndex: false });
@@ -32,8 +32,8 @@ try {
     await collection.createIndex(key, options);
   }
   const queries = [
-    { name: 'admin_recent', filter: { tenantId }, sort: { updatedAt: -1 } },
-    { name: 'counter_catalog', filter: { tenantId, isActive: true }, sort: { name: 1 } },
+    { name: 'admin_recent', filter: { tenantId }, sort: { updatedAt: -1, _id: 1 } },
+    { name: 'counter_catalog', filter: { tenantId, isActive: true }, sort: { name: 1, _id: 1 } },
     { name: 'storefront_default', filter: { tenantId, isActive: true, isOnline: true,
       variants: { $elemMatch: { isActive: true } } }, sort: { isFeatured: -1, updatedAt: -1, _id: 1 } },
   ];

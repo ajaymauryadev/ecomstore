@@ -100,7 +100,7 @@ test('POS exposes owner, employee and later packing assignment and opens the pen
   const order = (await response.json()).data.order;
   expect(order).toMatchObject({ status: 'accepted', assignedTo: String(employee._id), saleType: 'parcha' });
   await page.getByRole('link', { name: 'Open Pack Orders' }).click();
-  await expect(page.getByText('#' + order.orderNumber, { exact: true })).toBeVisible();
+  await expect(page.getByText(order.orderNumber, { exact: true })).toBeVisible();
   expect((await storefront.Order.findById(order._id)).deliveredAt).toBeUndefined();
 });
 

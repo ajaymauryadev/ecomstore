@@ -1,5 +1,6 @@
+import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
 import Pagination from '../../../components/ui/Pagination';
-import { usePageSize, usePageState } from '../../../hooks/usePagination';
+import { usePagination } from '../../../hooks/usePagination';
 import { useState } from 'react';
 import { Package, AlertTriangle, TrendingUp, DollarSign, Search, ArrowUpDown } from 'lucide-react';
 import { useGetInventoryDashboardQuery, useGetInventoryListQuery } from '../../../features/inventory/inventoryApi';
@@ -55,13 +56,13 @@ export default function InventoryDashboard() {
   const [search, setSearch] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [stockStatus, setStockStatus] = useState('');
-  const { limit } = usePageSize('compact');
-  const [page, setPage] = usePageState(limit);
+  const settledSearch = useDebouncedValue(search.trim(), 250);
+  const { page, setPage, limit } = usePagination(JSON.stringify([settledSearch, categoryId, stockStatus]), 'compact');
   const [adjustTarget, setAdjustTarget] = useState(null); // { product, variant }
 
   const { data: dashData, isLoading: dashLoading, isError: dashFailed, error: dashError, refetch: reloadDashboard } = useGetInventoryDashboardQuery();
   const { data: listData, isLoading: listLoading, isFetching, isError, error, refetch } = useGetInventoryListQuery({
-    search, categoryId, stockStatus, page, limit,
+    search: settledSearch, categoryId, stockStatus, page, limit,
   });
   const { data: catData } = useGetCategoriesQuery();
 
@@ -121,7 +122,7 @@ export default function InventoryDashboard() {
             placeholder="Search products..."
             aria-label="Search inventory"
             value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+            onChange={(e) => { setSearch(e.target.value); }}
             className="input pl-8 w-full"
           />
         </div>

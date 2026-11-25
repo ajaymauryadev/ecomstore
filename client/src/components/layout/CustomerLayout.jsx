@@ -1,3 +1,4 @@
+import { useNavigationPrefetch } from '../../hooks/useNavigationPrefetch';
 import { useState, useEffect } from 'react';
 import { Outlet, useParams, Link, useNavigate, useLocation, useMatch, Navigate } from 'react-router-dom';
 import RouteContent from './RouteContent';
@@ -136,6 +137,7 @@ function CartDrawer({ isOpen, onClose }) {
 
 /* ─── Main Layout ─────────────────────────────────── */
 export default function CustomerLayout() {
+  const prefetchHandlers = useNavigationPrefetch();
   const [search, setSearch] = useState('');
   const [searchEdited, setSearchEdited] = useState(false);
   const settledSearch = useDebouncedValue(search.trim(), 250);
@@ -225,7 +227,7 @@ export default function CustomerLayout() {
 
   return (
     <WorkspaceTheme.Provider value>
-      <div className="workspace-theme customer-layout flex flex-col overflow-hidden bg-navy-950">
+      <div className="workspace-theme customer-layout flex flex-col overflow-hidden bg-navy-950" {...prefetchHandlers}>
         <a href="#shop-content" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-2 focus:z-50 btn btn-primary">Skip to main content</a>
         {/* Sticky Header */}
         <header className="shrink-0 z-40 bg-navy-900 border-b border-navy-700/60">

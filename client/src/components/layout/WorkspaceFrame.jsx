@@ -1,3 +1,4 @@
+import { useNavigationPrefetch } from '../../hooks/useNavigationPrefetch';
 import { useCallback, useEffect, useState } from 'react';
 import { ChevronLeft, ChevronRight, MoreHorizontal, LogOut, Menu, Store } from 'lucide-react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
@@ -56,6 +57,7 @@ function Navigation({ sections, badges, compact, onNavigate, label, accordion = 
 }
 
 export default function WorkspaceFrame({ sections, accordionNavigation = false, user, store, logout, isLoggingOut, badges = {}, notifications, staffTabs = false, mobileItems = [] }) {
+  const prefetchHandlers = useNavigationPrefetch();
   const [compact, setCompact] = useState(false);
   const [drawer, setDrawer] = useState(false);
   const closeDrawer = useCallback(() => setDrawer(false), []);
@@ -88,7 +90,7 @@ export default function WorkspaceFrame({ sections, accordionNavigation = false, 
   );
   return (
     <WorkspaceTheme.Provider value>
-      <div className={"workspace-theme workspace-shell flex"}>
+      <div className={"workspace-theme workspace-shell flex"} {...prefetchHandlers}>
         <a href="#workspace-content" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-2 focus:z-50 btn btn-primary">Skip to main content</a>
         <aside className={cn('workspace-sidebar hidden shrink-0 flex-col border-r lg:flex', compact ? 'w-[4.5rem]' : accordionNavigation ? 'w-[17.5rem]' : 'w-60')}>
           <div className={cn('flex gap-3 border-b border-navy-700 p-4', compact ? 'flex-col items-center' : 'items-center')}>

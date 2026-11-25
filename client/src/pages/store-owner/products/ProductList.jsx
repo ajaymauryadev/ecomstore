@@ -22,6 +22,7 @@ import LoadError from '../../../components/ui/LoadError';
 import { cn } from '../../../utils/cn';
 import toast from 'react-hot-toast';
 import ProductImport from '../../../components/products/ProductImport';
+import { useNextPagePrefetch } from '../../../hooks/useNextPagePrefetch';
 
 const API_BASE = import.meta.env.VITE_API_URL?.replace('/api/v1', '') || '';
 
@@ -90,14 +91,16 @@ export default function ProductList() {
   const [page, setPage] = usePageState(limit);
   const [deleteTarget, setDeleteTarget] = useState(null);
 
-  const { data, isLoading, isFetching, isError, error, refetch } = useGetProductsQuery({
+  const productArgs = {
     page,
     limit,
     ...(search && { search }),
     ...(categoryId && { categoryId }),
     ...(isActive !== '' && { isActive }),
     ...(lowStock && { lowStock: 'true' }),
-  });
+  };
+  const { data, currentData, isLoading, isFetching, isError, error, refetch } = useGetProductsQuery(productArgs);
+  useNextPagePrefetch('getProducts', productArgs, currentData?.meta, { skip: isFetching });
 
   const { data: catData } = useGetCategoriesQuery(undefined, { skip: !canViewCategories });
   const [deleteProduct, { isLoading: isDeleting }] = useDeleteProductMutation();
