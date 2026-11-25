@@ -11,7 +11,7 @@ import { useAuth } from '../../hooks/useAuth';
 const moneyFormatter = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const money = (value) => moneyFormatter.format(Number(value) || 0);
 const paymentLabels = { counter: 'Cash', upi_id: 'UPI', credit: 'Udhar/Credit' };
-const statusLabels = { paid: 'Paid', pending: 'Payment pending', refunded: 'Refunded', partially_refunded: 'Partially refunded', failed: 'Payment failed' };
+const statusLabels = { paid: 'Paid', pending: 'Payment pending', partial: 'Partially paid', refunded: 'Refunded', partially_refunded: 'Partially refunded', failed: 'Payment failed' };
 
 export function ReceiptContent({ order, store, paper = 'a4' }) {
   const pricing = order.pricing ?? {};
@@ -23,8 +23,16 @@ export function ReceiptContent({ order, store, paper = 'a4' }) {
   const timeText = validDate ? date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone }) : '';
   const address = store?.address;
   const addressText = address && [address.street, address.city, address.state, address.pincode].filter(Boolean).join(', ');
-  const credit = order.paymentMethod === 'credit' && order.paymentStatus !== 'paid';
-  const status = credit ? 'On credit' : statusLabels[order.paymentStatus] || 'Recorded';
+  const credit = order.paymentMethod === 'credit' || order.udharAmount > 0;
+  const checkoutReceived = (order.checkoutPayments ?? []).reduce((sum, payment) => sum + Math.round((Number(payment.amount) || 0) * 100), 0) / 100;
+  const closed = ['cancelled', 'rejected'].includes(order.status) || order.paymentStatus === 'refunded';
+  const unpaidAtCheckout = Math.max(0, Math.round((Number(pricing.grandTotal) || 0) * 100) - Math.round(checkoutReceived * 100)) / 100;
+  const fallbackPending = order.paymentStatus === 'paid' ? 0 : order.udharAmount
+    ?? (credit || ['pending', 'partial'].includes(order.paymentStatus) ? unpaidAtCheckout : 0);
+  const pendingAmount = closed ? 0 : Math.max(0, Number(order.paymentSummary?.pending ?? order.settlement?.pending
+    ?? fallbackPending) || 0);
+  const paymentPending = pendingAmount > 0;
+  const status = paymentPending ? 'PAYMENT PENDING' : statusLabels[order.paymentStatus] || 'Recorded';
   return <article className="bill-receipt" data-paper={paper} aria-label="Sales receipt">
     <header className="bill-header">
       <div><h2>{store?.name || 'Smart Kirana'}</h2>
@@ -34,8 +42,14 @@ export function ReceiptContent({ order, store, paper = 'a4' }) {
           {store?.taxSettings?.gstNumber && <p>GSTIN: {store.taxSettings.gstNumber}</p>}
         </div>}
       </div>
-      <div className="bill-document-label"><strong>SALES RECEIPT</strong><span className={`bill-status${credit ? ' is-credit' : ''}`}>{status}</span></div>
+      <div className="bill-document-label"><strong>SALES RECEIPT</strong><span className={`bill-status${paymentPending ? ' is-credit' : ''}`}>{status}</span></div>
     </header>
+    {paymentPending && <section className="bill-pending" aria-label="Payment pending">
+      <div><strong className="bill-pending-title">PAYMENT PENDING / <span lang="hi">उधार बाकी</span></strong>
+        <p>{credit ? 'Balance added to Udhar. Please pay the pending amount.' : 'Please pay the pending amount.'}</p>
+      </div>
+      <div className="bill-pending-amount"><span>Amount still due</span><strong>{money(pendingAmount)}</strong></div>
+    </section>}
     <section className="bill-meta">
       <div><span className="bill-caption">Customer</span><strong>{customer.name || 'Walk-in Customer'}</strong>
         {customer.phone && <p>{customer.phone}</p>}
@@ -61,8 +75,10 @@ export function ReceiptContent({ order, store, paper = 'a4' }) {
       <div className="bill-total-line bill-grand-total"><span>Total</span><span>{money(pricing.grandTotal)}</span></div>
       {order.checkoutPayments?.map((payment, index) => <div key={index} className="bill-total-line"><span>{payment.method === 'cash' ? 'Cash received' : 'UPI received'}</span><span>{money(payment.amount)}</span></div>)}
       {order.udharAmount > 0 && <div className="bill-total-line"><strong>Added to Udhar</strong><strong>{money(order.udharAmount)}</strong></div>}
+      {order.paymentSummary?.collected > 0 && <div className="bill-total-line"><span>Payments after purchase</span><span>{money(order.paymentSummary.collected)}</span></div>}
+      {paymentPending && <div className="bill-total-line bill-pending-total"><strong>{credit ? 'Pending amount (Udhar)' : 'Pending amount'}</strong><strong>{money(pendingAmount)}</strong></div>}
     </section>
-    {credit && <p className="bill-payment-note">This purchase has been added to the customer’s Udhar account. Refer to the account ledger for the current balance.</p>}
+    {credit && paymentPending && <p className="bill-payment-note">Payment is still pending for the amount shown above. Please clear this Udhar balance. Refer to the account ledger for the current balance.</p>}
     <footer className="bill-footer"><strong>Thank you for shopping with us.</strong><p>Please keep this receipt for your records.</p></footer>
     </div>
   </article>;

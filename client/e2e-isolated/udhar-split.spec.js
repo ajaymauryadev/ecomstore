@@ -34,6 +34,14 @@ for (const width of [390, 1440]) {
     await expect(receipt).toContainText('Cash received');
     await expect(receipt).toContainText('UPI received');
     await expect(receipt).toContainText('Added to Udhar');
+    await expect(receipt.getByRole('region', { name: 'Payment pending' })).toContainText('PAYMENT PENDING / उधार बाकी');
+    await expect(receipt.getByRole('region', { name: 'Payment pending' })).toContainText('₹50.00');
+    await expect(receipt.getByText('Pending amount (Udhar)').locator('..')).toContainText('₹50.00');
+    await page.screenshot({ path: testInfo.outputPath('pending-a4-bill.png'), fullPage: true });
+    await receipt.getByLabel('Paper size').selectOption('thermal');
+    await expect(receipt.getByRole('region', { name: 'Payment pending' })).toBeVisible();
+    expect(await receipt.locator('.bill-receipt').evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+    await page.screenshot({ path: testInfo.outputPath('pending-thermal-bill.png'), fullPage: true });
     expect((await storefront.UdharCustomer.findById(customer._id)).balance).toBe(50);
     await page.getByRole('button', { name: 'New Sale', exact: true }).click();
     await page.goto(storefront.origin + '/store/udhar');
