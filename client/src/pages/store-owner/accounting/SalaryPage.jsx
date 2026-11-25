@@ -1,3 +1,5 @@
+import { usePagination } from '../../../hooks/usePagination';
+import Pagination from '../../../components/ui/Pagination';
 import { useState } from 'react';
 import {
   Users, Plus, X, CheckCircle2, Clock, AlertTriangle,
@@ -52,7 +54,8 @@ export default function SalaryPage() {
   const [addForm, setAddForm] = useState({ staffId: '', monthlySalary: '', notes: '' });
   const [payForm, setPayForm] = useState({ amount: '', type: 'salary', method: 'cash', note: '' });
 
-  const { data: listData, isLoading } = useGetSalaryRecordsQuery({ monthYear: selectedMonth });
+  const paging = usePagination(selectedMonth, 'cards');
+  const { data: listData, isLoading, isFetching } = useGetSalaryRecordsQuery({ monthYear: selectedMonth, page: paging.page, limit: paging.limit });
   const { data: statsData } = useGetSalaryStatsQuery({ monthYear: selectedMonth });
   const { data: staffData } = useGetStaffListQuery();
 
@@ -287,6 +290,7 @@ export default function SalaryPage() {
           </div>
         </div>
       )}
+      <Pagination meta={listData?.meta} page={paging.page} onPageChange={paging.setPage} isFetching={isFetching} label="salary records" />
     </div>
   );
 }

@@ -1,3 +1,5 @@
+import Pagination from '../../../components/ui/Pagination';
+import { usePageSize, usePageState } from '../../../hooks/usePagination';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../../hooks/useAuth';
@@ -35,13 +37,14 @@ export default function NotificationsPage() {
   const { user } = useAuth();
   const [roleFilter, setRoleFilter] = useState('');
   const [readFilter, setReadFilter] = useState('');
-  const [page, setPage] = useState(1);
+  const { limit } = usePageSize('rows');
+  const [page, setPage] = usePageState(limit);
 
-  const params = { limit: 25, page };
+  const params = { limit, page };
   if (roleFilter) params.role = roleFilter;
   if (readFilter !== '') params.isRead = readFilter;
 
-  const { data, isLoading, isError, error, refetch } = useGetNotificationsQuery(params);
+  const { data, isFetching, isLoading, isError, error, refetch } = useGetNotificationsQuery(params);
   const [markRead] = useMarkReadMutation();
   const [markAllRead] = useMarkAllReadMutation();
 
@@ -131,13 +134,7 @@ export default function NotificationsPage() {
       </div>
 
       {/* Pagination */}
-      {meta.totalPages > 1 && (
-        <div className="flex items-center justify-center gap-2">
-          <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} className="btn-secondary px-3 py-2 text-xs disabled:opacity-40">Prev</button>
-          <span className="text-sm text-slate-400">Page {page} of {meta.totalPages}</span>
-          <button onClick={() => setPage((p) => Math.min(meta.totalPages, p + 1))} disabled={page === meta.totalPages} className="btn-secondary px-3 py-2 text-xs disabled:opacity-40">Next</button>
-        </div>
-      )}
+      <Pagination meta={meta} page={page} onPageChange={setPage} isFetching={isFetching} label="notifications" />
     </div>
   );
 }

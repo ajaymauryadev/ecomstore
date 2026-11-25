@@ -1,3 +1,5 @@
+import { usePagination } from '../../../hooks/usePagination';
+import Pagination from '../../../components/ui/Pagination';
 import { useState } from 'react';
 import { Plus, Edit2, Trash2, Gift, Layers, ShoppingBag, Package, Star, TrendingUp } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -34,7 +36,8 @@ function TypeBadge({ type }) {
 }
 
 export default function OffersPage() {
-  const { data, isLoading } = useGetOffersQuery({});
+  const paging = usePagination('', 'cards');
+  const { data, isLoading, isFetching } = useGetOffersQuery({ page: paging.page, limit: paging.limit });
   const [create] = useCreateOfferMutation();
   const [update] = useUpdateOfferMutation();
   const [del] = useDeleteOfferMutation();
@@ -136,7 +139,7 @@ export default function OffersPage() {
           <p className="text-slate-400">No offers yet. Create your first deal!</p>
         </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div ref={paging.contentRef} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {offers.map((o) => (
             <div key={o._id} className={cn('card p-4 space-y-3', !o.isActive && 'opacity-60')}>
               <div className="flex items-start justify-between gap-2">
@@ -163,6 +166,7 @@ export default function OffersPage() {
         </div>
       )}
 
+      <Pagination meta={data?.meta} page={paging.page} onPageChange={paging.setPage} isFetching={isFetching} label="offers" />
       <Modal isOpen={showForm} onClose={() => setShowForm(false)} title={editId ? 'Edit Offer' : 'New Offer'} size="lg">
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>

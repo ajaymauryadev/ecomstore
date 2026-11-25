@@ -1,3 +1,5 @@
+import { usePagination } from '../../../hooks/usePagination';
+import Pagination from '../../../components/ui/Pagination';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
@@ -114,7 +116,8 @@ export default function DailyClosingPage() {
     { date: selectedDate },
     { refetchOnMountOrArgChange: true }
   );
-  const { data: historyData, isLoading: historyLoading } = useGetDailyClosingsQuery({ limit: 30 });
+  const paging = usePagination('history');
+  const { data: historyData, isLoading: historyLoading } = useGetDailyClosingsQuery({ page: paging.page, limit: paging.limit });
   const [saveClosing, { isLoading: saving }] = useSaveDailyClosingMutation();
   const [finalizeClosing, { isLoading: finalizing }] = useFinalizeDailyClosingMutation();
   const [correctClosing, { isLoading: correcting }] = useCorrectDailyClosingMutation();
@@ -539,6 +542,7 @@ export default function DailyClosingPage() {
           </form>
         )}
       </Modal>
+      {activeTab === 'history' && <Pagination meta={historyData?.meta} page={paging.page} onPageChange={paging.setPage} isFetching={historyLoading} label="closings" />}
     </div>
   );
 }

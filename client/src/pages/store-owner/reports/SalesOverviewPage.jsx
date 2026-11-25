@@ -1,3 +1,4 @@
+import { usePageSize } from '../../../hooks/usePagination';
 import { Link, useSearchParams } from 'react-router-dom';
 import { ShoppingCart, Truck, Wallet, TrendingUp, BookOpen, RefreshCw, Receipt } from 'lucide-react';
 import { useGetSalesOverviewQuery } from '../../../features/reports/reportsApi';
@@ -27,10 +28,11 @@ export default function SalesOverviewPage() {
   const today = accountingDate(undefined, timeZone);
   const startDate = params.get('startDate') || today;
   const endDate = params.get('endDate') || startDate;
-  const paging = useCursorPages(`${startDate}:${endDate}`);
+  const { limit } = usePageSize('rows');
+  const paging = useCursorPages(`${startDate}:${endDate}:${limit}`);
   const page = paging.page;
   const invalidRange = startDate > endDate;
-  const { currentData, isLoading, isFetching, isError, error, refetch } = useGetSalesOverviewQuery({ startDate, endDate, page, cursor: paging.cursor, limit: 5 }, { skip: invalidRange });
+  const { currentData, isLoading, isFetching, isError, error, refetch } = useGetSalesOverviewQuery({ startDate, endDate, page, cursor: paging.cursor, limit }, { skip: invalidRange });
   const report = currentData?.data;
   const summary = report?.summary || {};
   const setDate = (key, value) => { paging.reset(); setParams({ startDate, endDate, [key]: value || today }, { replace: true }); };

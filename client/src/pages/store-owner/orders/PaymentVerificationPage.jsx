@@ -1,7 +1,9 @@
+import Pagination from '../../../components/ui/Pagination';
+import { usePageSize, usePageState } from '../../../hooks/usePagination';
 import { useState, useEffect } from 'react';
 import {
   ShieldCheck, ShieldX, RefreshCw,
-  Phone, CreditCard, Clock, ChevronLeft, ChevronRight,
+  Phone, CreditCard, Clock,
 } from 'lucide-react';
 import {
   useGetPaymentQueueQuery,
@@ -193,10 +195,11 @@ export default function PaymentVerificationPage() {
   const { store } = useAuth();
   const slug = store?.slug;
   const { on } = useSocket();
-  const [page, setPage] = useState(1);
+  const { limit } = usePageSize('rows');
+  const [page, setPage] = usePageState(limit);
 
   const { data, isLoading, isFetching, refetch } = useGetPaymentQueueQuery(
-    { slug, page, limit: 15 },
+    { slug, page, limit },
     { skip: !slug, pollingInterval: 30000, skipPollingIfUnfocused: true }
   );
 
@@ -251,29 +254,7 @@ export default function PaymentVerificationPage() {
       )}
 
       {/* Pagination */}
-      {pagination && pagination.totalPages > 1 && (
-        <div className="flex items-center justify-center gap-3">
-          <button
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-            disabled={page === 1}
-            aria-label="Previous payment page"
-            title="Previous page"
-            className="min-w-11 min-h-11 flex items-center justify-center rounded-xl hover:bg-navy-800 text-slate-400 disabled:opacity-40"
-          >
-            <ChevronLeft size={18} />
-          </button>
-          <span className="text-sm text-slate-400">Page {page} of {pagination.totalPages}</span>
-          <button
-            onClick={() => setPage((p) => Math.min(pagination.totalPages, p + 1))}
-            disabled={page === pagination.totalPages}
-            aria-label="Next payment page"
-            title="Next page"
-            className="min-w-11 min-h-11 flex items-center justify-center rounded-xl hover:bg-navy-800 text-slate-400 disabled:opacity-40"
-          >
-            <ChevronRight size={18} />
-          </button>
-        </div>
-      )}
+      <Pagination meta={pagination} page={page} onPageChange={setPage} isFetching={isFetching} label="orders" />
     </div>
   );
 }

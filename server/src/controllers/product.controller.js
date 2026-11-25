@@ -83,7 +83,7 @@ export const getProducts = asyncHandler(async (req, res) => {
 
   const [products, total] = await Promise.all([
     Product.find(filter)
-      .sort(sort)
+      .sort({ ...sort, _id: 1 })
       .skip(skip)
       .limit(limit)
       .populate('categoryId', 'name emoji'),

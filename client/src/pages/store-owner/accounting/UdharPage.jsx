@@ -1,3 +1,4 @@
+import { usePageSize, usePageState } from '../../../hooks/usePagination';
 import { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { PERMISSIONS, hasPermission } from '../../../constants/permissions';
@@ -132,7 +133,8 @@ export default function UdharPage() {
   const { store, user } = useAuth();
   const canManage = hasPermission(user, PERMISSIONS.ACCOUNTING_MANAGE);
   const [searchParams] = useSearchParams();
-  const [customerPage, setCustomerPage] = useState(1);
+  const { limit } = usePageSize('rows');
+  const [customerPage, setCustomerPage] = usePageState(limit);
   const timeZone = resolveStoreTimeZone(store?.settings?.timezone);
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState('all'); // all | dues
@@ -140,16 +142,16 @@ export default function UdharPage() {
   const [showAddModal, setShowAddModal] = useState(() => (searchParams.get('new') === '1' || Boolean(searchParams.get('phone'))) && canManage);
   const [showTxModal, setShowTxModal] = useState(null);
   const [historyTab, setHistoryTab] = useState('bills');
-  const ledgerPaging = useCursorPages(selectedAccount?._id);
+  const ledgerPaging = useCursorPages(`${selectedAccount?._id}:${limit}`);
   const ledgerPage = ledgerPaging.page;
 
   const [addForm, setAddForm] = useState({ name: searchParams.get('name') || '', phone: searchParams.get('phone') || '', address: '', notes: '' });
 
-  const params = { page: customerPage, limit: 5, search: search || undefined, hasBalance: activeTab === 'dues' ? 'true' : undefined };
+  const params = { page: customerPage, limit, search: search || undefined, hasBalance: activeTab === 'dues' ? 'true' : undefined };
   const { data: listData, isLoading, isError, error, refetch } = useGetUdharCustomersQuery(params);
   const statsQuery = useGetUdharStatsQuery();
   const { currentData: ledgerData, isFetching: ledgerLoading, isError: ledgerError, error: ledgerFailure, refetch: refetchLedger } = useGetCustomerLedgerQuery(
-    { id: selectedAccount?._id, page: ledgerPage, cursor: ledgerPaging.cursor, limit: 5 },
+    { id: selectedAccount?._id, page: ledgerPage, cursor: ledgerPaging.cursor, limit },
     { skip: !selectedAccount }
   );
   const selectedCustomer = ledgerData?.data?.customer ?? (selectedAccount?.name ? selectedAccount : null);

@@ -1,3 +1,5 @@
+import { usePagination } from '../../../hooks/usePagination';
+import Pagination from '../../../components/ui/Pagination';
 import { useState, useEffect } from 'react';
 import {
   Package, CheckCircle2, XCircle, AlertTriangle, RefreshCw,
@@ -301,8 +303,9 @@ function QueueCard({ session, isSelected, onClick }) {
 }
 
 export default function PackingVerificationPage() {
-  const { data, isLoading, refetch } = useGetPackingQueueQuery(
-    { page: 1, limit: 50 },
+  const paging = usePagination();
+  const { data, isLoading, isFetching, refetch } = useGetPackingQueueQuery(
+    { page: paging.page, limit: paging.limit },
     { skip: false }
   );
   const [selectedId, setSelectedId] = useState(null);
@@ -330,7 +333,7 @@ export default function PackingVerificationPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-slate-100">Packing Queue</h1>
-          <p className="text-xs text-slate-500 mt-0.5">{sessions.length} session{sessions.length !== 1 ? 's' : ''} awaiting verification</p>
+          <p className="text-xs text-slate-500 mt-0.5">{data?.meta?.total ?? sessions.length} session{sessions.length !== 1 ? 's' : ''} awaiting verification</p>
         </div>
         <button onClick={refetch} className="p-2 rounded-xl hover:bg-navy-700 text-slate-400">
           <RefreshCw size={16} />
@@ -378,6 +381,7 @@ export default function PackingVerificationPage() {
           </div>
         </div>
       )}
+      <Pagination meta={data?.meta} page={paging.page} onPageChange={(page) => { paging.setPage(page); setSelectedId(null); }} isFetching={isFetching} label="packing sessions" />
     </div>
   );
 }

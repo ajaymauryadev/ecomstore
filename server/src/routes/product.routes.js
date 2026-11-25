@@ -11,6 +11,7 @@ import { tenantIsolation } from '../middleware/tenantIsolation.js';
 import { validate } from '../middleware/validate.js';
 import { UNIT_VALUES } from '../models/Product.js';
 import { isSafeImageUrl } from '../utils/validation.js';
+import { downloadProductSample, importProducts, uploadProductWorkbook } from '../controllers/productImport.controller.js';
 
 const router = Router();
 
@@ -46,6 +47,8 @@ const productRules = [
 ];
 
 router.get('/', requirePermission(PERMISSIONS.PRODUCTS_VIEW), getProducts);
+router.get('/import/sample', requirePermission(PERMISSIONS.PRODUCTS_CREATE), downloadProductSample);
+router.post('/import', requirePermission(PERMISSIONS.PRODUCTS_CREATE), uploadProductWorkbook, importProducts);
 router.get('/:id', requirePermission(PERMISSIONS.PRODUCTS_VIEW), getProduct);
 router.post('/', requirePermission(PERMISSIONS.PRODUCTS_CREATE), productRules, createProduct);
 router.put('/:id', requirePermission(PERMISSIONS.PRODUCTS_EDIT), [

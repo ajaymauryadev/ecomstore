@@ -1,3 +1,5 @@
+import Pagination from '../../components/ui/Pagination';
+import { usePageSize, usePageState } from '../../hooks/usePagination';
 import { useState } from 'react';
 import { Shield } from 'lucide-react';
 import { useGetSAAuditLogsQuery } from '../../features/superAdmin/superAdminApi';
@@ -24,14 +26,15 @@ export default function AuditLogsPage() {
   const [action, setAction] = useState('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
-  const [page, setPage] = useState(1);
+  const { limit } = usePageSize('compact');
+  const [page, setPage] = usePageState(limit);
 
-  const params = { page, limit: 50 };
+  const params = { page, limit };
   if (action) params.action = action;
   if (from) params.from = from;
   if (to) params.to = to;
 
-  const { data, isLoading } = useGetSAAuditLogsQuery(params);
+  const { data, isFetching, isLoading } = useGetSAAuditLogsQuery(params);
   const logs = data?.data ?? [];
   const meta = data?.meta ?? {};
 
@@ -99,15 +102,7 @@ export default function AuditLogsPage() {
               </tbody>
             </table>
           </div>
-          {meta.totalPages > 1 && (
-            <div className="flex items-center justify-between px-4 py-3 border-t border-navy-700/60">
-              <span className="text-xs text-slate-500">Page {page} of {meta.totalPages}</span>
-              <div className="flex gap-2">
-                <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} className="btn-secondary px-3 py-1.5 text-xs disabled:opacity-40">Prev</button>
-                <button onClick={() => setPage((p) => Math.min(meta.totalPages, p + 1))} disabled={page === meta.totalPages} className="btn-secondary px-3 py-1.5 text-xs disabled:opacity-40">Next</button>
-              </div>
-            </div>
-          )}
+          <Pagination meta={meta} page={page} onPageChange={setPage} isFetching={isFetching} label="audit logs" />
         </div>
       )}
     </div>

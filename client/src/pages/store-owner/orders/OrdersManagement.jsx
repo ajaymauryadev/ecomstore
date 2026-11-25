@@ -1,3 +1,4 @@
+import { usePageSize } from '../../../hooks/usePagination';
 import { useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
@@ -368,7 +369,8 @@ export default function OrdersManagement() {
   const [search, setSearch] = useState('');
   const settledSearch = useDebouncedValue(search.trim());
   const [statusFilter, setStatusFilter] = useState('');
-  const paging = useCursorPages(`${slug}:${statusFilter}:${settledSearch}`);
+  const { limit } = usePageSize('rows');
+  const paging = useCursorPages(`${slug}:${statusFilter}:${settledSearch}:${limit}`);
   const page = paging.page;
   const [params, setParams] = useSearchParams();
   const selectedOrderId = params.get('orderId');
@@ -380,7 +382,7 @@ export default function OrdersManagement() {
   }, { replace: true });
 
   const { data, isLoading, isFetching, isError, error, refetch } = useGetAdminOrdersQuery(
-    { slug, status: statusFilter, search: settledSearch || undefined, page, cursor: paging.cursor, limit: 5 },
+    { slug, status: statusFilter, search: settledSearch || undefined, page, cursor: paging.cursor, limit },
     { skip: !slug }
   );
 

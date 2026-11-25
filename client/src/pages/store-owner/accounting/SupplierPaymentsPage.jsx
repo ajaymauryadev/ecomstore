@@ -1,3 +1,5 @@
+import { usePagination, useClientPagination } from '../../../hooks/usePagination';
+import Pagination from '../../../components/ui/Pagination';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import RecordSupplierPaymentDialog from '../../../components/purchases/RecordSupplierPaymentDialog';
@@ -25,12 +27,14 @@ export default function SupplierPaymentsPage() {
   const [showPayModal, setShowPayModal] = useState(false);
   const [showReconciliation, setShowReconciliation] = useState(false);
 
-  const { data: listData, isLoading } = useGetSuppliersQuery({ limit: 100 });
+  const paging = usePagination();
+  const { data: listData, isLoading, isFetching } = useGetSuppliersQuery({ page: paging.page, limit: paging.limit });
   const [recordPayment, { isLoading: paying }] = useRecordSupplierPaymentMutation();
 
   const suppliers = listData?.data?.suppliers ?? [];
   const selectedSupplier = suppliers.find((supplier) => supplier._id === selectedSupplierId);
-  const totalDue = suppliers.reduce((s, sup) => s + (sup.pendingAmount ?? 0), 0);
+  const totalDue = listData?.data?.summary?.totalDue ?? 0;
+  const historyPaging = useClientPagination([...(selectedSupplier?.paymentHistory || [])].reverse(), selectedSupplierId);
   const suppliersWithDue = suppliers.filter((s) => (s.pendingAmount ?? 0) > 0);
 
   const openPayModal = (supplier) => {
@@ -53,11 +57,11 @@ export default function SupplierPaymentsPage() {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-navy-800 border border-navy-700/60 rounded-xl p-5">
           <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Total Suppliers</p>
-          <p className="text-2xl font-bold text-slate-100">{suppliers.length}</p>
+          <p className="text-2xl font-bold text-slate-100">{listData?.meta?.total ?? suppliers.length}</p>
         </div>
         <div className="bg-navy-800 border border-navy-700/60 rounded-xl p-5">
           <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">With Pending Due</p>
-          <p className="text-2xl font-bold text-gold-400">{suppliersWithDue.length}</p>
+          <p className="text-2xl font-bold text-gold-400">{listData?.data?.summary?.withDue ?? suppliersWithDue.length}</p>
         </div>
         <div className="bg-navy-800 border border-navy-700/60 rounded-xl p-5">
           <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Total Due</p>
@@ -128,6 +132,7 @@ export default function SupplierPaymentsPage() {
         )}
       </div>
 
+      <Pagination meta={listData?.meta} page={paging.page} onPageChange={(page) => { paging.setPage(page); setSelectedSupplierId(null); }} isFetching={isFetching} label="suppliers" />
       {/* Payment History for selected supplier */}
       {selectedSupplier && (
         <div className="bg-navy-800 border border-navy-700/60 rounded-xl overflow-hidden">
@@ -141,7 +146,7 @@ export default function SupplierPaymentsPage() {
             <div className="p-8 text-center text-slate-500 text-sm">No payments recorded yet</div>
           ) : (
             <div className="divide-y divide-navy-700/40 max-h-64 overflow-y-auto">
-              {[...selectedSupplier.paymentHistory].reverse().map((p) => (
+              {historyPaging.items.map((p) => (
                 <div key={p._id} className="flex items-center gap-3 px-4 py-3">
                   <div className="p-2 rounded-lg bg-emerald-500/10 shrink-0">
                     <DollarSign size={14} className="text-emerald-400" />
@@ -181,6 +186,7 @@ export default function SupplierPaymentsPage() {
         />
       )}
       {showReconciliation && <SupplierReconciliationDialog onClose={() => setShowReconciliation(false)} />}
+      {selectedSupplier && <Pagination meta={historyPaging.meta} page={historyPaging.page} onPageChange={historyPaging.setPage} label="supplier payments" />}
     </div>
   );
 }

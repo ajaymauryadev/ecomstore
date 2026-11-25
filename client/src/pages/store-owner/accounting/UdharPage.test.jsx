@@ -34,7 +34,7 @@ test('opens a customer ledger with purchased items, recorder and history paginat
   expect(screen.getByText(/2 kg ×/)).toBeInTheDocument();
   expect(screen.getByRole('link', { name: 'Open order' })).toHaveAttribute('href', '/store/orders?orderId=bill');
   fireEvent.click(screen.getByRole('button', { name: 'Next entries' }));
-  expect(api.ledger).toHaveBeenLastCalledWith({ id, page: 2, cursor: 'next-history', limit: 5 }, { skip: false });
+  expect(api.ledger).toHaveBeenLastCalledWith({ id, page: 2, cursor: 'next-history', limit: expect.any(Number) }, { skip: false });
   fireEvent.click(screen.getByRole('button', { name: 'Next accounts' }));
   expect(api.customers).toHaveBeenLastCalledWith(expect.objectContaining({ page: 2 }));
 });

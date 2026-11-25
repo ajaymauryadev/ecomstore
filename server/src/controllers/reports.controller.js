@@ -302,7 +302,7 @@ export const getYearlySales = asyncHandler(async (req, res) => {
 // GET /reports/product-sales
 export const getProductSales = asyncHandler(async (req, res) => {
   const { startDate, endDate } = req.query;
-  const requestedLimit = Math.min(Math.max(Number.parseInt(req.query.limit, 10) || 20, 1), 100);
+  const { page, limit, skip } = parsePagination(req.query, { defaultLimit: 20, maxLimit: 100 });
   const { start, end } = dateRange(startDate, endDate, req.storeTimeZone);
 
   const data = await Order.aggregate([
@@ -317,11 +317,11 @@ export const getProductSales = asyncHandler(async (req, res) => {
         orderCount: { $sum: 1 },
       },
     },
-    { $sort: { totalRevenue: -1 } },
-    { $limit: requestedLimit },
+    { $sort: { totalRevenue: -1, _id: 1 } },
+    { $facet: { products: [{ $skip: skip }, { $limit: limit }], count: [{ $count: 'total' }] } },
   ]);
 
-  sendSuccess(res, { products: data, period: { start, end } });
+  sendSuccess(res, { products: data[0]?.products || [], period: { start, end } }, 200, { meta: { page, limit, total: data[0]?.count[0]?.total || 0, totalPages: Math.ceil((data[0]?.count[0]?.total || 0) / limit) } });
 });
 
 // GET /reports/category-sales
@@ -360,7 +360,7 @@ export const getCategorySales = asyncHandler(async (req, res) => {
         orderCount: { $sum: 1 },
       },
     },
-    { $sort: { totalRevenue: -1 } },
+    { $sort: { totalRevenue: -1, _id: 1 } },
   ]);
 
   sendSuccess(res, { categories: data, period: { start, end } });
@@ -375,7 +375,7 @@ export const getStockReport = asyncHandler(async (req, res) => {
   const products = await Product.find(filter)
     .select('name categoryId variants')
     .populate('categoryId', 'name emoji')
-    .sort({ name: 1 })
+    .sort({ name: 1, _id: 1 })
     .skip(skip)
     .limit(limit);
 
@@ -386,28 +386,26 @@ export const getStockReport = asyncHandler(async (req, res) => {
 
 // GET /reports/supplier-dues
 export const getSupplierDues = asyncHandler(async (req, res) => {
-  const suppliers = await Supplier.find({
-    tenantId: req.tenantId,
-    pendingAmount: { $gt: 0 },
-    isActive: true,
-  }).select('name phone companyName pendingAmount totalPurchased totalPaid paymentHistory').sort({ pendingAmount: -1 });
-  suppliers.splice(500);
-
-  const total = suppliers.reduce((s, sup) => s + sup.pendingAmount, 0);
-  sendSuccess(res, { suppliers, total: +total.toFixed(2) });
+  const { page, limit, skip } = parsePagination(req.query, { defaultLimit: 20, maxLimit: 100 });
+  const filter = { tenantId: req.tenantId, pendingAmount: { $gt: 0 }, isActive: true };
+  const [suppliers, [totals], count] = await Promise.all([
+    Supplier.find(filter).select('name phone companyName pendingAmount totalPurchased totalPaid').sort({ pendingAmount: -1, _id: 1 }).skip(skip).limit(limit),
+    Supplier.aggregate([{ $match: filter }, { $group: { _id: null, total: { $sum: '$pendingAmount' } } }]),
+    Supplier.countDocuments(filter),
+  ]);
+  sendSuccess(res, { suppliers, total: +(totals?.total || 0).toFixed(2) }, 200, { meta: { page, limit, total: count, totalPages: Math.ceil(count / limit) } });
 });
 
 // GET /reports/customer-dues
 export const getCustomerDues = asyncHandler(async (req, res) => {
-  const customers = await UdharCustomer.find({
-    tenantId: req.tenantId,
-    balance: { $gt: 0 },
-    isActive: true,
-  }).sort({ balance: -1 });
-  customers.splice(500);
-
-  const total = customers.reduce((s, c) => s + c.balance, 0);
-  sendSuccess(res, { customers, total: +total.toFixed(2) });
+  const { page, limit, skip } = parsePagination(req.query, { defaultLimit: 20, maxLimit: 100 });
+  const filter = { tenantId: req.tenantId, balance: { $gt: 0 }, isActive: true };
+  const [customers, [totals], count] = await Promise.all([
+    UdharCustomer.find(filter).sort({ balance: -1, _id: 1 }).skip(skip).limit(limit),
+    UdharCustomer.aggregate([{ $match: filter }, { $group: { _id: null, total: { $sum: '$balance' } } }]),
+    UdharCustomer.countDocuments(filter),
+  ]);
+  sendSuccess(res, { customers, total: +(totals?.total || 0).toFixed(2) }, 200, { meta: { page, limit, total: count, totalPages: Math.ceil(count / limit) } });
 });
 
 // GET /reports/expenses
@@ -450,11 +448,12 @@ export const getExpenseReport = asyncHandler(async (req, res) => {
 // GET /reports/salary
 export const getSalaryReport = asyncHandler(async (req, res) => {
   const { monthYear } = req.query;
+  const { page, limit, skip } = parsePagination(req.query, { defaultLimit: 20, maxLimit: 100 });
   const filter = { tenantId: req.tenantId };
   if (monthYear) filter.monthYear = monthYear;
 
-  const [records, [stats]] = await Promise.all([
-    StaffSalary.find(filter).sort({ monthYear: -1, staffName: 1 }).limit(1000),
+  const [records, [stats], total] = await Promise.all([
+    StaffSalary.find(filter).sort({ monthYear: -1, staffName: 1 }).skip(skip).limit(limit),
     StaffSalary.aggregate([
       { $match: filter },
       {
@@ -469,12 +468,13 @@ export const getSalaryReport = asyncHandler(async (req, res) => {
         },
       },
     ]),
+    StaffSalary.countDocuments(filter),
   ]);
 
   sendSuccess(res, {
     records,
     stats: stats ?? { totalSalary: 0, totalPaid: 0, totalDue: 0, staffCount: 0 },
-  });
+  }, 200, { meta: { page, limit, total, totalPages: Math.ceil(total / limit) } });
 });
 
 // GET /reports/purchases

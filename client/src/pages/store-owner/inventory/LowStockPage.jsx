@@ -1,3 +1,5 @@
+import { useClientPagination } from '../../../hooks/usePagination';
+import Pagination from '../../../components/ui/Pagination';
 import { useEffect, useState, useMemo } from 'react';
 import { AlertTriangle, Package, ArrowLeft } from 'lucide-react';
 import { useGetLowStockProductsQuery } from '../../../features/inventory/inventoryApi';
@@ -19,6 +21,7 @@ export default function LowStockPage() {
 
   const products = useMemo(() => data?.data?.products || [], [data?.data?.products]);
 
+  const paging = useClientPagination(products, '', 'rows');
   useEffect(() => {
     if (!products.length || adjustTarget) return;
     const productId = searchParams.get('productId');
@@ -59,7 +62,7 @@ export default function LowStockPage() {
         </div>
       ) : (
         <div className="card p-0 overflow-hidden">
-          {products.map((item, idx) => {
+          {paging.items.map((item, idx) => {
             const variant = item.variant;
             const stockPct = Math.min(100, (variant.stock / variant.lowStockLimit) * 100);
             return (
@@ -122,6 +125,7 @@ export default function LowStockPage() {
           variant={adjustTarget.variant}
         />
       )}
+      <Pagination meta={paging.meta} page={paging.page} onPageChange={paging.setPage} isFetching={isLoading} label="products" />
     </div>
   );
 }

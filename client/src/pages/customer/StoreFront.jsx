@@ -1,12 +1,13 @@
+import { usePagination } from '../../hooks/usePagination';
+import Pagination from '../../components/ui/Pagination';
 import { useState, useEffect, useMemo } from 'react';
 import { useOutletContext, useParams, useSearchParams, useNavigate, Link } from 'react-router-dom';
-import { ShoppingCart, Plus, Minus, Flame, Star, AlertTriangle, Tag, ChevronDown, SlidersHorizontal, X } from 'lucide-react';
+import { ShoppingCart, Plus, Minus, Flame, Star, AlertTriangle, Tag, SlidersHorizontal, X } from 'lucide-react';
 import { useGetPublicProductsQuery } from '../../features/products/productApi';
 import { useGetPublicCategoriesQuery } from '../../features/categories/categoryApi';
 import { useCart } from '../../hooks/useCart';
 import { formatCurrency } from '../../utils/formatters';
 import { cn } from '../../utils/cn';
-import Spinner from '../../components/ui/Spinner';
 import CategoryBrowser from '../../components/products/CategoryBrowser';
 import CatalogFilters from '../../components/products/CatalogFilters';
 
@@ -233,17 +234,10 @@ function SkeletonCard() {
 
 /* ─── Main StoreFront ───────────────────────────────────── */
 function ProductResults({ storeSlug, filters, title, onReset, hasFilters }) {
-  const [page, setPage] = useState(1);
-  const [pages, setPages] = useState({});
-  const { currentData, isFetching, isError, refetch } = useGetPublicProductsQuery({ slug: storeSlug, page, limit: 24, ...filters });
-  useEffect(() => {
-    if (currentData) setPages((previous) => ({ ...previous, [page]: currentData }));
-  }, [currentData, page]);
-  const latest = currentData || pages[page - 1];
-  const meta = latest?.meta || {};
-  const products = useMemo(() => [...new Map(Object.entries({ ...pages, ...(currentData && { [page]: currentData }) })
-    .sort(([left], [right]) => Number(left) - Number(right))
-    .flatMap(([, result]) => result.data || []).map((product) => [product._id, product])).values()], [pages, currentData, page]);
+  const paging = usePagination(JSON.stringify([storeSlug, filters]), 'storefront');
+  const { currentData, isFetching, isError, refetch } = useGetPublicProductsQuery({ slug: storeSlug, page: paging.page, limit: paging.limit, ...filters });
+  const meta = currentData?.meta || {};
+  const products = currentData?.data || [];
 
   return (
     <section aria-label="Product results" aria-busy={isFetching} className="space-y-3">
@@ -263,13 +257,10 @@ function ProductResults({ storeSlug, filters, title, onReset, hasFilters }) {
         {hasFilters && <><p className="text-sm mt-1">Try another category or clear your filters.</p>
           <button type="button" onClick={onReset} className="btn btn-secondary min-h-11 mt-4">Clear all filters</button></>}
       </div> : <>
-        <div className={cn('grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3', isFetching && 'opacity-80')}>
+        <div ref={paging.contentRef} className={cn('grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3', isFetching && 'opacity-80')}>
           {products.map((product) => <ProductCard key={product._id} product={product} />)}
         </div>
-        {meta.hasNextPage && <button type="button" disabled={isFetching} onClick={() => setPage((value) => value + 1)}
-          className="w-full btn btn-secondary btn-md gap-2 border-dashed min-h-11">
-          {isFetching ? <Spinner size="sm" /> : <ChevronDown size={16} />} Load more products
-        </button>}
+        <Pagination meta={meta} page={paging.page} onPageChange={paging.setPage} isFetching={isFetching} label="products" />
       </>}
     </section>
   );

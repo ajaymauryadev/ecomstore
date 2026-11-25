@@ -19,7 +19,7 @@ export const getExpenses = asyncHandler(async (req, res) => {
   if (category) filter.category = category;
   addDateFilter(filter, req);
   const [expenses, total] = await Promise.all([
-    Expense.find(filter).sort({ date: -1 }).skip(skip).limit(limit),
+    Expense.find(filter).sort({ date: -1, _id: 1 }).skip(skip).limit(limit),
     Expense.countDocuments(filter),
   ]);
   sendPaginated(res, expenses, total, page, limit);

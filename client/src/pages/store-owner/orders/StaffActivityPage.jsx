@@ -1,7 +1,9 @@
+import { usePagination } from '../../../hooks/usePagination';
+import Pagination from '../../../components/ui/Pagination';
 import { useState } from 'react';
 import {
   Activity, AlertTriangle, ShieldAlert, RefreshCw, Filter,
-  ChevronLeft, ChevronRight, User, Package, Hash,
+  User, Package, Hash,
 } from 'lucide-react';
 import {
   useGetStaffActivityLogsQuery,
@@ -30,7 +32,8 @@ const TABS = ['Activity Log', 'Missing Report', 'High-Value Alerts'];
 function ActivityLog() {
   const [filters, setFilters] = useState({ page: 1, limit: 25, highValueOnly: false });
   const [showFilters, setShowFilters] = useState(false);
-  const { data, isLoading, isFetching } = useGetStaffActivityLogsQuery(filters);
+  const paging = usePagination(JSON.stringify({ ...filters, page: undefined, limit: undefined }));
+  const { data, isLoading, isFetching } = useGetStaffActivityLogsQuery({ ...filters, page: paging.page, limit: paging.limit });
 
   const logs = data?.data ?? [];
   const meta = data?.meta ?? {};
@@ -153,31 +156,14 @@ function ActivityLog() {
       )}
 
       {/* Pagination */}
-      {meta.totalPages > 1 && (
-        <div className="flex items-center justify-between pt-2">
-          <button
-            disabled={filters.page <= 1}
-            onClick={() => setFilters((f) => ({ ...f, page: f.page - 1 }))}
-            className="flex items-center gap-1 text-xs text-slate-400 disabled:opacity-40 hover:text-slate-200 transition-colors"
-          >
-            <ChevronLeft size={14} /> Prev
-          </button>
-          <span className="text-xs text-slate-500">Page {filters.page} of {meta.totalPages}</span>
-          <button
-            disabled={filters.page >= meta.totalPages}
-            onClick={() => setFilters((f) => ({ ...f, page: f.page + 1 }))}
-            className="flex items-center gap-1 text-xs text-slate-400 disabled:opacity-40 hover:text-slate-200 transition-colors"
-          >
-            Next <ChevronRight size={14} />
-          </button>
-        </div>
-      )}
+      <Pagination meta={meta} page={paging.page} onPageChange={paging.setPage} isFetching={isFetching} label="activity logs" />
     </div>
   );
 }
 
 function MissingReport() {
-  const { data, isLoading } = useGetMissingItemsReportQuery();
+  const paging = usePagination();
+  const { data, isLoading, isFetching } = useGetMissingItemsReportQuery({ page: paging.page, limit: paging.limit });
   const items = data?.data?.report ?? [];
 
   if (isLoading) {
@@ -209,7 +195,7 @@ function MissingReport() {
           )}
         >
           <span className="text-xl font-black text-navy-600 w-6 text-center shrink-0">
-            {idx + 1}
+            {(paging.page - 1) * paging.limit + idx + 1}
           </span>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
@@ -224,12 +210,14 @@ function MissingReport() {
           </div>
         </div>
       ))}
+      <Pagination meta={data?.meta} page={paging.page} onPageChange={paging.setPage} isFetching={isFetching} />
     </div>
   );
 }
 
 function HighValueAlerts() {
-  const { data, isLoading } = useGetHighValueAlertsQuery();
+  const paging = usePagination();
+  const { data, isLoading, isFetching } = useGetHighValueAlertsQuery({ page: paging.page, limit: paging.limit });
   const alerts = data?.data?.alerts ?? [];
 
   if (isLoading) {
@@ -282,6 +270,7 @@ function HighValueAlerts() {
           </p>
         </div>
       ))}
+      <Pagination meta={data?.meta} page={paging.page} onPageChange={paging.setPage} isFetching={isFetching} />
     </div>
   );
 }

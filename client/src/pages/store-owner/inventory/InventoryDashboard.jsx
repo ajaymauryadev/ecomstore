@@ -1,3 +1,5 @@
+import Pagination from '../../../components/ui/Pagination';
+import { usePageSize, usePageState } from '../../../hooks/usePagination';
 import { useState } from 'react';
 import { Package, AlertTriangle, TrendingUp, DollarSign, Search, ArrowUpDown } from 'lucide-react';
 import { useGetInventoryDashboardQuery, useGetInventoryListQuery } from '../../../features/inventory/inventoryApi';
@@ -53,12 +55,13 @@ export default function InventoryDashboard() {
   const [search, setSearch] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [stockStatus, setStockStatus] = useState('');
-  const [page, setPage] = useState(1);
+  const { limit } = usePageSize('compact');
+  const [page, setPage] = usePageState(limit);
   const [adjustTarget, setAdjustTarget] = useState(null); // { product, variant }
 
   const { data: dashData, isLoading: dashLoading, isError: dashFailed, error: dashError, refetch: reloadDashboard } = useGetInventoryDashboardQuery();
   const { data: listData, isLoading: listLoading, isFetching, isError, error, refetch } = useGetInventoryListQuery({
-    search, categoryId, stockStatus, page, limit: 25,
+    search, categoryId, stockStatus, page, limit,
   });
   const { data: catData } = useGetCategoriesQuery();
 
@@ -237,23 +240,7 @@ export default function InventoryDashboard() {
           </div>
 
           {/* Pagination */}
-          {meta.totalPages > 1 && (
-            <div className="flex items-center justify-between px-4 py-3 border-t border-navy-700/60">
-              <p className="text-xs text-slate-500">{meta.total} variants · Page {meta.page} of {meta.totalPages}</p>
-              <div className="flex gap-2">
-                <button
-                  disabled={page === 1}
-                  onClick={() => setPage((p) => p - 1)}
-                  className="btn btn-secondary btn-sm"
-                >Prev</button>
-                <button
-                  disabled={page >= meta.totalPages}
-                  onClick={() => setPage((p) => p + 1)}
-                  className="btn btn-secondary btn-sm"
-                >Next</button>
-              </div>
-            </div>
-          )}
+          <Pagination meta={meta} page={page} onPageChange={setPage} isFetching={isFetching} label="variants" />
         </div>
       )}
 

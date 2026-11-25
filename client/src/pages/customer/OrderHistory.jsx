@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import Pagination from '../../components/ui/Pagination';
+import { usePageSize, usePageState } from '../../hooks/usePagination';
 import { Link, useParams } from 'react-router-dom';
 import { ShoppingBag, ChevronRight, ArrowLeft } from 'lucide-react';
 import { useGetOrdersQuery } from '../../features/orders/orderApi';
@@ -37,8 +38,9 @@ function formatDate(str) {
 
 export default function OrderHistory() {
   const { storeSlug } = useParams();
-  const [page, setPage] = useState(1);
-  const { data, isLoading, isFetching, isError, error, refetch } = useGetOrdersQuery({ slug: storeSlug, page, limit: 15 });
+  const { limit } = usePageSize('cards');
+  const [page, setPage] = usePageState(limit);
+  const { data, isLoading, isFetching, isError, error, refetch } = useGetOrdersQuery({ slug: storeSlug, page, limit });
 
   const orders = data?.data || [];
   const meta = data?.meta || {};
@@ -120,15 +122,7 @@ export default function OrderHistory() {
             );
           })}
 
-          {meta.totalPages > 1 && (
-            <div className="flex items-center justify-between pt-2">
-              <p className="text-xs text-slate-500">Page {meta.page} of {meta.totalPages}</p>
-              <div className="flex gap-2">
-                <button disabled={page === 1} onClick={() => setPage((p) => p - 1)} className="btn btn-secondary btn-sm">Prev</button>
-                <button disabled={page >= meta.totalPages} onClick={() => setPage((p) => p + 1)} className="btn btn-secondary btn-sm">Next</button>
-              </div>
-            </div>
-          )}
+          <Pagination meta={meta} page={page} onPageChange={setPage} isFetching={isFetching} label="orders" />
         </div>
       )}
     </div>

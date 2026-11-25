@@ -1,3 +1,5 @@
+import Pagination from '../../components/ui/Pagination';
+import { usePageSize, usePageState } from '../../hooks/usePagination';
 import OrderResponsibility from '../../components/orders/OrderResponsibility';
 import { useState } from 'react';
 import { ClipboardList, RefreshCw, Search } from 'lucide-react';
@@ -17,9 +19,10 @@ export default function OperationalOrdersPage() {
   const [search, setSearch] = useState('');
   const settledSearch = useDebouncedValue(search.trim());
   const [status, setStatus] = useState('');
-  const [page, setPage] = useState(1);
+  const { limit } = usePageSize('cards');
+  const [page, setPage] = usePageState(limit);
   const { data, isLoading, isError, isFetching, refetch } = useGetAdminOrdersQuery(
-    { slug: store?.slug, search: settledSearch || undefined, status: status || undefined, page, limit: 20 },
+    { slug: store?.slug, search: settledSearch || undefined, status: status || undefined, page, limit },
     { skip: !store?.slug },
   );
 
@@ -86,7 +89,7 @@ export default function OperationalOrdersPage() {
         </>
       )}
 
-      {meta.totalPages > 1 && <div className="flex items-center justify-between"><p className="text-xs text-slate-500">Page {meta.page} of {meta.totalPages}</p><div className="flex gap-2"><Button size="sm" variant="secondary" disabled={!meta.hasPrevPage} onClick={() => setPage((value) => value - 1)}>Previous</Button><Button size="sm" variant="secondary" disabled={!meta.hasNextPage} onClick={() => setPage((value) => value + 1)}>Next</Button></div></div>}
+      <Pagination meta={meta} page={page} onPageChange={setPage} isFetching={isFetching} label="orders" />
     </div>
   );
 }

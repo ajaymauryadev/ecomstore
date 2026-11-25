@@ -1,3 +1,5 @@
+import Pagination from '../../components/ui/Pagination';
+import { usePageSize, usePageState } from '../../hooks/usePagination';
 import OrderResponsibility from '../../components/orders/OrderResponsibility';
 import { useState } from 'react';
 import { CheckCircle2, Clock, MapPin, PackageCheck, Phone, RefreshCw, Truck } from 'lucide-react';
@@ -17,9 +19,10 @@ export default function DeliveryOrdersPage() {
   const { user } = useAuth();
   const managesAll = hasPermission(user, PERMISSIONS.DELIVERY_MANAGE);
   const canUpdate = hasPermission(user, PERMISSIONS.DELIVERY_UPDATE);
-  const [page, setPage] = useState(1);
+  const { limit } = usePageSize('cards');
+  const [page, setPage] = usePageState(limit);
   const [confirmation, setConfirmation] = useState(null);
-  const { data, isLoading, isError, isFetching, refetch } = useGetDeliveryOrdersQuery({ page, limit: 20 }, {
+  const { data, isLoading, isError, isFetching, refetch } = useGetDeliveryOrdersQuery({ page, limit }, {
     pollingInterval: 30000, skipPollingIfUnfocused: true, refetchOnFocus: true, refetchOnReconnect: true,
   });
   const [updateStatus, { isLoading: updating }] = useUpdateDeliveryStatusMutation();
@@ -67,7 +70,7 @@ export default function DeliveryOrdersPage() {
         </article>;
       })}</div>}
 
-      {meta.totalPages > 1 && <div className="flex items-center justify-between"><p className="text-xs text-slate-500">Page {meta.page} of {meta.totalPages}</p><div className="flex gap-2"><Button size="sm" variant="secondary" disabled={!meta.hasPrevPage} onClick={() => setPage((value) => value - 1)}>Previous</Button><Button size="sm" variant="secondary" disabled={!meta.hasNextPage} onClick={() => setPage((value) => value + 1)}>Next</Button></div></div>}
+      <Pagination meta={meta} page={page} onPageChange={setPage} isFetching={isFetching} label="deliveries" />
 
       <Modal isOpen={Boolean(confirmation)} onClose={() => setConfirmation(null)} title={confirmation?.status === 'delivered' ? 'Confirm delivery' : 'Start delivery'} size="sm">
         <p className="text-sm text-slate-300">{confirmation?.status === 'delivered' ? `Confirm ${confirmation?.orderNumber} was handed to the customer. This records delivery and completes any COD payment.` : `Mark ${confirmation?.orderNumber} as out for delivery?`}</p>

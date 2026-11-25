@@ -1,3 +1,5 @@
+import { useClientPagination } from '../../hooks/usePagination';
+import Pagination from '../../components/ui/Pagination';
 import { useRef, useState } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import {
@@ -41,6 +43,8 @@ export default function AccountPage() {
 
   const profile = profileData?.data?.user;
   const favorites = favData?.data?.products || [];
+  const favoritesPaging = useClientPagination(favorites, storeSlug, 'cards');
+  const addressPaging = useClientPagination(profile?.savedAddresses || [], storeSlug);
 
   const [editProfile, setEditProfile] = useState(false);
   const [profileForm, setProfileForm] = useState({ name: '', email: '' });
@@ -180,7 +184,7 @@ export default function AccountPage() {
           </div>
         ) : (
           <div className="space-y-2">
-            {profile.savedAddresses.map((addr) => (
+            {addressPaging.items.map((addr) => (
               <div key={addr._id} className="account-address flex items-start justify-between gap-3 bg-navy-800/60 rounded-xl p-3 border border-navy-700/40">
                 <div className="flex items-start gap-2.5 min-w-0">
                   <MapPin size={13} className="text-gold-400 mt-0.5 shrink-0" />
@@ -209,6 +213,8 @@ export default function AccountPage() {
         )}
       </div>
 
+      <Pagination meta={addressPaging.meta} page={addressPaging.page} onPageChange={addressPaging.setPage} label="saved addresses" />
+
       {/* Favourites */}
       {favorites.length > 0 && (
         <div id="favorites-section" className="card space-y-3">
@@ -216,7 +222,7 @@ export default function AccountPage() {
             <Heart size={14} className="text-red-400" /> Favourites
           </p>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-            {favorites.map((product) => {
+            {favoritesPaging.items.map((product) => {
               const variant = product.variants?.filter((v) => v.isActive)?.[0];
               if (!variant) return null;
               const price = variant.offerPrice ?? variant.retailPrice;
@@ -245,6 +251,8 @@ export default function AccountPage() {
           </div>
         </div>
       )}
+
+      <Pagination meta={favoritesPaging.meta} page={favoritesPaging.page} onPageChange={favoritesPaging.setPage} label="favorites" />
 
       {/* Logout */}
       <button

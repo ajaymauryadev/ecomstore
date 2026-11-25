@@ -1,3 +1,5 @@
+import Pagination from '../../../components/ui/Pagination';
+import { usePageSize, usePageState } from '../../../hooks/usePagination';
 import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, ArrowUp, ArrowDown, BookOpen } from 'lucide-react';
@@ -29,10 +31,11 @@ export default function StockLedgerPage() {
   const { productId } = useParams();
   const [variantId, setVariantId] = useState('');
   const [movementType, setMovementType] = useState('');
-  const [page, setPage] = useState(1);
+  const { limit } = usePageSize('compact');
+  const [page, setPage] = usePageState(limit);
 
   const { data: productData } = useGetProductQuery(productId);
-  const { data, isLoading, isFetching } = useGetStockLedgerQuery({ productId, variantId, movementType, page, limit: 30 });
+  const { data, isLoading, isFetching } = useGetStockLedgerQuery({ productId, variantId, movementType, page, limit });
 
   const product = productData?.data?.product;
   const entries = data?.data?.entries || [];
@@ -132,15 +135,7 @@ export default function StockLedgerPage() {
           })}
 
           {/* Pagination */}
-          {meta.totalPages > 1 && (
-            <div className="flex items-center justify-between pt-2">
-              <p className="text-xs text-slate-500">{meta.total} entries · Page {meta.page} of {meta.totalPages}</p>
-              <div className="flex gap-2">
-                <button disabled={page === 1} onClick={() => setPage((p) => p - 1)} className="btn btn-secondary btn-sm">Prev</button>
-                <button disabled={page >= meta.totalPages} onClick={() => setPage((p) => p + 1)} className="btn btn-secondary btn-sm">Next</button>
-              </div>
-            </div>
-          )}
+          <Pagination meta={meta} page={page} onPageChange={setPage} isFetching={isFetching} label="stock entries" />
         </div>
       )}
     </div>

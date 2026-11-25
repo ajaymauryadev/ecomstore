@@ -1,3 +1,5 @@
+import { useClientPagination } from '../../hooks/usePagination';
+import Pagination from '../../components/ui/Pagination';
 import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
@@ -38,6 +40,8 @@ export default function TenantDetailPage() {
   const recentAudit = data?.data?.recentAudit ?? [];
   const plans = plansData?.data?.plans ?? [];
   const supportLogs = accessLogs?.data?.logs ?? [];
+  const auditPaging = useClientPagination(recentAudit, id);
+  const supportPaging = useClientPagination([...supportLogs].reverse(), id);
 
   const [subForm, setSubForm] = useState(null);
   const [limitsForm, setLimitsForm] = useState(null);
@@ -296,7 +300,7 @@ export default function TenantDetailPage() {
             {recentAudit.length === 0 ? (
               <div className="py-12 text-center text-slate-500 text-sm">No audit logs yet</div>
             ) : (
-              recentAudit.map((log) => (
+              auditPaging.items.map((log) => (
                 <div key={log._id} className="flex items-start gap-4 px-5 py-3.5">
                   <div className="w-8 h-8 rounded-full bg-navy-700 flex items-center justify-center shrink-0">
                     <Shield size={14} className="text-purple-400" />
@@ -333,7 +337,7 @@ export default function TenantDetailPage() {
               <div className="py-12 text-center text-slate-500 text-sm">No support access logged</div>
             ) : (
               <div className="divide-y divide-navy-700/30">
-                {[...supportLogs].reverse().map((log, i) => (
+                {supportPaging.items.map((log, i) => (
                   <div key={i} className="flex items-center gap-4 px-5 py-3.5">
                     <div className="w-8 h-8 rounded-full bg-purple-500/10 flex items-center justify-center">
                       <Shield size={14} className="text-purple-400" />
@@ -353,6 +357,8 @@ export default function TenantDetailPage() {
           </div>
         </div>
       )}
+      {activeTab === 'audit' && <Pagination meta={auditPaging.meta} page={auditPaging.page} onPageChange={auditPaging.setPage} label="audit logs" />}
+      {activeTab === 'support' && <Pagination meta={supportPaging.meta} page={supportPaging.page} onPageChange={supportPaging.setPage} label="support logs" />}
     </div>
   );
 }

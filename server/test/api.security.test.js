@@ -3274,3 +3274,51 @@ describe('encrypted tenant backup and isolated restore', () => {
     expect((await Store.findById(ids.storeA)).branding.logo).toBe(logo);
   });
 });
+
+
+describe('Excel product import', () => {
+  test('downloads a sample, previews without writes, imports tenant products and opening stock atomically', async () => {
+    const { productSample } = await import('../src/services/productSpreadsheet.service.js');
+    const sample = await request(app).get('/api/v1/products/import/sample').set(auth(tokens.ownerA));
+    expect(sample.status).toBe(200);
+    expect(sample.headers['content-disposition']).toContain('product-import-sample.xlsx');
+    const buffer = Buffer.from(await productSample());
+    const preview = await request(app).post('/api/v1/products/import').set(auth(tokens.ownerA)).field('preview', 'true').attach('file', buffer, 'products.xlsx');
+    expect(preview.status).toBe(200);
+    expect(preview.body.data).toMatchObject({ productCount: 1, variantCount: 2 });
+    expect(await Product.countDocuments({ tenantId: ids.storeA })).toBe(0);
+    const imported = await request(app).post('/api/v1/products/import').set(auth(tokens.ownerA)).attach('file', buffer, 'products.xlsx');
+    expect(imported.status).toBe(201);
+    expect(await Product.countDocuments({ tenantId: ids.storeA })).toBe(1);
+    expect(await Product.countDocuments({ tenantId: ids.storeB })).toBe(0);
+    const ledger = await StockLedger.find({ tenantId: ids.storeA }).sort({ balanceAfter: -1 });
+    expect(ledger.map((entry) => entry.balanceAfter)).toEqual([20, 10]);
+    const duplicate = await request(app).post('/api/v1/products/import').set(auth(tokens.ownerA)).attach('file', buffer, 'products.xlsx');
+    expect(duplicate.status).toBe(409);
+    expect(await Product.countDocuments({ tenantId: ids.storeA })).toBe(1);
+    expect(await StockLedger.countDocuments({ tenantId: ids.storeA })).toBe(2);
+    const otherStore = await request(app).post('/api/v1/products/import').set(auth(tokens.ownerB)).attach('file', buffer, 'products.xlsx');
+    expect(otherStore.status).toBe(201);
+  });
+
+  test('rejects unauthorized, invalid and oversized uploads before creating products', async () => {
+    const forbidden = await request(app).get('/api/v1/products/import/sample').set(auth(tokens.packer));
+    expect(forbidden.status).toBe(403);
+    const invalid = await request(app).post('/api/v1/products/import').set(auth(tokens.ownerA)).attach('file', Buffer.from('bad'), 'bad.xlsx');
+    expect(invalid.status).toBe(400);
+    const large = await request(app).post('/api/v1/products/import').set(auth(tokens.ownerA)).attach('file', Buffer.alloc(2 * 1024 * 1024 + 1), 'large.xlsx');
+    expect(large.status).toBe(400);
+    expect(await Product.countDocuments({ tenantId: ids.storeA })).toBe(0);
+  });
+
+  test('rolls back all products if the opening stock ledger fails', async () => {
+    const { productSample } = await import('../src/services/productSpreadsheet.service.js');
+    const spy = vi.spyOn(StockLedger, 'create').mockRejectedValueOnce(new Error('Injected import ledger failure'));
+    try {
+      const result = await request(app).post('/api/v1/products/import').set(auth(tokens.ownerA)).attach('file', Buffer.from(await productSample()), 'products.xlsx');
+      expect(result.status).toBe(500);
+      expect(await Product.countDocuments({ tenantId: ids.storeA })).toBe(0);
+      expect(await StockLedger.countDocuments({ tenantId: ids.storeA })).toBe(0);
+    } finally { spy.mockRestore(); }
+  });
+});

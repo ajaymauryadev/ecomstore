@@ -1,3 +1,5 @@
+import { usePagination } from '../../../hooks/usePagination';
+import Pagination from '../../../components/ui/Pagination';
 import { useRef, useState } from 'react';
 import { Plus, Edit2, Trash2, Phone, MapPin, CreditCard, Search, IndianRupee } from 'lucide-react';
 import {
@@ -97,7 +99,8 @@ export default function SuppliersPage() {
   const [paymentTarget, setPaymentTarget] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
 
-  const { data, isLoading } = useGetSuppliersQuery({ search });
+  const paging = usePagination(search, 'cards');
+  const { data, isLoading, isFetching } = useGetSuppliersQuery({ search, page: paging.page, limit: paging.limit });
   const [createSupplier, { isLoading: isCreating }] = useCreateSupplierMutation();
   const [updateSupplier, { isLoading: isUpdating }] = useUpdateSupplierMutation();
   const [deleteSupplier, { isLoading: isDeleting }] = useDeleteSupplierMutation();
@@ -151,7 +154,7 @@ export default function SuppliersPage() {
       <div className="page-header">
         <div>
           <h1 className="page-title">Suppliers</h1>
-          <p className="text-slate-400 text-sm mt-0.5">{suppliers.length} suppliers</p>
+          <p className="text-slate-400 text-sm mt-0.5">{data?.meta?.total ?? suppliers.length} suppliers</p>
         </div>
         <Button size="sm" leftIcon={<Plus size={14} />} onClick={openCreate}>Add Supplier</Button>
       </div>
@@ -177,7 +180,7 @@ export default function SuppliersPage() {
           <Button size="sm" leftIcon={<Plus size={14} />} className="mt-4" onClick={openCreate}>Add Supplier</Button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div ref={paging.contentRef} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {suppliers.map((s) => (
             <SupplierCard
               key={s._id}
@@ -190,6 +193,7 @@ export default function SuppliersPage() {
         </div>
       )}
 
+      <Pagination meta={data?.meta} page={paging.page} onPageChange={paging.setPage} isFetching={isFetching} label="suppliers" />
       {/* Create/Edit Modal */}
       <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit Supplier' : 'Add Supplier'} initialFocusRef={supplierNameInput} size="md">
         <div className="space-y-4">

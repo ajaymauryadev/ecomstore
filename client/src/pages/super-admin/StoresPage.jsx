@@ -1,3 +1,5 @@
+import Pagination from '../../components/ui/Pagination';
+import { usePageSize, usePageState } from '../../hooks/usePagination';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Plus, Search, Store, Power, ArrowUpRight } from 'lucide-react';
@@ -19,15 +21,16 @@ const EMPTY_NEW = { ownerName: '', ownerPhone: '', ownerEmail: '', ownerPassword
 export default function StoresPage() {
   const [search, setSearch] = useState('');
   const [planFilter, setPlanFilter] = useState('');
-  const [page, setPage] = useState(1);
+  const { limit } = usePageSize('compact');
+  const [page, setPage] = usePageState(limit);
   const [showCreate, setShowCreate] = useState(false);
   const [newForm, setNewForm] = useState(EMPTY_NEW);
 
-  const params = { page, limit: 20 };
+  const params = { page, limit };
   if (search) params.search = search;
   if (planFilter) params.plan = planFilter;
 
-  const { data, isLoading } = useGetSAStoresQuery(params);
+  const { data, isFetching, isLoading } = useGetSAStoresQuery(params);
   const { data: plansData } = useGetPlansQuery();
   const [createStore, { isLoading: isCreating }] = useCreateStoreMutation();
   const [toggleStatus] = useToggleStoreStatusMutation();
@@ -149,15 +152,7 @@ export default function StoresPage() {
             </table>
           </div>
 
-          {meta.totalPages > 1 && (
-            <div className="flex items-center justify-between px-4 py-3 border-t border-navy-700/60">
-              <span className="text-xs text-slate-500">Page {page} of {meta.totalPages}</span>
-              <div className="flex gap-2">
-                <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} className="btn-secondary px-3 py-1.5 text-xs disabled:opacity-40">Prev</button>
-                <button onClick={() => setPage((p) => Math.min(meta.totalPages, p + 1))} disabled={page === meta.totalPages} className="btn-secondary px-3 py-1.5 text-xs disabled:opacity-40">Next</button>
-              </div>
-            </div>
-          )}
+          <Pagination meta={meta} page={page} onPageChange={setPage} isFetching={isFetching} label="stores" />
         </div>
       )}
 

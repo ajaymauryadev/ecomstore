@@ -1,3 +1,5 @@
+import { usePagination, useClientPagination } from '../../../hooks/usePagination';
+import Pagination from '../../../components/ui/Pagination';
 import { useState } from 'react';
 import LoadError from '../../../components/ui/LoadError';
 import {
@@ -207,7 +209,8 @@ function ProductSalesReport({ timeZone }) {
   const firstOfMonth = today.slice(0, 8) + '01';
   const [startDate, setStartDate] = useState(firstOfMonth);
   const [endDate, setEndDate] = useState(today);
-  const { data, isLoading, isError, error, refetch } = useGetProductSalesQuery({ startDate, endDate, limit: 20 });
+  const paging = usePagination(`${startDate}:${endDate}`, 'compact');
+  const { data, isLoading, isFetching, isError, error, refetch } = useGetProductSalesQuery({ startDate, endDate, page: paging.page, limit: paging.limit });
   if (isError) return <LoadError title="Could not load report" error={error} retry={refetch} />;
   const products = data?.data?.products ?? [];
 
@@ -223,7 +226,7 @@ function ProductSalesReport({ timeZone }) {
           <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="bg-transparent text-sm text-slate-200 outline-none" />
         </div>
       </div>
-      <SectionCard title="Top 20 Products by Revenue">
+      <SectionCard title="Products by Revenue">
         {isLoading ? <div className="p-8 text-center text-slate-500">Loading...</div> : products.length === 0 ? (
           <div className="p-8 text-center text-slate-500">No sales data</div>
         ) : (
@@ -242,7 +245,7 @@ function ProductSalesReport({ timeZone }) {
             <div className="divide-y divide-navy-700/40 max-h-80 overflow-y-auto">
               {products.map((p, i) => (
                 <div key={i} className="flex items-center gap-3 px-4 py-2.5">
-                  <span className="text-xs font-bold text-slate-600 w-5 shrink-0">#{i + 1}</span>
+                  <span className="text-xs font-bold text-slate-600 w-5 shrink-0">#{(paging.page - 1) * paging.limit + i + 1}</span>
                   <p className="flex-1 text-sm text-slate-200 truncate">{p.productName}</p>
                   <div className="text-right shrink-0">
                     <p className="text-sm font-bold text-gold-400">{fmtFull(p.totalRevenue)}</p>
@@ -254,6 +257,7 @@ function ProductSalesReport({ timeZone }) {
           </>
         )}
       </SectionCard>
+      <Pagination meta={data?.meta} page={paging.page} onPageChange={paging.setPage} isFetching={isFetching} />
     </div>
   );
 }
@@ -263,9 +267,11 @@ function CategorySalesReport({ timeZone }) {
   const firstOfMonth = today.slice(0, 8) + '01';
   const [startDate, setStartDate] = useState(firstOfMonth);
   const [endDate, setEndDate] = useState(today);
-  const { data, isLoading, isError, error, refetch } = useGetCategorySalesQuery({ startDate, endDate });
-  if (isError) return <LoadError title="Could not load report" error={error} retry={refetch} />;
+  const { data, isLoading, isFetching, isError, error, refetch } = useGetCategorySalesQuery({ startDate, endDate });
+
   const categories = data?.data?.categories ?? [];
+  const paging = useClientPagination(categories, `${startDate}:${endDate}`, 'compact');
+  if (isError) return <LoadError title="Could not load report" error={error} retry={refetch} />;
 
   return (
     <div className="space-y-4">
@@ -299,7 +305,7 @@ function CategorySalesReport({ timeZone }) {
             <div className="p-8 text-center text-slate-500">No data</div>
           ) : (
             <div className="divide-y divide-navy-700/40">
-              {categories.map((c, i) => (
+              {paging.items.map((c, i) => (
                 <div key={i} className="flex items-center gap-3 px-4 py-3">
                   <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: CHART_COLORS[i % CHART_COLORS.length] }} />
                   <p className="flex-1 text-sm text-slate-200">{c.categoryEmoji} {c.categoryName || 'Uncategorized'}</p>
@@ -313,12 +319,14 @@ function CategorySalesReport({ timeZone }) {
           )}
         </SectionCard>
       </div>
+      <Pagination meta={paging.meta} page={paging.page} onPageChange={paging.setPage} isFetching={isFetching} />
     </div>
   );
 }
 
 function StockReport() {
-  const { data, isLoading, isError, error, refetch } = useGetStockReportQuery({});
+  const paging = usePagination('', 'compact');
+  const { data, isLoading, isFetching, isError, error, refetch } = useGetStockReportQuery({ page: paging.page, limit: paging.limit });
   if (isError) return <LoadError title="Could not load report" error={error} retry={refetch} />;
   const products = data?.data ?? [];
 
@@ -346,12 +354,14 @@ function StockReport() {
           ))}
         </div>
       )}
+      <Pagination meta={data?.meta} page={paging.page} onPageChange={paging.setPage} isFetching={isFetching} />
     </SectionCard>
   );
 }
 
 function SupplierDuesReport() {
-  const { data, isLoading, isError, error, refetch } = useGetSupplierDuesReportQuery();
+  const paging = usePagination('', 'compact');
+  const { data, isLoading, isFetching, isError, error, refetch } = useGetSupplierDuesReportQuery({ page: paging.page, limit: paging.limit });
   if (isError) return <LoadError title="Could not load report" error={error} retry={refetch} />;
   const suppliers = data?.data?.suppliers ?? [];
   const total = data?.data?.total ?? 0;
@@ -382,12 +392,14 @@ function SupplierDuesReport() {
           </div>
         )}
       </SectionCard>
+      <Pagination meta={data?.meta} page={paging.page} onPageChange={paging.setPage} isFetching={isFetching} />
     </div>
   );
 }
 
 function CustomerDuesReport() {
-  const { data, isLoading, isError, error, refetch } = useGetCustomerDuesReportQuery();
+  const paging = usePagination('', 'compact');
+  const { data, isLoading, isFetching, isError, error, refetch } = useGetCustomerDuesReportQuery({ page: paging.page, limit: paging.limit });
   if (isError) return <LoadError title="Could not load report" error={error} retry={refetch} />;
   const customers = data?.data?.customers ?? [];
   const total = data?.data?.total ?? 0;
@@ -417,6 +429,7 @@ function CustomerDuesReport() {
           </div>
         )}
       </SectionCard>
+      <Pagination meta={data?.meta} page={paging.page} onPageChange={paging.setPage} isFetching={isFetching} />
     </div>
   );
 }
@@ -471,7 +484,8 @@ function ExpenseReport({ timeZone }) {
 
 function SalaryReport({ timeZone }) {
   const [monthYear, setMonthYear] = useState(() => accountingDate(undefined, timeZone).slice(0, 7));
-  const { data, isLoading, isError, error, refetch } = useGetSalaryReportQuery({ monthYear });
+  const paging = usePagination(monthYear, 'compact');
+  const { data, isLoading, isFetching, isError, error, refetch } = useGetSalaryReportQuery({ monthYear, page: paging.page, limit: paging.limit });
   if (isError) return <LoadError title="Could not load report" error={error} retry={refetch} />;
   const records = data?.data?.records ?? [];
   const stats = data?.data?.stats ?? {};
@@ -510,6 +524,7 @@ function SalaryReport({ timeZone }) {
           </div>
         )}
       </SectionCard>
+      <Pagination meta={data?.meta} page={paging.page} onPageChange={paging.setPage} isFetching={isFetching} />
     </div>
   );
 }
@@ -519,9 +534,11 @@ function PurchaseReport({ timeZone }) {
   const firstOfMonth = today.slice(0, 8) + '01';
   const [startDate, setStartDate] = useState(firstOfMonth);
   const [endDate, setEndDate] = useState(today);
-  const { data, isLoading, isError, error, refetch } = useGetPurchaseReportQuery({ startDate, endDate });
-  if (isError) return <LoadError title="Could not load report" error={error} retry={refetch} />;
+  const { data, isLoading, isFetching, isError, error, refetch } = useGetPurchaseReportQuery({ startDate, endDate });
+
   const bySupplier = data?.data?.bySupplier ?? [];
+  const paging = useClientPagination(bySupplier, `${startDate}:${endDate}`, 'compact');
+  if (isError) return <LoadError title="Could not load report" error={error} retry={refetch} />;
   const total = data?.data?.total ?? 0;
   const paid = data?.data?.paid ?? 0;
 
@@ -547,7 +564,7 @@ function PurchaseReport({ timeZone }) {
           <div className="p-8 text-center text-slate-500">No purchases in this period</div>
         ) : (
           <div className="divide-y divide-navy-700/40">
-            {bySupplier.map((s, i) => (
+            {paging.items.map((s, i) => (
               <div key={i} className="flex items-center gap-3 px-4 py-3">
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-slate-200">{s.supplierName}</p>
@@ -562,6 +579,7 @@ function PurchaseReport({ timeZone }) {
           </div>
         )}
       </SectionCard>
+      <Pagination meta={paging.meta} page={paging.page} onPageChange={paging.setPage} isFetching={isFetching} />
     </div>
   );
 }

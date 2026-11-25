@@ -1,3 +1,5 @@
+import { usePagination } from '../../../hooks/usePagination';
+import Pagination from '../../../components/ui/Pagination';
 import { useState } from 'react';
 import {
   Receipt, Plus, Trash2, Pencil, TrendingDown,
@@ -57,8 +59,9 @@ export default function ExpensesPage() {
   const [editingExpense, setEditingExpense] = useState(null);
   const [form, setForm] = useState(() => emptyForm(timeZone));
 
-  const params = { startDate, endDate, category: filterCat || undefined };
-  const { data: listData, isLoading } = useGetExpensesQuery(params);
+  const paging = usePagination(`${startDate}:${endDate}:${filterCat}`, 'compact');
+  const params = { page: paging.page, limit: paging.limit, startDate, endDate, category: filterCat || undefined };
+  const { data: listData, isLoading, isFetching } = useGetExpensesQuery(params);
   const { data: statsData } = useGetExpenseStatsQuery({ startDate, endDate });
 
   const [createExpense, { isLoading: creating }] = useCreateExpenseMutation();
@@ -244,6 +247,7 @@ export default function ExpensesPage() {
         </div>
       </div>
 
+      <Pagination meta={listData?.meta} page={paging.page} onPageChange={paging.setPage} isFetching={isFetching} label="expenses" />
       <Modal isOpen={showModal} onClose={() => setShowModal(false)} title={editingExpense ? 'Edit Expense' : 'Add Expense'} size="md">
             <div className="space-y-4">
               <div>

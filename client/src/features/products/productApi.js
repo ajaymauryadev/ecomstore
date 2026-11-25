@@ -26,6 +26,28 @@ export const productApi = baseApi.injectEndpoints({
       ] : [],
     }),
 
+    importProducts: builder.mutation({
+      query: (body) => ({ url: '/products/import', method: 'POST', body, timeout: 60000 }),
+      invalidatesTags: (result, error, body) => result && body.get('preview') !== 'true'
+        ? [...stockViewTags([]), { type: 'Category', id: 'LIST' }] : [],
+    }),
+
+    downloadProductSample: builder.mutation({
+      async queryFn(arg, api, extraOptions, baseQuery) {
+        const result = await baseQuery({ url: '/products/import/sample', responseHandler: (response) => response.ok ? response.blob() : response.json() });
+        if (result.error) return { error: result.error };
+        const url = URL.createObjectURL(result.data);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'product-import-sample.xlsx';
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        return { data: { downloaded: true } };
+      },
+    }),
+
     updateProduct: builder.mutation({
       query: ({ id, ...body }) => ({ url: `/products/${id}`, method: 'PUT', body }),
       invalidatesTags: (result, error, { id }) => result ? [
@@ -91,6 +113,8 @@ export const {
   useGetProductsQuery,
   useGetProductQuery,
   useCreateProductMutation,
+  useImportProductsMutation,
+  useDownloadProductSampleMutation,
   useUpdateProductMutation,
   useDeleteProductMutation,
   useToggleProductFieldMutation,

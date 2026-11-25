@@ -98,7 +98,7 @@ test('parent categories include descendants and stock/offers use active variants
   expect((await request.get(endpoint, { params: { categoryId: 'invalid' } })).status()).toBe(400);
 });
 
-test('load more appends products and changing filters resets pagination', async ({ page, storefront }) => {
+test('pagination keeps products bounded and changing filters resets the page', async ({ page, storefront }) => {
   const { store } = await storefront.seedStore('catalog-pagination');
   await storefront.Product.create(Array.from({ length: 27 }, (_, index) => ({
     tenantId: store._id, name: `Catalog item ${String(index).padStart(2, '0')}`, isOnline: true,
@@ -106,17 +106,20 @@ test('load more appends products and changing filters resets pagination', async 
   })));
   await page.goto(`${storefront.origin}/s/catalog-pagination?sort=name`);
   const cards = page.locator('.storefront-product');
-  await expect(cards).toHaveCount(24);
+  await expect(page.getByRole('navigation', { name: 'products pagination' })).toContainText('Page 1 of');
+  const pageSize = await cards.count();
+  expect(pageSize).toBeGreaterThan(0);
+  expect(pageSize).toBeLessThan(28);
   const first = await cards.first().innerText();
-  await page.getByRole('button', { name: 'Load more products' }).click();
-  await expect(cards).toHaveCount(28);
-  expect(await cards.first().innerText()).toBe(first);
-  await expect(page.getByRole('button', { name: 'Load more products' })).toHaveCount(0);
+  await page.getByRole('navigation', { name: 'products pagination' }).getByRole('button', { name: 'Next', exact: true }).click();
+  await expect(cards).toHaveCount(pageSize);
+  await expect(cards.first()).not.toHaveText(first);
+  await expect(page.getByRole('navigation', { name: 'products pagination' })).toContainText('Page 2 of');
   await page.getByRole('button', { name: 'Offers', exact: true }).click();
   await expect(page.getByText('No products match your search and filters')).toBeVisible();
   await expect(cards).toHaveCount(0);
   await page.getByRole('group', { name: 'Product filters' }).getByRole('button', { name: 'Offers', exact: true }).click();
-  await expect(cards).toHaveCount(24);
+  await expect(cards).toHaveCount(pageSize);
 });
 
 test('modern search and filter sheets support keyboard, draft changes, previews and cancel', async ({ page, storefront }) => {

@@ -3,7 +3,7 @@ import { baseApi } from '../../api/baseApi';
 const couponsApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
     getCoupons: builder.query({
-      query: () => '/coupons',
+      query: (params = {}) => ({ url: '/coupons', params }),
       providesTags: [{ type: 'Coupon', id: 'LIST' }],
     }),
     createCoupon: builder.mutation({

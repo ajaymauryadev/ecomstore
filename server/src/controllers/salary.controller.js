@@ -22,7 +22,7 @@ export const getSalaryRecords = asyncHandler(async (req, res) => {
   if (staffId) filter.staffId = staffId;
   if (status) filter.status = status;
   const [records, total] = await Promise.all([
-    StaffSalary.find(filter).sort({ monthYear: -1, staffName: 1 }).skip(skip).limit(limit),
+    StaffSalary.find(filter).sort({ monthYear: -1, staffName: 1, _id: 1 }).skip(skip).limit(limit),
     StaffSalary.countDocuments(filter),
   ]);
   sendPaginated(res, records, total, page, limit);

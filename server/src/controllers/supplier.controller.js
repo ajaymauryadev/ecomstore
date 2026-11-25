@@ -24,14 +24,18 @@ export const getSuppliers = async (req, res, next) => {
       filter.$or = [{ name: regex }, { phone: regex }, { companyName: regex }];
     }
 
-    const [suppliers, total] = await Promise.all([
-      Supplier.find(filter).sort({ name: 1 }).skip(skip).limit(limit).lean(),
+    const [suppliers, total, [summary]] = await Promise.all([
+      Supplier.find(filter).sort({ name: 1, _id: 1 }).skip(skip).limit(limit).lean(),
       Supplier.countDocuments(filter),
+      Supplier.aggregate([
+        { $match: filter },
+        { $group: { _id: null, totalDue: { $sum: '$pendingAmount' }, withDue: { $sum: { $cond: [{ $gt: ['$pendingAmount', 0] }, 1, 0] } } } },
+      ]),
     ]);
 
     res.json({
       success: true,
-      data: { suppliers },
+      data: { suppliers, summary: { totalDue: summary?.totalDue || 0, withDue: summary?.withDue || 0 } },
       meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
     });
   } catch (err) { next(err); }

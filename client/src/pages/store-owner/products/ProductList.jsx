@@ -1,3 +1,5 @@
+import Pagination from '../../../components/ui/Pagination';
+import { usePageSize, usePageState } from '../../../hooks/usePagination';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
@@ -19,6 +21,7 @@ import { hasPermission, PERMISSIONS } from '../../../constants/permissions';
 import LoadError from '../../../components/ui/LoadError';
 import { cn } from '../../../utils/cn';
 import toast from 'react-hot-toast';
+import ProductImport from '../../../components/products/ProductImport';
 
 const API_BASE = import.meta.env.VITE_API_URL?.replace('/api/v1', '') || '';
 
@@ -82,13 +85,14 @@ export default function ProductList() {
   const [categoryId, setCategoryId] = useState('');
   const [isActive, setIsActive] = useState('');
   const [lowStock, setLowStock] = useState(false);
-  const [page, setPage] = useState(1);
-  const [deleteTarget, setDeleteTarget] = useState(null);
   const [view, setView] = useState('cards');
+  const { limit, contentRef } = usePageSize(view === 'cards' ? 'products' : 'compact');
+  const [page, setPage] = usePageState(limit);
+  const [deleteTarget, setDeleteTarget] = useState(null);
 
   const { data, isLoading, isFetching, isError, error, refetch } = useGetProductsQuery({
     page,
-    limit: 20,
+    limit,
     ...(search && { search }),
     ...(categoryId && { categoryId }),
     ...(isActive !== '' && { isActive }),
@@ -145,6 +149,7 @@ export default function ProductList() {
           </div>
           {canViewCategories && <Link to="/store/categories" className="btn-secondary btn-sm"><Filter size={14} /> Categories</Link>}
           {canCreate && <Link to="/store/products/new" className="btn-primary btn-sm"><Plus size={14} /> Add Product</Link>}
+          {canCreate && <ProductImport onImported={() => setPage(1)} />}
         </div>
       </div>
 
@@ -215,11 +220,11 @@ export default function ProductList() {
           )}
         </div>
       ) : view === 'cards' ? (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4" aria-busy={isFetching}>
+        <div ref={contentRef} className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4" aria-busy={isFetching}>
           {products.map((product) => <CatalogCard key={product._id} product={product} canEdit={canEdit} canDelete={canDelete} onToggle={handleToggle} onDelete={setDeleteTarget} />)}
         </div>
       ) : (
-        <div className="table-container relative" aria-busy={isFetching}>
+        <div ref={contentRef} className="table-container relative" aria-busy={isFetching}>
           {isFetching && (
             <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-gold animate-pulse" />
           )}
@@ -330,21 +335,7 @@ export default function ProductList() {
       )}
 
       {/* Pagination */}
-      {meta.totalPages > 1 && (
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-slate-400">
-            Page {meta.page} of {meta.totalPages} · {meta.total} products
-          </p>
-          <div className="flex gap-2">
-            <Button variant="secondary" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>
-              Previous
-            </Button>
-            <Button variant="secondary" size="sm" disabled={!meta.hasNextPage} onClick={() => setPage(page + 1)}>
-              Next
-            </Button>
-          </div>
-        </div>
-      )}
+      <Pagination meta={meta} page={page} onPageChange={setPage} isFetching={isFetching} label="products" />
 
       {/* Delete confirm modal */}
       <Modal isOpen={!!deleteTarget} onClose={() => setDeleteTarget(null)} title="Delete Product" size="sm">

@@ -4,6 +4,7 @@ import { asyncHandler } from '../utils/asyncHandler.js';
 import { AppError } from '../utils/AppError.js';
 import { sendSuccess } from '../utils/response.js';
 import { fromMinorUnits, toMinorUnits } from '../utils/money.js';
+import { parsePagination } from '../utils/query.js';
 
 const WRITABLE_FIELDS = Object.freeze([
   'title', 'description', 'type', 'image', 'bundleItems', 'bundlePrice',
@@ -51,11 +52,15 @@ const validateProductReferences = async (payload, tenantId) => {
 };
 
 export const getOffers = asyncHandler(async (req, res) => {
+  const { page, limit, skip } = parsePagination(req.query, { defaultLimit: 30, maxLimit: 100 });
   const filter = { tenantId: req.tenantId };
   if (req.query.type) filter.type = req.query.type;
   if (req.query.isActive !== undefined) filter.isActive = req.query.isActive === 'true';
-  const offers = await Offer.find(filter).sort({ displayOrder: 1, createdAt: -1 }).limit(500).lean();
-  sendSuccess(res, { offers });
+  const [offers, total] = await Promise.all([
+    Offer.find(filter).sort({ displayOrder: 1, createdAt: -1, _id: 1 }).skip(skip).limit(limit).lean(),
+    Offer.countDocuments(filter),
+  ]);
+  sendSuccess(res, { offers }, 200, { meta: { total, page, limit, totalPages: Math.ceil(total / limit) } });
 });
 
 export const createOffer = asyncHandler(async (req, res) => {

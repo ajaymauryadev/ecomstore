@@ -1,3 +1,5 @@
+import Pagination from '../../../components/ui/Pagination';
+import { usePageSize, usePageState } from '../../../hooks/usePagination';
 import { useMemo, useState } from 'react';
 import { Edit2, Plus, Search, ShieldCheck, UserRound, UserX } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -161,13 +163,14 @@ function PermissionEditor({ role, selected, onChange }) {
 export default function StaffManagementPage() {
   const [search, setSearch] = useState('');
   const [role, setRole] = useState('');
-  const [page, setPage] = useState(1);
+  const { limit } = usePageSize('cards');
+  const [page, setPage] = usePageState(limit);
   const [form, setForm] = useState(EMPTY_FORM);
   const [editing, setEditing] = useState(null);
   const [deactivateTarget, setDeactivateTarget] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
-  const params = useMemo(() => ({ page, limit: 20, ...(search ? { search } : {}), ...(role ? { role } : {}) }), [page, search, role]);
-  const { data, isLoading, isError, refetch } = useGetStaffQuery(params);
+  const params = useMemo(() => ({ page, limit, ...(search ? { search } : {}), ...(role ? { role } : {}) }), [page, limit, search, role]);
+  const { data, isFetching, isLoading, isError, refetch } = useGetStaffQuery(params);
   const [createStaff, { isLoading: creating }] = useCreateStaffMutation();
   const [updateStaff, { isLoading: updating }] = useUpdateStaffMutation();
   const [deactivateStaff, { isLoading: deactivating }] = useDeactivateStaffMutation();
@@ -330,15 +333,7 @@ export default function StaffManagementPage() {
         </>
       )}
 
-      {meta.totalPages > 1 && (
-        <div className="flex items-center justify-between">
-          <p className="text-xs text-slate-500">Page {meta.page} of {meta.totalPages}</p>
-          <div className="flex gap-2">
-            <Button size="sm" variant="secondary" disabled={!meta.hasPrevPage} onClick={() => setPage((value) => value - 1)}>Previous</Button>
-            <Button size="sm" variant="secondary" disabled={!meta.hasNextPage} onClick={() => setPage((value) => value + 1)}>Next</Button>
-          </div>
-        </div>
-      )}
+      <Pagination meta={meta} page={page} onPageChange={setPage} isFetching={isFetching} label="staff" />
 
       <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit staff member' : 'Add staff member'} size="lg">
         <form onSubmit={save} className="space-y-4">

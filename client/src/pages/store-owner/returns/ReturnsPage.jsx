@@ -1,3 +1,5 @@
+import { usePagination } from '../../../hooks/usePagination';
+import Pagination from '../../../components/ui/Pagination';
 import { useState } from 'react';
 import {
   Plus, X, RefreshCw, CheckCircle2, XCircle,
@@ -456,10 +458,11 @@ export default function ReturnsPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [statusFilter, setStatusFilter] = useState('');
 
-  const { data, isLoading, refetch } = useGetReturnsQuery({
+  const paging = usePagination(`${activeType}:${statusFilter}`);
+  const { data, isLoading, isFetching, refetch } = useGetReturnsQuery({
     type: activeType,
     status: statusFilter || undefined,
-    limit: 30,
+    page: paging.page, limit: paging.limit,
   });
   const { data: statsData } = useGetReturnStatsQuery({});
   const returns = data?.data ?? [];
@@ -545,6 +548,7 @@ export default function ReturnsPage() {
         </div>
       )}
 
+      <Pagination meta={data?.meta} page={paging.page} onPageChange={paging.setPage} isFetching={isFetching} label="returns" />
       {/* Create form modal */}
       {showCreate && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm overflow-y-auto">

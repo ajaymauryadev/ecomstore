@@ -602,6 +602,7 @@ export const getStaffActivityLogs = asyncHandler(async (req, res, next) => {
 
 export const getMissingItemsReport = asyncHandler(async (req, res, next) => {
   const { dateFrom, dateTo } = req.query;
+  const { page, limit, skip } = parsePagination(req.query, { defaultLimit: 20, maxLimit: 100 });
   const matchFilter = {
     tenantId: req.tenantId,
     action: 'item_missing',
@@ -627,23 +628,25 @@ export const getMissingItemsReport = asyncHandler(async (req, res, next) => {
       },
     },
     { $sort: { isHighValue: -1, occurrences: -1 } },
-    { $limit: 100 },
+    { $facet: { rows: [{ $skip: skip }, { $limit: limit }], count: [{ $count: 'total' }] } },
   ]);
 
-  sendSuccess(res, { report });
+  sendSuccess(res, { report: report[0]?.rows || [] }, 200, { meta: { page, limit, total: report[0]?.count[0]?.total || 0, totalPages: Math.ceil((report[0]?.count[0]?.total || 0) / limit) } });
 });
 
 export const getHighValueAlerts = asyncHandler(async (req, res, next) => {
   // Recent high-value missing items (last 7 days)
   const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-  const alerts = await StaffActivityLog.find({
+  const { page, limit, skip } = parsePagination(req.query, { defaultLimit: 20, maxLimit: 100 });
+  const filter = {
     tenantId: req.tenantId,
     action: 'item_missing',
     isHighValue: true,
     createdAt: { $gte: since },
-  }).sort({ createdAt: -1 }).limit(50).lean();
+  };
+  const [alerts, total] = await Promise.all([StaffActivityLog.find(filter).sort({ createdAt: -1, _id: 1 }).skip(skip).limit(limit).lean(), StaffActivityLog.countDocuments(filter)]);
 
-  sendSuccess(res, { alerts });
+  sendSuccess(res, { alerts }, 200, { meta: { page, limit, total, totalPages: Math.ceil(total / limit) } });
 });
 
 export const getStaffPackingSessions = asyncHandler(async (req, res, next) => {

@@ -1,3 +1,5 @@
+import { useClientPagination } from '../../../hooks/usePagination';
+import Pagination from '../../../components/ui/Pagination';
 import { useRef, useState } from 'react';
 import { Plus, Edit2, Trash2, GripVertical, Tag } from 'lucide-react';
 import {
@@ -85,6 +87,7 @@ export default function CategoriesPage() {
   const [deleteCategory, { isLoading: isDeleting }] = useDeleteCategoryMutation();
 
   const categories = data?.data?.categories || [];
+  const paging = useClientPagination(categories, '', 'rows');
   const categoriesById = new Map(categories.map((category) => [category._id, category]));
   const availableParents = modalOpen
     ? categories.filter((category) => canUseParent(category, editing?._id, categoriesById))
@@ -180,7 +183,7 @@ export default function CategoriesPage() {
         </div>
       ) : (
         <div className="card p-0 overflow-hidden">
-          {categories.map((cat) => (
+          {paging.items.map((cat) => (
             <CategoryCard key={cat._id} category={cat} parent={categoriesById.get(cat.parentId)} onEdit={openEdit} onDelete={setDeleteId} />
           ))}
         </div>
@@ -298,6 +301,7 @@ export default function CategoriesPage() {
           )}
         </div>
       </Modal>
+      <Pagination meta={paging.meta} page={paging.page} onPageChange={paging.setPage} isFetching={isLoading} label="categories" />
     </div>
   );
 }

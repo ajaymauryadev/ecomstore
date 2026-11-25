@@ -1,3 +1,4 @@
+import { usePageSize, usePageState } from '../../../hooks/usePagination';
 import { memo, useState, useRef, useMemo, useCallback, useDeferredValue, useEffect } from 'react';
 import {
   Search, Plus, Minus, Trash2,
@@ -73,7 +74,8 @@ export default function POSPage() {
   const debouncedSearch = useDebouncedValue(search.trim());
   const deferredSearch = useDeferredValue(search.trim());
   const searchInput = useRef(null);
-  const [catalogPage, setCatalogPage] = useState(1);
+  const { limit: catalogLimit } = usePageSize('cards');
+  const [catalogPage, setCatalogPage] = usePageState(catalogLimit);
   const [announcement, setAnnouncement] = useState('');
   const [pendingScan, setPendingScan] = useState('');
   const [cart, setCart] = useState([]);
@@ -82,7 +84,8 @@ export default function POSPage() {
   const [cashAmount, setCashAmount] = useState('');
   const [upiAmount, setUpiAmount] = useState('');
   const [accountSearch, setAccountSearch] = useState('');
-  const [accountPage, setAccountPage] = useState(1);
+  const { limit: accountLimit } = usePageSize('compact');
+  const [accountPage, setAccountPage] = usePageState(accountLimit);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const debouncedAccountSearch = useDebouncedValue(accountSearch.trim());
   const [customerName, setCustomerName] = useState('');
@@ -99,9 +102,9 @@ export default function POSPage() {
   const retrySeconds = useRetryCountdown(retryAt);
   const draftLocked = submitting || Boolean(retryAt);
 
-  const catalogQuery = useGetProductsQuery({ ...POS_CATALOG_PARAMS, ...(catalogPage > 1 && { page: catalogPage }) });
+  const catalogQuery = useGetProductsQuery({ ...POS_CATALOG_PARAMS, limit: catalogLimit, ...(catalogPage > 1 && { page: catalogPage }) });
   const searchQuery = useGetProductsQuery(
-    { search: debouncedSearch, isActive: true, limit: 24, sortBy: 'name' },
+    { search: debouncedSearch, isActive: true, limit: catalogLimit, page: catalogPage, sortBy: 'name' },
     { skip: !debouncedSearch }
   );
   const remote = debouncedSearch && debouncedSearch === deferredSearch ? searchQuery.currentData?.data ?? EMPTY_PRODUCTS : EMPTY_PRODUCTS;
@@ -187,7 +190,7 @@ export default function POSPage() {
   const isUdhar = paymentMethod === 'credit' || (isSplit && pendingAmount > 0);
   const phone = customerPhone.trim();
   const isValidPhone = /^[6-9]\d{9}$/.test(phone);
-  const { currentData: udharData, error: udharError, isFetching: findingUdhar, refetch: refetchAccounts } = useGetPOSUdharCustomersQuery({ search: debouncedAccountSearch, page: accountPage }, {
+  const { currentData: udharData, error: udharError, isFetching: findingUdhar, refetch: refetchAccounts } = useGetPOSUdharCustomersQuery({ search: debouncedAccountSearch, page: accountPage, limit: accountLimit }, {
     skip: !isUdhar, refetchOnFocus: true,
   });
   const udharCustomer = selectedCustomer;
@@ -331,10 +334,10 @@ export default function POSPage() {
           {!products.length && <p className="card p-5 text-sm text-slate-500" role="status">
             {searchPending ? 'Searching for items…' : search.trim() ? 'No items found. Try a name or barcode.' : 'No items yet. Add your first item from Products.'}
           </p>}
-          {!search.trim() && (catalogPage > 1 || (catalogQuery.currentData?.meta?.totalPages ?? 1) > catalogPage) && <div className="flex items-center justify-between gap-2">
+          {(catalogPage > 1 || (activeQuery.currentData?.meta?.totalPages ?? 1) > catalogPage) && <div className="flex items-center justify-between gap-2">
             <button type="button" className="btn-secondary" disabled={catalogPage <= 1 || searching} onClick={() => setCatalogPage((page) => page - 1)}>Previous items</button>
             <span className="text-sm">Page {catalogPage}</span>
-            <button type="button" className="btn-secondary" disabled={searching || catalogPage >= (catalogQuery.currentData?.meta?.totalPages ?? catalogPage)} onClick={() => setCatalogPage((page) => page + 1)}>More items</button>
+            <button type="button" className="btn-secondary" disabled={searching || catalogPage >= (activeQuery.currentData?.meta?.totalPages ?? catalogPage)} onClick={() => setCatalogPage((page) => page + 1)}>More items</button>
           </div>}
           {search.trim() && (searchQuery.currentData?.meta?.total ?? 0) > 24 && <p className="text-sm text-slate-500">More items match. Enter a fuller name or barcode.</p>}
         </section>

@@ -1,3 +1,5 @@
+import Pagination from '../../../components/ui/Pagination';
+import { usePageSize, usePageState } from '../../../hooks/usePagination';
 import { useState } from 'react';
 import { Plus, Search, TrendingDown, CreditCard, Clock, CheckCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -21,9 +23,10 @@ function formatDate(str) {
 export default function PurchaseList() {
   const [search, setSearch] = useState('');
   const [paymentStatus, setPaymentStatus] = useState('');
-  const [page, setPage] = useState(1);
+  const { limit } = usePageSize('compact');
+  const [page, setPage] = usePageState(limit);
 
-  const { data, isLoading, isFetching } = useGetPurchasesQuery({ search, paymentStatus, page, limit: 20 });
+  const { data, isLoading, isFetching } = useGetPurchasesQuery({ search, paymentStatus, page, limit });
   const { data: statsData } = useGetPurchaseStatsQuery({});
 
   const purchases = data?.data?.purchases || [];
@@ -159,15 +162,7 @@ export default function PurchaseList() {
             </table>
           </div>
 
-          {meta.totalPages > 1 && (
-            <div className="flex items-center justify-between px-4 py-3 border-t border-navy-700/60">
-              <p className="text-xs text-slate-500">{meta.total} entries · Page {meta.page} of {meta.totalPages}</p>
-              <div className="flex gap-2">
-                <button disabled={page === 1} onClick={() => setPage((p) => p - 1)} className="btn btn-secondary btn-sm">Prev</button>
-                <button disabled={page >= meta.totalPages} onClick={() => setPage((p) => p + 1)} className="btn btn-secondary btn-sm">Next</button>
-              </div>
-            </div>
-          )}
+          <Pagination meta={meta} page={page} onPageChange={setPage} isFetching={isFetching} label="purchases" />
         </div>
       )}
     </div>

@@ -1,3 +1,5 @@
+import { useClientPagination } from '../../hooks/usePagination';
+import Pagination from '../../components/ui/Pagination';
 import { useState } from 'react';
 import { Plus, Edit2, Trash2, CreditCard, Zap, Check, Package, Crown } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -39,6 +41,7 @@ export default function PlansPage() {
 
   const plans = data?.data?.plans ?? [];
 
+  const paging = useClientPagination(plans, '', 'cards');
   const set = (key, val) => setForm((f) => ({ ...f, [key]: val }));
   const setLimit = (key, val) => setForm((f) => ({ ...f, limits: { ...f.limits, [key]: val } }));
   const toggleModule = (m) => set('modules', form.modules.includes(m) ? form.modules.filter((x) => x !== m) : [...form.modules, m]);
@@ -114,7 +117,7 @@ export default function PlansPage() {
         <EmptyState icon={CreditCard} title="No plans yet" description="Click Seed Defaults to add the 4 standard plans, or create a custom one." />
       ) : (
         <div className="grid gap-5 grid-cols-[repeat(auto-fit,minmax(min(100%,16rem),1fr))]">
-          {plans.map((p) => {
+          {paging.items.map((p) => {
             const Icon = PLAN_ICONS[p.name] || CreditCard;
             const colorCls = PLAN_COLORS[p.name] || PLAN_COLORS.basic;
             return (
@@ -254,6 +257,7 @@ export default function PlansPage() {
               </div>
             </form>
       </Modal>
+      <Pagination meta={paging.meta} page={paging.page} onPageChange={paging.setPage} isFetching={isLoading} label="plans" />
     </div>
   );
 }

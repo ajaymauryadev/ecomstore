@@ -35,11 +35,11 @@ export const reportsApi = baseApi.injectEndpoints({
       providesTags: [{ type: 'Reports', id: 'stock' }],
     }),
     getSupplierDuesReport: builder.query({
-      query: () => '/reports/supplier-dues',
+      query: (params = {}) => ({ url: '/reports/supplier-dues', params }),
       providesTags: [{ type: 'Reports', id: 'supplier-dues' }],
     }),
     getCustomerDuesReport: builder.query({
-      query: () => '/reports/customer-dues',
+      query: (params = {}) => ({ url: '/reports/customer-dues', params }),
       providesTags: [{ type: 'Reports', id: 'customer-dues' }],
     }),
     getExpenseReport: builder.query({

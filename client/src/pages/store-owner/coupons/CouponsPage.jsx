@@ -1,3 +1,5 @@
+import { usePagination } from '../../../hooks/usePagination';
+import Pagination from '../../../components/ui/Pagination';
 import { useState } from 'react';
 import { Plus, Edit2, Trash2, Tag, Copy, Check, ToggleLeft, ToggleRight } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -21,7 +23,8 @@ function generateCode() {
 }
 
 export default function CouponsPage() {
-  const { data, isLoading } = useGetCouponsQuery();
+  const paging = usePagination('', 'cards');
+  const { data, isLoading, isFetching } = useGetCouponsQuery({ page: paging.page, limit: paging.limit });
   const [create] = useCreateCouponMutation();
   const [update] = useUpdateCouponMutation();
   const [del] = useDeleteCouponMutation();
@@ -31,7 +34,7 @@ export default function CouponsPage() {
   const [editId, setEditId] = useState(null);
   const [copiedCode, setCopiedCode] = useState(null);
 
-  const coupons = data?.data?.coupons ?? [];
+  const coupons = data?.data ?? [];
 
   const set = (key, val) => setForm((f) => ({ ...f, [key]: val }));
 
@@ -110,7 +113,7 @@ export default function CouponsPage() {
           <p className="text-slate-400">No coupons yet. Create your first one!</p>
         </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div ref={paging.contentRef} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {coupons.map((c) => {
             const expired = c.expiresAt && new Date(c.expiresAt) < new Date();
             return (
@@ -156,6 +159,7 @@ export default function CouponsPage() {
         </div>
       )}
 
+      <Pagination meta={data?.meta} page={paging.page} onPageChange={paging.setPage} isFetching={isFetching} label="coupons" />
       <Modal isOpen={showForm} onClose={() => setShowForm(false)} title={editId ? 'Edit Coupon' : 'Create Coupon'} size="lg">
             <form onSubmit={handleSubmit} className="space-y-4">
               {/* Code */}
