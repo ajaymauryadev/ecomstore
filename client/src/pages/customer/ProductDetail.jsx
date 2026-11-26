@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link, useNavigate, useOutletContext } from 'react-router-dom';
 import {
   ShoppingCart, Plus, Minus, Heart, Tag, Trash2,
   ChevronRight, AlertTriangle, Flame, Zap,
@@ -58,6 +58,7 @@ function ProductImage({ images, name }) {
 }
 
 function RelatedCard({ product }) {
+  const { cartReady = true } = useOutletContext() || {};
   const activeVariants = product.variants?.filter((v) => v.isActive) || [];
   const variant = activeVariants.find((v) => v.stock > 0) ?? activeVariants[0];
   const { getItemQuantity, addItem, updateQuantity } = useCart();
@@ -100,7 +101,7 @@ function RelatedCard({ product }) {
           <button
             type="button"
             aria-label={`Add ${product.name} to cart`}
-            disabled={variant.stock <= 0 || qty >= variant.stock}
+            disabled={!cartReady || variant.stock <= 0 || qty >= variant.stock}
             onClick={(e) => {
               e.preventDefault();
               if (qty === 0) addItem(cartItem);
@@ -117,6 +118,7 @@ function RelatedCard({ product }) {
 }
 
 export default function ProductDetail() {
+  const { cartReady = true } = useOutletContext() || {};
   const { storeSlug, productId } = useParams();
   const navigate = useNavigate();
   const user = useSelector(selectCurrentUser);
@@ -274,28 +276,28 @@ export default function ProductDetail() {
               Out of Stock
             </button>
           ) : qty === 0 ? (
-            <button onClick={handleAdd} className="btn btn-secondary btn-lg w-full min-w-0 gap-1.5 px-2 text-sm sm:px-6 sm:text-base whitespace-nowrap">
+            <button onClick={handleAdd} disabled={!cartReady} className="btn btn-secondary btn-lg w-full min-w-0 gap-1.5 px-2 text-sm sm:px-6 sm:text-base whitespace-nowrap">
               <ShoppingCart size={18} className="shrink-0" />
               Add to Cart
             </button>
           ) : (
             <div className="flex flex-wrap items-center gap-3">
               <div className="flex min-w-[10rem] items-center gap-3 bg-navy-800 border border-navy-700 rounded-xl px-3 py-2 flex-1 justify-between">
-                <button aria-label={qty === 1 ? 'Remove from cart' : 'Decrease quantity'} onClick={() => updateQuantity(cartKey, qty - 1)} className="w-11 h-11 shrink-0 rounded-lg bg-navy-700 hover:bg-navy-600 flex items-center justify-center text-slate-300 transition-colors">
+                <button aria-label={qty === 1 ? 'Remove from cart' : 'Decrease quantity'} disabled={!cartReady} onClick={() => updateQuantity(cartKey, qty - 1)} className="w-11 h-11 shrink-0 rounded-lg bg-navy-700 hover:bg-navy-600 flex items-center justify-center text-slate-300 transition-colors">
                   {qty === 1 ? <Trash2 size={14} className="text-red-400" /> : <Minus size={14} />}
                 </button>
                 <span className="text-lg font-black text-gold-400">{qty}</span>
-                <button aria-label="Increase quantity" onClick={() => qty < variant.stock && updateQuantity(cartKey, qty + 1)} disabled={qty >= variant.stock} className="w-11 h-11 shrink-0 rounded-lg bg-gold-500/10 hover:bg-gold-500/20 disabled:opacity-40 flex items-center justify-center text-gold-400 transition-colors">
+                <button aria-label="Increase quantity" onClick={() => qty < variant.stock && updateQuantity(cartKey, qty + 1)} disabled={!cartReady || qty >= variant.stock} className="w-11 h-11 shrink-0 rounded-lg bg-gold-500/10 hover:bg-gold-500/20 disabled:opacity-40 flex items-center justify-center text-gold-400 transition-colors">
                   <Plus size={14} />
                 </button>
               </div>
-              <button onClick={openCart} className="btn btn-secondary btn-lg px-5">
+              <button onClick={openCart} disabled={!cartReady} className="btn btn-secondary btn-lg px-5">
                 View Cart
               </button>
             </div>
           )}
 
-          {variant.stock > 0 && <button type="button" onClick={() => navigate(`/s/${storeSlug}/checkout`, { state: { buyNow: cartItem } })} className="btn btn-primary btn-lg w-full min-w-0 gap-1.5 px-2 text-sm sm:px-6 sm:text-base whitespace-nowrap">
+          {variant.stock > 0 && <button type="button" disabled={!cartReady} onClick={() => navigate(`/s/${storeSlug}/checkout`, { state: { buyNow: cartItem } })} className="btn btn-primary btn-lg w-full min-w-0 gap-1.5 px-2 text-sm sm:px-6 sm:text-base whitespace-nowrap">
             <Zap size={18} className="shrink-0" aria-hidden="true" /> Buy Now
           </button>}
           </div>

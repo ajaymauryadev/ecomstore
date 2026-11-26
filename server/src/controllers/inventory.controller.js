@@ -8,6 +8,7 @@ import { logAudit } from '../services/audit.service.js';
 import { runInTransaction } from '../utils/transaction.js';
 import { assertPositiveInteger } from '../utils/money.js';
 import { escapeRegex, parsePagination } from '../utils/query.js';
+import { inventoryStockExpression } from '../utils/inventoryQuery.js';
 
 /* ─── Inventory dashboard ─────────────────────────── */
 export const getInventoryDashboard = async (req, res, next) => {
@@ -83,27 +84,19 @@ export const getInventoryList = async (req, res, next) => {
       filter.$or = [{ name: regex }, { brand: regex }];
     }
 
-    let products = await Product.find(filter)
-      .populate('categoryId', 'name emoji')
-      .sort({ name: 1 })
-      .lean({ virtuals: true });
-
-    // Filter by stock status across variants
-    if (stockStatus) {
-      products = products.filter((p) => {
-        const hasLow = p.variants.some(
-          (v) => v.isActive && v.stock > 0 && v.stock <= v.lowStockLimit
-        );
-        const hasOut = p.variants.some((v) => v.isActive && v.stock <= 0);
-        if (stockStatus === 'low_stock') return hasLow;
-        if (stockStatus === 'out_of_stock') return hasOut;
-        if (stockStatus === 'in_stock') return !hasLow && !hasOut;
-        return true;
-      });
-    }
-
-    const total = products.length;
-    const paginated = products.slice(skip, skip + limit);
+    const stockExpression = inventoryStockExpression(stockStatus);
+    if (stockExpression) filter.$expr = stockExpression;
+    const [products, total] = await Promise.all([
+      Product.find(filter)
+        .select('name brand categoryId images variants isActive')
+        .populate({ path: 'categoryId', select: 'name emoji', match: { tenantId: req.tenantId } })
+        .sort({ name: 1, _id: 1 }).skip(skip).limit(limit).lean(),
+      Product.countDocuments(filter),
+    ]);
+    // Mongoose's built-in lean() does not execute schema virtuals.
+    const paginated = products.map((product) => ({ ...product,
+      mainImage: product.images?.find((image) => image.isMain)?.url ?? product.images?.[0]?.url ?? null,
+    }));
 
     res.json({
       success: true,

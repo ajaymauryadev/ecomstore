@@ -154,10 +154,12 @@ export default function CustomerLayout() {
   const store = storeData?.data?.store;
   const isAuth = useMatch('/s/:storeSlug/auth');
   const isCheckout = useMatch('/s/:storeSlug/checkout');
+  const isCart = useMatch('/s/:storeSlug/cart');
   const isCustomer = user?.role === 'customer' && (user.tenantId?._id ?? user.tenantId) === store?._id;
   const sessionUserId = user?._id ?? null;
   const userId = isCustomer ? sessionUserId : null;
   const expectedScope = cartDraftKey(store?._id, userId);
+  const cartReady = scopeKey === expectedScope && status === 'ready';
 
   useEffect(() => {
     if (!expectedScope) return;
@@ -196,8 +198,10 @@ export default function CustomerLayout() {
     return <Navigate to={`/s/${storeSlug}/auth`} state={{ checkout: true, buyNow: location.state?.buyNow }} replace />;
   }
 
-  if (scopeKey !== expectedScope || status === 'idle' || status === 'loading') return <PageLoader className="workspace-theme" />;
-  if (status === 'error') {
+  // Only cart/checkout require restored cart data. Browsing and order history
+  // must not wait for an unrelated product/coupon verification request.
+  if ((isCart || isCheckout) && (scopeKey !== expectedScope || status === 'idle' || status === 'loading')) return <PageLoader className="workspace-theme" />;
+  if ((isCart || isCheckout) && status === 'error') {
     return (
       <main className="workspace-theme min-h-screen bg-navy-950 flex items-center justify-center p-6">
         <div className="card max-w-md p-8 text-center">
@@ -220,7 +224,7 @@ export default function CustomerLayout() {
     { label: 'Home', icon: Home, to: ROUTES.STOREFRONT(storeSlug), end: true },
     { label: 'Categories', icon: LayoutGrid, to: ROUTES.STOREFRONT_CATEGORIES(storeSlug) },
     { label: 'Account', icon: User, to: isCustomer ? ROUTES.STOREFRONT_ACCOUNT(storeSlug) : ROUTES.STOREFRONT_AUTH(storeSlug) },
-    { label: 'Cart', icon: ShoppingCart, onClick: openCart, ariaLabel: cartLabel, expanded: isOpen, active: isOpen, count },
+    { label: 'Cart', icon: ShoppingCart, onClick: openCart, disabled: !cartReady, ariaLabel: cartLabel, expanded: isOpen, active: isOpen, count },
   ];
 
   const isOrderPage = location.pathname.includes('/orders/');
@@ -271,6 +275,7 @@ export default function CustomerLayout() {
               {!isCheckout && (
                 <button
                   onClick={openCart}
+                  disabled={!cartReady}
                   aria-label={cartLabel}
                   aria-expanded={isOpen}
                   title="Cart"
@@ -303,18 +308,24 @@ export default function CustomerLayout() {
         {/* Page content */}
         <div key={location.pathname} className="customer-scroll min-h-0 flex-1 overflow-y-auto overscroll-y-contain">
           <main id="shop-content" tabIndex={-1} className="page-width customer-main py-5 sm:py-8">
+            {!cartReady && <div role="status" className="mb-4 text-sm text-slate-400">
+              {status === 'error' ? <>
+                Cart could not be checked. Your saved draft is retained.
+                <button type="button" className="ml-2 underline" onClick={() => setRestoreAttempt((attempt) => attempt + 1)}>Retry cart</button>
+              </> : 'Checking saved cart… You can continue browsing.'}
+            </div>}
             {restoredWithChanges && (
               <p role="status" className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-300">
                 Cart availability or coupon eligibility changed. Review your cart before checkout.
               </p>
             )}
-            <RouteContent><Outlet context={{ search, store }} /></RouteContent>
+            <RouteContent><Outlet context={{ search, store, cartReady }} /></RouteContent>
           </main>
         </div>
 
         {!isCheckout && <MobileNavigation label="Shop navigation" items={mobileItems} className="md:hidden" />}
 
-        <CartDrawer isOpen={isOpen} onClose={closeCart} />
+        {cartReady && <CartDrawer isOpen={isOpen} onClose={closeCart} />}
       </div>
     </WorkspaceTheme.Provider>
   );

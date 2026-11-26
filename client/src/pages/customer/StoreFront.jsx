@@ -52,6 +52,7 @@ function VariantSelector({ variants, selected, onSelect }) {
 
 /* ─── Add / Qty control ────────────────────────────────── */
 function CartControl({ product, variant }) {
+  const { cartReady = true } = useOutletContext() || {};
   const { getItemQuantity, addItem, updateQuantity } = useCart();
   const cartKey = `${product._id}_${variant._id}`;
   const qty = getItemQuantity(cartKey);
@@ -83,6 +84,7 @@ function CartControl({ product, variant }) {
       <button
         type="button"
         aria-label={`Add ${product.name} to cart`}
+        disabled={!cartReady}
         onClick={(e) => { e.stopPropagation(); addItem(cartItem); }}
         className="w-11 h-11 rounded-xl bg-gold-500 text-white flex items-center justify-center hover:brightness-110 active:scale-90 transition-all duration-150 shadow-sm"
       >
@@ -99,6 +101,7 @@ function CartControl({ product, variant }) {
       <button
         type="button"
         aria-label={`Decrease quantity of ${product.name}`}
+        disabled={!cartReady}
         onClick={() => updateQuantity(cartKey, qty - 1)}
         className="w-11 h-11 rounded-xl bg-navy-700 hover:bg-navy-600 flex items-center justify-center text-slate-300 transition-colors"
       >
@@ -109,7 +112,7 @@ function CartControl({ product, variant }) {
         type="button"
         aria-label={`Increase quantity of ${product.name}`}
         onClick={() => qty < variant.stock && updateQuantity(cartKey, qty + 1)}
-        disabled={qty >= variant.stock}
+        disabled={!cartReady || qty >= variant.stock}
         className="w-11 h-11 rounded-xl bg-gold-500/10 hover:bg-gold-500/20 disabled:opacity-40 flex items-center justify-center text-gold-400 transition-colors"
       >
         <Plus size={12} />

@@ -44,6 +44,8 @@ test('pickup cart reaches checkout and submitted payments render in the owner qu
   const order = await storefront.Order.findOne({ tenantId: store._id });
 
   const owner = await browser.newPage();
+  if (process.env.STOREFRONT_OFFLINE_FONTS === 'true') await owner.route('https://fonts.googleapis.com/**',
+    (route) => route.fulfill({ status: 200, contentType: 'text/css', body: '' }));
   captureErrors(owner);
   try {
     await owner.goto(storefront.origin + '/login');
@@ -51,8 +53,10 @@ test('pickup cart reaches checkout and submitted payments render in the owner qu
     await owner.locator('input[name="password"]').fill(password);
     await owner.getByRole('button', { name: 'Sign in', exact: true }).click();
     await expect(owner).toHaveURL(/\/store\/dashboard$/);
-    const responsePromise = owner.waitForResponse((response) => response.url().includes('/admin/orders/payment-queue'));
-    await owner.goto(storefront.origin + '/store/orders/payment-queue');
+    await owner.getByRole('button', { name: 'Sales', exact: true }).click();
+    const responsePromise = owner.waitForResponse((response) => response.url().includes('/admin/orders/payment-queue') &&
+      new URL(response.url()).searchParams.get('limit') !== '1');
+    await owner.getByRole('link', { name: /^Payments/ }).first().click();
     const response = await responsePromise;
     expect(response.status()).toBe(200);
     const queue = (await response.json()).data;

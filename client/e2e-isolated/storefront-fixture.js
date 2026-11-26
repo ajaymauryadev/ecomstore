@@ -6,7 +6,7 @@ import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createServer as createViteServer } from 'vite';
+import { createServer as createViteServer, preview } from 'vite';
 import { test as base } from '@playwright/test';
 
 const serverRequire = createRequire(new URL('../../server/package.json', import.meta.url));
@@ -38,7 +38,22 @@ async function withStorefrontFixture(use, { realtime = false } = {}) {
       VITE_WS_URL: '',
     });
     const apiOrigin = 'http://127.0.0.1:' + api.address().port;
-    vite = await createViteServer({
+    if (process.env.STOREFRONT_PRODUCTION === 'true') {
+      const built = await preview({ preview: { host: '127.0.0.1', port: 0,
+        proxy: { '/api': { target: apiOrigin, changeOrigin: true }, '/uploads': { target: apiOrigin, changeOrigin: true }, '/socket.io': { target: apiOrigin, changeOrigin: true, ws: true } },
+      } });
+      const connections = new Set();
+      built.httpServer.on('connection', (socket) => {
+        connections.add(socket);
+        socket.once('close', () => connections.delete(socket));
+      });
+      vite = { httpServer: built.httpServer, close: () => {
+        // Node's closeAllConnections excludes upgraded WebSocket connections.
+        for (const socket of connections) socket.destroy();
+        return new Promise((resolve) => built.httpServer.close(resolve));
+      } };
+    } else {
+      vite = await createViteServer({
       cacheDir: path.join(root, 'vite'),
       server: {
         host: '127.0.0.1',
@@ -46,12 +61,13 @@ async function withStorefrontFixture(use, { realtime = false } = {}) {
         proxy: { '/api': { target: apiOrigin, changeOrigin: true }, '/uploads': { target: apiOrigin, changeOrigin: true }, '/socket.io': { target: apiOrigin, changeOrigin: true, ws: true } },
       },
     });
-    await vite.listen();
+      await vite.listen();
+    }
     const origin = 'http://127.0.0.1:' + vite.httpServer.address().port;
     process.env.CORS_ORIGINS = origin;
     const { app } = await import('../../server/src/app.js');
     api.on('request', app);
-    if (realtime) {
+    if (realtime || process.env.STOREFRONT_PRODUCTION === 'true') {
       const { initSocket } = await import('../../server/src/config/socket.js');
       sockets = initSocket(api);
     }
@@ -94,9 +110,9 @@ async function withStorefrontFixture(use, { realtime = false } = {}) {
     await use({ origin, apiOrigin, seedStore, Product, Order, StockLedger, Coupon, User, UdharCustomer, UdharEntry, Supplier, PurchaseEntry });
   } finally {
     try {
+      if (sockets) await new Promise((resolve) => sockets.close(resolve));
       await vite?.close();
     } finally {
-      if (sockets) await sockets.close();
       if (api?.listening) await new Promise((resolve) => api.close(resolve));
       await mongoose.disconnect();
       try {
@@ -108,17 +124,25 @@ async function withStorefrontFixture(use, { realtime = false } = {}) {
   }
 }
 
+const isolatedFonts = [async ({ page }, use) => {
+  if (process.env.STOREFRONT_OFFLINE_FONTS === 'true') await page.route('https://fonts.googleapis.com/**', (route) => route.fulfill({ status: 200, contentType: 'text/css', body: '' }));
+  await use();
+}, { auto: true }];
+
 export const test = base.extend({
+  isolatedFonts,
   storefront: [async ({}, use) => withStorefrontFixture(use), { scope: 'worker', timeout: 300_000 }],
-  // Independent scenarios share a disposable API process, not an auth-attempt budget.
+  // Independent scenarios share a disposable API process and loopback IP.
   // Keep the production limiter enabled within each scenario.
   authBudget: [async ({ storefront }, use) => {
-    const { authLimiter } = await import('../../server/src/middleware/rateLimiter.js');
-    authLimiter.resetKey(new URL(storefront.origin).hostname);
+    const { authLimiter, apiLimiter, refreshLimiter, paymentProofLimiter } = await import('../../server/src/middleware/rateLimiter.js');
+    const address = new URL(storefront.origin).hostname;
+    for (const limiter of [authLimiter, apiLimiter, refreshLimiter, paymentProofLimiter]) limiter.resetKey(address);
     await use();
   }, { auto: true }],
 });
 
 export const realtimeTest = base.extend({
+  isolatedFonts,
   storefront: [async ({}, use) => withStorefrontFixture(use, { realtime: true }), { scope: 'worker', timeout: 300_000 }],
 });

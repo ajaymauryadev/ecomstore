@@ -350,7 +350,80 @@ describe('sales and customer ledger detail', () => {
   });
 });
 
+describe('bounded inventory reads', () => {
+  test('matches the original stock filters and totals across pages without omitting archived variants', async () => {
+    const categories = await Category.create([
+      { tenantId: ids.storeA, name: 'Local' }, { tenantId: ids.storeB, name: 'Foreign' },
+    ]);
+    const products = await Product.create(Array.from({ length: 31 }, (_, index) => ({
+      tenantId: ids.storeA, name: `Item ${String(Math.floor(index / 2)).padStart(2, '0')}`,
+      brand: index % 2 ? 'Brand A' : 'Brand B', isActive: index !== 30,
+      categoryId: categories[0]._id, description: 'Not needed in an inventory row',
+      images: [{ url: '/first.webp' }, { url: '/main.webp', isMain: true }],
+      variants: [
+        { name: 'Active', retailPrice: 10, stock: index % 10, lowStockLimit: 3, isActive: index % 7 !== 0 },
+        { name: 'Archived', retailPrice: 20, stock: 0, lowStockLimit: 2, isActive: false },
+      ],
+    })));
+    await createProduct({ tenantId: ids.storeB, name: 'Item foreign', stock: 0 });
+    const active = products.filter((p) => p.isActive).sort((a, b) => a.name.localeCompare(b.name) || String(a._id).localeCompare(String(b._id)));
+    for (const status of ['', 'low_stock', 'out_of_stock', 'in_stock']) {
+      const matching = active.filter((p) => {
+        const hasLow = p.variants.some((v) => v.isActive && v.stock > 0 && v.stock <= v.lowStockLimit);
+        const hasOut = p.variants.some((v) => v.isActive && v.stock <= 0);
+        return status === 'low_stock' ? hasLow : status === 'out_of_stock' ? hasOut : status === 'in_stock' ? !hasLow && !hasOut : true;
+      });
+      const found = [];
+      for (let page = 1; page <= Math.ceil(matching.length / 5); page++) {
+        const response = await request(app).get('/api/v1/inventory/list').set(auth(tokens.ownerA))
+          .query({ page, limit: 5, stockStatus: status });
+        expect(response.status).toBe(200);
+        expect(response.body.meta).toMatchObject({ total: matching.length, page, limit: 5 });
+        expect(response.body.data.products.length).toBeLessThanOrEqual(5);
+        for (const product of response.body.data.products) {
+          expect(product.variants[1]).toMatchObject({ name: 'Archived', isActive: false, stock: 0 });
+          expect(product.mainImage).toBe('/main.webp');
+          expect(product.categoryId.name).toBe('Local');
+          expect(product.description).toBeUndefined();
+          found.push(product._id);
+        }
+      }
+      expect(found).toEqual(matching.map((p) => String(p._id)));
+    }
+    const searched = await request(app).get('/api/v1/inventory/list').set(auth(tokens.ownerA))
+      .query({ search: 'Brand A', categoryId: categories[0]._id.toString(), limit: 5 });
+    expect(searched.body.meta.total).toBe(15);
+    const escaped = await request(app).get('/api/v1/inventory/list').set(auth(tokens.ownerA)).query({ search: '.*' });
+    expect(escaped.body.meta.total).toBe(0);
+    const foreign = await request(app).get('/api/v1/inventory/list').set(auth(tokens.ownerA))
+      .query({ categoryId: categories[1]._id.toString() });
+    expect(foreign.body.meta.total).toBe(0);
+  });
+});
+
 describe('owner dashboard queues', () => {
+  test('preserves day boundaries, status exclusions and revenue in combined day summaries', async () => {
+    const today = accountingDay(undefined, 'Asia/Kolkata');
+    const yesterday = accountingDay(new Date(today.start.getTime() - 1), 'Asia/Kolkata');
+    const rows = [
+      { status: 'delivered', createdAt: today.start, deliveredAt: today.start, amount: 125.25 },
+      { status: 'delivered', createdAt: yesterday.start, deliveredAt: yesterday.start, amount: 70.1 },
+      { status: 'accepted', createdAt: today.start, amount: 999 },
+      { status: 'cancelled', createdAt: today.start, amount: 999 },
+      { status: 'rejected', createdAt: yesterday.start, amount: 999 },
+      { status: 'delivered', createdAt: today.end, deliveredAt: today.end, amount: 999 },
+      { status: 'delivered', createdAt: new Date(yesterday.start.getTime() - 1), deliveredAt: new Date(yesterday.start.getTime() - 1), amount: 999 },
+    ];
+    await Order.collection.insertMany(rows.map(({ amount, ...row }, i) => ({
+      ...row, tenantId: ids.storeA, orderNumber: `SUMMARY-${i}`, pricing: { grandTotal: amount },
+    })));
+    await Order.collection.insertOne({ tenantId: ids.storeB, orderNumber: 'FOREIGN-SUMMARY', status: 'delivered', createdAt: today.start, deliveredAt: today.start, pricing: { grandTotal: 9999 } });
+    const response = await request(app).get('/api/v1/dashboard').set(auth(tokens.ownerA));
+    expect(response.status).toBe(200);
+    expect(response.body.data.kpis).toMatchObject({ revenueToday: 125.25, revenueYesterday: 70.1,
+      ordersToday: 2, ordersYesterday: 1, ordersChange: 100 });
+  });
+
   test('counts all tenant pending orders and low-stock variants with bounded previews', async () => {
     const orders = Array.from({ length: 9 }, (_, index) => ({
       tenantId: ids.storeA, orderNumber: `OPEN-${index}`, status: 'accepted', createdAt: new Date(index),

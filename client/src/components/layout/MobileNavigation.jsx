@@ -11,7 +11,7 @@ export default function MobileNavigation({ label, items, className }) {
   return (
     <nav aria-label={label} className={cn("safe-bottom shrink-0 border-t border-[var(--brand-line)] bg-navy-900", className)}>
       <div className="mx-auto flex max-w-2xl items-stretch px-1">
-        {items.map(({ label: name, icon: Icon, to, end, onClick, expanded, active, count, ariaLabel }) => {
+        {items.map(({ label: name, icon: Icon, to, end, onClick, expanded, active, count, ariaLabel, disabled }) => {
           const content = (
             <>
               <span className="relative">
@@ -31,7 +31,7 @@ export default function MobileNavigation({ label, items, className }) {
               {content}
             </NavLink>
           ) : (
-            <button key={name} type="button" onClick={onClick} aria-label={ariaLabel} aria-expanded={expanded} className={itemClass(active)}>
+            <button key={name} type="button" onClick={onClick} disabled={disabled} aria-label={ariaLabel} aria-expanded={expanded} className={itemClass(active)}>
               {content}
             </button>
           );

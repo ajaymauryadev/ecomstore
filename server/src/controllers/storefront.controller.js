@@ -568,7 +568,7 @@ export const createOrder = asyncHandler(async (req, res, next) => {
 });
 
 export const getOrders = asyncHandler(async (req, res, next) => {
-  const store = await findStore(req.params.slug);
+  const store = req.store ?? await findStore(req.params.slug);
   if (!store) return next(new AppError('Store not found.', 404));
 
   if (!req.user) return next(new AppError('Authentication required to view orders.', 401));

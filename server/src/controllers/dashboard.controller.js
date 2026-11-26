@@ -18,22 +18,20 @@ const ownerDashboard = async (tenantId, timeZone) => {
   const tenantObjectId = new mongoose.Types.ObjectId(tenantId);
   const today = accountingDay(undefined, timeZone);
   const yesterday = accountingDay(shiftAccountingDate(today.businessDate, -1), timeZone);
-  const salesMatch = (range) => ({
+  const salesMatch = {
     tenantId: tenantObjectId,
     status: 'delivered',
-    deliveredAt: { $gte: range.start, $lt: range.end },
-  });
-  const orderMatch = (range) => ({
-    tenantId,
+    deliveredAt: { $gte: yesterday.start, $lt: today.end },
+  };
+  const orderMatch = {
+    tenantId: tenantObjectId,
     status: { $nin: ['cancelled', 'rejected'] },
-    createdAt: { $gte: range.start, $lt: range.end },
-  });
+    createdAt: { $gte: yesterday.start, $lt: today.end },
+  };
 
   const [
-    [todaySales],
-    [yesterdaySales],
-    todayOrders,
-    yesterdayOrders,
+    salesByDay,
+    ordersByDay,
     productCount,
     staffCount,
     recentOrders,
@@ -41,15 +39,14 @@ const ownerDashboard = async (tenantId, timeZone) => {
     [stock],
   ] = await Promise.all([
     Order.aggregate([
-      { $match: salesMatch(today) },
-      { $group: { _id: null, revenue: { $sum: '$pricing.grandTotal' } } },
+      { $match: salesMatch },
+      { $group: { _id: { $cond: [{ $gte: ['$deliveredAt', today.start] }, 'today', 'yesterday'] },
+        revenue: { $sum: '$pricing.grandTotal' } } },
     ]),
     Order.aggregate([
-      { $match: salesMatch(yesterday) },
-      { $group: { _id: null, revenue: { $sum: '$pricing.grandTotal' } } },
+      { $match: orderMatch },
+      { $group: { _id: { $cond: [{ $gte: ['$createdAt', today.start] }, 'today', 'yesterday'] }, count: { $sum: 1 } } },
     ]),
-    Order.countDocuments(orderMatch(today)),
-    Order.countDocuments(orderMatch(yesterday)),
     Product.countDocuments({ tenantId, isActive: true }),
     User.countDocuments({
       tenantId, role: { $in: ['staff', 'packer', 'delivery'] }, isActive: true,
@@ -93,8 +90,10 @@ const ownerDashboard = async (tenantId, timeZone) => {
     ]),
   ]);
 
-  const revenueToday = Number((todaySales?.revenue || 0).toFixed(2));
-  const revenueYesterday = Number((yesterdaySales?.revenue || 0).toFixed(2));
+  const revenueToday = Number((salesByDay.find((row) => row._id === 'today')?.revenue || 0).toFixed(2));
+  const revenueYesterday = Number((salesByDay.find((row) => row._id === 'yesterday')?.revenue || 0).toFixed(2));
+  const todayOrders = ordersByDay.find((row) => row._id === 'today')?.count ?? 0;
+  const yesterdayOrders = ordersByDay.find((row) => row._id === 'yesterday')?.count ?? 0;
   return {
     kpis: {
       revenueToday,
