@@ -5,7 +5,6 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "perf:bundle": "node scripts/bundle-report.mjs",
     "preview": "vite preview",
     "lint": "eslint src/ --ext .js,.jsx",
     "test": "vitest run",

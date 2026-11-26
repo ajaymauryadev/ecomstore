@@ -8,10 +8,7 @@ import {
 } from '../controllers/notification.controller.js';
 
 const router = Router();
-// Customers use the same inbox handlers, which always scope reads and writes
-// to their own user ID and tenant. Employee access still requires permission.
-router.use(protect, tenantIsolation, (req, res, next) => req.user.role === 'customer'
-  ? next() : requirePermission(PERMISSIONS.NOTIFICATIONS_VIEW)(req, res, next));
+router.use(protect, tenantIsolation, requirePermission(PERMISSIONS.NOTIFICATIONS_VIEW));
 
 router.get('/', getNotifications);
 router.get('/unread-count', getUnreadCount);

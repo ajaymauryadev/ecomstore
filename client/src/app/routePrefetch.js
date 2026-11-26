@@ -60,8 +60,6 @@ export const pageLoaders = {
 };
 
 const routes = {
-  '/login': pageLoaders.Login,
-  '/register': pageLoaders.Register,
   '/store/dashboard': pageLoaders.StoreOwnerDashboard,
   '/store/pos': pageLoaders.POSPage,
   '/store/products': pageLoaders.ProductList,
@@ -106,38 +104,18 @@ const routes = {
 
 function routeLoader(pathname) {
   if (routes[pathname]) return routes[pathname];
-  if (/^\/store\/products\/[^/]+\/edit$/.test(pathname)) return pageLoaders.ProductForm;
-  if (/^\/store\/inventory\/ledger\/[^/]+$/.test(pathname)) return pageLoaders.StockLedgerPage;
-  if (/^\/(?:store\/packing\/work|staff\/packing)\/[^/]+$/.test(pathname)) return pageLoaders.StaffPackingPage;
-  if (/^\/super-admin\/stores\/[^/]+$/.test(pathname)) return pageLoaders.TenantDetailPage;
-  if (/^\/s\/[^/]+\/orders\/[^/]+$/.test(pathname)) return pageLoaders.OrderTracking;
   if (/^\/s\/[^/]+(?:\/(?:search|categories))?$/.test(pathname)) return pageLoaders.StoreFront;
   if (/^\/s\/[^/]+\/p\/[^/]+$/.test(pathname)) return pageLoaders.ProductDetail;
-  const customerPage = pathname.match(/^\/s\/[^/]+\/(cart|checkout|orders|account|auth|notifications)$/)?.[1];
+  const customerPage = pathname.match(/^\/s\/[^/]+\/(cart|checkout|orders|account|auth)$/)?.[1];
   return ({ cart: pageLoaders.CartPage, checkout: pageLoaders.Checkout,
-    notifications: pageLoaders.NotificationsPage, orders: pageLoaders.OrderHistory, account: pageLoaders.AccountPage, auth: pageLoaders.CustomerAuth })[customerPage];
+    orders: pageLoaders.OrderHistory, account: pageLoaders.AccountPage, auth: pageLoaders.CustomerAuth })[customerPage];
 }
 
 const loaded = new Map();
-function loadChunk(load) {
-  if (!load) return;
-  if (!loaded.has(load)) loaded.set(load, load().catch(() => { loaded.delete(load); }));
-  return loaded.get(load);
-}
-
-// Load only the requested view and its shell while AuthInit checks the session.
-// This runs no API reads and removes the auth -> layout -> page code waterfall.
-export function prepareRoute(pathname) {
-  const layout = pathname.startsWith('/store/') ? pageLoaders.StoreOwnerLayout
-    : pathname.startsWith('/staff/') ? pageLoaders.StaffLayout
-      : pathname.startsWith('/super-admin/') ? pageLoaders.SuperAdminLayout
-        : pathname.startsWith('/s/') ? pageLoaders.CustomerLayout : null;
-  return Promise.all([loadChunk(layout), loadChunk(routeLoader(pathname))]);
-}
-
 // Chunk preloading performs no writes or authenticated API reads.
 export function prefetchRoute(pathname) {
   const load = routeLoader(pathname);
   if (!load || !backgroundAllowed()) return;
-  return loadChunk(load);
+  if (!loaded.has(load)) loaded.set(load, load().catch(() => { loaded.delete(load); }));
+  return loaded.get(load);
 }

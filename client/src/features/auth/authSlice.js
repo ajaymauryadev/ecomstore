@@ -1,12 +1,8 @@
 import { createSlice } from '@reduxjs/toolkit';
 
-const identity = (user) => JSON.stringify([
-  user?._id ?? null, user?.role ?? null, user?.tenantId?._id ?? user?.tenantId ?? null,
-]);
 const scope = ({ user, store }) => JSON.stringify([
-  identity(user),
+  user?._id ?? null, user?.role ?? null, user?.tenantId?._id ?? user?.tenantId ?? null,
   store?._id ?? store?.slug ?? null,
-  [...(user?.permissions ?? [])].sort(),
 ]);
 
 function changeScope(state, update) {
@@ -28,7 +24,7 @@ const authSlice = createSlice({
     setCredentials: (state, action) => {
       const { user, store, accessToken } = action.payload;
       changeScope(state, () => {
-        const sameAccount = identity(state.user) === identity(user);
+        const sameAccount = scope({ user: state.user }) === scope({ user });
         state.user = user;
         if (store !== undefined || !sameAccount) state.store = store ?? null;
       });

@@ -7,7 +7,7 @@ import { asyncHandler } from '../utils/asyncHandler.js';
 import { AppError } from '../utils/AppError.js';
 import { sendSuccess, sendPaginated } from '../utils/response.js';
 import { emitToTenant, emitToUser, emitToWorkers } from '../config/socket.js';
-import { notifyAdmin, notifyStaff, recordCustomerOrderUpdate, publishNotification } from '../services/notification.service.js';
+import { notifyAdmin, notifyStaff } from '../services/notification.service.js';
 import { logAudit } from '../services/audit.service.js';
 import { isHighValue } from '../models/PackingSession.js';
 import Store from '../models/Store.js';
@@ -91,10 +91,9 @@ export const acceptPackingOrder = asyncHandler(async (req, res) => {
       action: 'status_updated', orderId: order._id, orderNumber: order.orderNumber,
       metadata: { status: 'accepted', source: 'packing' },
     }], { session });
-    return { order, changed: true, notification: await recordCustomerOrderUpdate(order, session) };
+    return { order, changed: true };
   });
   if (result.changed) {
-    publishNotification(result.notification);
     const order = result.order;
     try { emitToWorkers(req.tenantId, 'order:updated', { orderId: order._id, status: 'accepted' }); } catch {}
     if (order.customerId) safeEmitUser(order.customerId, 'order:status_updated', {
@@ -166,11 +165,10 @@ export const startPackingSession = asyncHandler(async (req, res) => {
       orderId: order._id,
       orderNumber: order.orderNumber,
     }], { session: mongoSession });
-    return { session: packing, created: true, notification: await recordCustomerOrderUpdate(order, mongoSession) };
+    return { session: packing, created: true };
   });
 
   if (result.created) {
-    publishNotification(result.notification);
     try { emitToWorkers(req.tenantId, 'order:updated', { orderId: req.params.orderId, status: 'packing' }); } catch {}
     await notifyAdmin(req.tenantId, 'packing_started', 'Packing started',
       `Order #${result.session.orderNumber} is being packed by ${req.user.name}.`,
@@ -404,10 +402,9 @@ export const completePackingSession = asyncHandler(async (req, res) => {
       orderNumber: packing.orderNumber,
       metadata: { totalPacked, totalMissing, highValueMissingCount },
     }], { session: mongoSession });
-    return { packing, totalPacked, totalMissing, highValueMissingCount, notification: await recordCustomerOrderUpdate(order, mongoSession) };
+    return { packing, totalPacked, totalMissing, highValueMissingCount };
   });
 
-  publishNotification(result.notification);
   safeEmitTenant(req.tenantId, 'packing:completed', {
     orderId: result.packing.orderId,
     orderNumber: result.packing.orderNumber,
@@ -559,10 +556,9 @@ export const verifyPackingSession = asyncHandler(async (req, res, next) => {
         metadata: { rejectionReason: packing.rejectionReason },
       }], { session });
     }
-    return { packing, order, notification: await recordCustomerOrderUpdate(order, session) };
+    return { packing, order };
   });
 
-  publishNotification(result.notification);
   safeEmitUser(result.packing.staffId, action === 'approve' ? 'packing:verified' : 'packing:rejected', {
     orderId: result.order._id,
     orderNumber: result.order.orderNumber,

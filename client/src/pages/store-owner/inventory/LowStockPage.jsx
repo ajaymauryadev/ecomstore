@@ -1,4 +1,4 @@
-import { usePagination } from '../../../hooks/usePagination';
+import { useClientPagination } from '../../../hooks/usePagination';
 import Pagination from '../../../components/ui/Pagination';
 import { useEffect, useState, useMemo } from 'react';
 import { AlertTriangle, Package, ArrowLeft } from 'lucide-react';
@@ -7,7 +7,6 @@ import StockAdjustmentModal from '../../../components/inventory/StockAdjustmentM
 import Spinner from '../../../components/ui/Spinner';
 import { Link, useSearchParams } from 'react-router-dom';
 import { ROUTES } from '../../../constants/routes';
-import LoadError from '../../../components/ui/LoadError';
 
 const API_BASE = import.meta.env.VITE_API_URL?.replace('/api/v1', '') || '';
 function imgSrc(url) {
@@ -16,30 +15,23 @@ function imgSrc(url) {
 }
 
 export default function LowStockPage() {
+  const { data, isLoading, refetch } = useGetLowStockProductsQuery();
   const [adjustTarget, setAdjustTarget] = useState(null);
   const [searchParams, setSearchParams] = useSearchParams();
-  const { page, limit, setPage } = usePagination();
-  const { data, isLoading, isFetching, isError, error, refetch } = useGetLowStockProductsQuery({
-    page, limit,
-    focusProductId: searchParams.get('productId') || undefined,
-    focusVariantId: searchParams.get('variantId') || undefined,
-  });
 
   const products = useMemo(() => data?.data?.products || [], [data?.data?.products]);
 
+  const paging = useClientPagination(products, '', 'rows');
   useEffect(() => {
-    if (data?.meta && !isFetching && page > Math.max(1, data.meta.totalPages)) setPage(Math.max(1, data.meta.totalPages));
-  }, [data?.meta, isFetching, page, setPage]);
-  useEffect(() => {
-    if (!data || isFetching || adjustTarget) return;
+    if (!products.length || adjustTarget) return;
     const productId = searchParams.get('productId');
     const variantId = searchParams.get('variantId');
     if (!productId || !variantId) return;
-    const product = data.data?.focus || products.find((item) =>
+    const product = products.find((item) =>
       item._id === productId && item.variant?._id === variantId);
     if (product) setAdjustTarget({ product, variant: product.variant });
     setSearchParams({}, { replace: true });
-  }, [data, isFetching, products, adjustTarget, searchParams, setSearchParams]);
+  }, [products, adjustTarget, searchParams, setSearchParams]);
 
   return (
     <div className="space-y-5 animate-fade-in">
@@ -54,13 +46,13 @@ export default function LowStockPage() {
               <AlertTriangle size={20} className="text-amber-400" />
               Low Stock Alert
             </h1>
-            <p className="text-slate-400 text-sm mt-0.5">{data?.meta?.total ?? 0} variant(s) running low</p>
+            <p className="text-slate-400 text-sm mt-0.5">{products.length} variant(s) running low</p>
           </div>
         </div>
         <button onClick={refetch} className="btn btn-secondary btn-sm">Refresh</button>
       </div>
 
-      {isError ? <LoadError title="Could not load low stock" error={error} retry={refetch} /> : isLoading ? (
+      {isLoading ? (
         <div className="flex justify-center py-12"><Spinner size="lg" className="text-gold-500" /></div>
       ) : products.length === 0 ? (
         <div className="card p-12 text-center">
@@ -69,13 +61,13 @@ export default function LowStockPage() {
           <p className="text-slate-500 text-sm mt-1">No low stock variants right now</p>
         </div>
       ) : (
-        <div className="card p-0 overflow-hidden" aria-busy={isFetching}>
-          {products.map((item) => {
+        <div className="card p-0 overflow-hidden">
+          {paging.items.map((item, idx) => {
             const variant = item.variant;
-            const stockPct = variant.lowStockLimit > 0 ? Math.min(100, (variant.stock / variant.lowStockLimit) * 100) : 0;
+            const stockPct = Math.min(100, (variant.stock / variant.lowStockLimit) * 100);
             return (
               <div
-                key={`${item._id}_${variant._id}`}
+                key={`${item._id}_${variant._id}_${idx}`}
                 className="flex items-center gap-4 px-4 py-3.5 border-b border-navy-700/40 last:border-0 hover:bg-navy-700/10 transition-colors"
               >
                 {/* Image */}
@@ -133,7 +125,7 @@ export default function LowStockPage() {
           variant={adjustTarget.variant}
         />
       )}
-      <Pagination meta={data?.meta} page={page} onPageChange={setPage} isFetching={isFetching} label="products" />
+      <Pagination meta={paging.meta} page={paging.page} onPageChange={paging.setPage} isFetching={isLoading} label="products" />
     </div>
   );
 }

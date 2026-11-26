@@ -13,7 +13,7 @@ import { formatDistanceToNow } from 'date-fns';
 const TYPE_ICON = { new_order: ShoppingCart, payment_submitted: CreditCard, order_cancelled: X, low_stock: AlertTriangle, item_missing: Package, stock_mismatch: AlertTriangle, order_assigned: User, payment_verified: Check };
 const refreshOptions = { pollingInterval: 30000, skipPollingIfUnfocused: true, refetchOnFocus: true, refetchOnReconnect: true };
 
-export default function NotificationBell({ storeSlug }) {
+export default function NotificationBell() {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   const triggerRef = useRef(null);
@@ -23,11 +23,9 @@ export default function NotificationBell({ storeSlug }) {
   const user = useSelector(selectCurrentUser);
   const navigate = useNavigate();
   const { on, connected } = useSocket();
-  const customer = user?.role === 'customer';
-  const options = { ...refreshOptions, pollingInterval: connected ? 0 : customer ? 60000 : 30000 };
-  const { data: countData } = useGetUnreadCountQuery(undefined, options);
+  const { data: countData } = useGetUnreadCountQuery(undefined, refreshOptions);
   // Keep a small inbox current even while closed, so polling can recover missed events.
-  const { data: notifData, isLoading, isError, refetch } = useGetNotificationsQuery({ limit: 20 }, { ...options, skip: customer && !open });
+  const { data: notifData, isLoading, isError, refetch } = useGetNotificationsQuery({ limit: 20 }, refreshOptions);
   const [markRead] = useMarkReadMutation();
   const [markAllRead] = useMarkAllReadMutation();
   const count = countData?.data?.count ?? 0;
@@ -36,15 +34,14 @@ export default function NotificationBell({ storeSlug }) {
   const viewNotification = useCallback((notification) => {
     setOpen(false);
     if (!notification.isRead) markRead(notification._id);
-    const to = notificationTarget(user, notification, storeSlug);
+    const to = notificationTarget(user, notification);
     if (to) navigate(to);
-  }, [markRead, navigate, user, storeSlug]);
+  }, [markRead, navigate, user]);
 
   const alertNotification = useCallback((notification) => {
     if (!notification?._id || seen.current.has(notification._id)) return;
     seen.current.add(notification._id);
     if (notification.isRead || open) return;
-    if (user?.role === 'customer' && !notification.userId) return;
     // Also guard the client inbox if a stale or misrouted event arrives.
     if (notification.userId && String(notification.userId) !== String(user?._id)) return;
     if (!notification.userId && notification.role !== (user?.role === 'store_owner' ? 'admin' : 'staff')) return;
@@ -69,7 +66,6 @@ export default function NotificationBell({ storeSlug }) {
     popupIds.current = [];
     seen.current = new Set();
     initialized.current = false;
-    return () => { popupIds.current.forEach((id) => toast.dismiss(id)); };
   }, [user?._id]);
 
   useEffect(() => on('notification:new', ({ notification }) => alertNotification(notification)), [on, alertNotification]);
@@ -118,7 +114,7 @@ export default function NotificationBell({ storeSlug }) {
               </button>;
             })}
           </div>
-          <button type="button" className="w-full shrink-0 min-h-12 text-sm font-semibold text-gold-400 border-t border-navy-700 bg-navy-750" onClick={() => { setOpen(false); navigate(customer ? `/s/${storeSlug}/notifications` : '/store/notifications'); }}>View all notifications</button>
+          <button type="button" className="w-full shrink-0 min-h-12 text-sm font-semibold text-gold-400 border-t border-navy-700 bg-navy-750" onClick={() => { setOpen(false); navigate('/store/notifications'); }}>View all notifications</button>
         </section>
       )}
     </div>

@@ -8,7 +8,6 @@ import { logAudit } from '../services/audit.service.js';
 import { runInTransaction } from '../utils/transaction.js';
 import { assertPositiveInteger } from '../utils/money.js';
 import { escapeRegex, parsePagination } from '../utils/query.js';
-import { inventoryStockExpression } from '../utils/inventoryQuery.js';
 
 /* ─── Inventory dashboard ─────────────────────────── */
 export const getInventoryDashboard = async (req, res, next) => {
@@ -84,19 +83,27 @@ export const getInventoryList = async (req, res, next) => {
       filter.$or = [{ name: regex }, { brand: regex }];
     }
 
-    const stockExpression = inventoryStockExpression(stockStatus);
-    if (stockExpression) filter.$expr = stockExpression;
-    const [products, total] = await Promise.all([
-      Product.find(filter)
-        .select('name brand categoryId images variants isActive')
-        .populate({ path: 'categoryId', select: 'name emoji', match: { tenantId: req.tenantId } })
-        .sort({ name: 1, _id: 1 }).skip(skip).limit(limit).lean(),
-      Product.countDocuments(filter),
-    ]);
-    // Mongoose's built-in lean() does not execute schema virtuals.
-    const paginated = products.map((product) => ({ ...product,
-      mainImage: product.images?.find((image) => image.isMain)?.url ?? product.images?.[0]?.url ?? null,
-    }));
+    let products = await Product.find(filter)
+      .populate('categoryId', 'name emoji')
+      .sort({ name: 1 })
+      .lean({ virtuals: true });
+
+    // Filter by stock status across variants
+    if (stockStatus) {
+      products = products.filter((p) => {
+        const hasLow = p.variants.some(
+          (v) => v.isActive && v.stock > 0 && v.stock <= v.lowStockLimit
+        );
+        const hasOut = p.variants.some((v) => v.isActive && v.stock <= 0);
+        if (stockStatus === 'low_stock') return hasLow;
+        if (stockStatus === 'out_of_stock') return hasOut;
+        if (stockStatus === 'in_stock') return !hasLow && !hasOut;
+        return true;
+      });
+    }
+
+    const total = products.length;
+    const paginated = products.slice(skip, skip + limit);
 
     res.json({
       success: true,
@@ -109,11 +116,7 @@ export const getInventoryList = async (req, res, next) => {
 /* ─── Low stock page ──────────────────────────────── */
 export const getLowStockProducts = async (req, res, next) => {
   try {
-    const { page, limit, skip } = parsePagination(req.query, { defaultLimit: 30, maxLimit: 100 });
-    const { focusProductId, focusVariantId } = req.query;
-    if ((focusProductId && !mongoose.isValidObjectId(focusProductId)) ||
-        (focusVariantId && !mongoose.isValidObjectId(focusVariantId))) throw new AppError('Invalid stock reference.', 400);
-    const [result] = await Product.aggregate([
+    const products = await Product.aggregate([
       { $match: { tenantId: new mongoose.Types.ObjectId(req.tenantId), isActive: true } },
       { $unwind: '$variants' },
       {
@@ -127,35 +130,29 @@ export const getLowStockProducts = async (req, res, next) => {
           },
         },
       },
-      { $facet: {
-        count: [{ $count: 'total' }],
-        products: [
-          { $sort: { 'variants.stock': 1, name: 1, _id: 1, 'variants._id': 1 } },
-          { $skip: skip }, { $limit: limit },
-          { $lookup: {
-            from: 'categories', localField: 'categoryId', foreignField: '_id',
-            pipeline: [{ $match: { tenantId: new mongoose.Types.ObjectId(req.tenantId) } },
-              { $project: { name: 1, emoji: 1 } }],
-            as: 'category',
-          } },
-          { $unwind: { path: '$category', preserveNullAndEmptyArrays: true } },
-          { $project: { name: 1, brand: 1, images: 1,
-            'category.name': 1, 'category.emoji': 1, variant: '$variants' } },
-        ],
-      } },
+      {
+        $lookup: {
+          from: 'categories',
+          localField: 'categoryId',
+          foreignField: '_id',
+          as: 'category',
+        },
+      },
+      { $unwind: { path: '$category', preserveNullAndEmptyArrays: true } },
+      {
+        $project: {
+          name: 1,
+          brand: 1,
+          images: 1,
+          'category.name': 1,
+          'category.emoji': 1,
+          variant: '$variants',
+        },
+      },
+      { $sort: { 'variants.stock': 1 } },
     ]);
-    // Notifications can open a specific variant even when it is not on page one.
-    let focus = null;
-    if (focusProductId && focusVariantId) {
-      const product = await Product.findOne({ _id: focusProductId, tenantId: req.tenantId, isActive: true })
-        .select('name brand images variants').lean();
-      const variant = product?.variants.find((v) => String(v._id) === focusVariantId &&
-        v.isActive && v.stock >= 0 && v.stock <= v.lowStockLimit);
-      if (variant) focus = { ...product, variants: undefined, variant };
-    }
-    const total = result.count[0]?.total ?? 0;
-    res.json({ success: true, data: { products: result.products, focus },
-      meta: { total, page, limit, totalPages: Math.ceil(total / limit) } });
+
+    res.json({ success: true, data: { products } });
   } catch (err) { next(err); }
 };
 

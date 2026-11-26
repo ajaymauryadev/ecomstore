@@ -1,6 +1,3 @@
-import NotificationBell from './NotificationBell';
-import { useLogoutMutation } from '../../features/auth/authApi';
-import toast from 'react-hot-toast';
 import { useNavigationPrefetch } from '../../hooks/useNavigationPrefetch';
 import { useState, useEffect } from 'react';
 import { Outlet, useParams, Link, useNavigate, useLocation, useMatch, Navigate } from 'react-router-dom';
@@ -9,11 +6,10 @@ import MobileNavigation from './MobileNavigation';
 import { ROUTES } from '../../constants/routes';
 import { WorkspaceTheme } from './WorkspaceTheme';
 import './workspace.css';
-import './customer.css';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import {
   ShoppingCart, Plus, Minus, Trash2, Home, LayoutGrid,
-  User, Tag, Truck, Store, AlertTriangle, Bell, LogOut,
+  User, Tag, Truck, Store, AlertTriangle,
 } from 'lucide-react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useCart } from '../../hooks/useCart';
@@ -157,9 +153,6 @@ export default function CustomerLayout() {
   const { currentData: storeData, isFetching: isStoreFetching, isError: isStoreError, error: storeError, refetch: refetchStore } = useGetStorefrontInfoQuery(storeSlug, { skip: !storeSlug });
   const store = storeData?.data?.store;
   const isAuth = useMatch('/s/:storeSlug/auth');
-  const isAccount = useMatch('/s/:storeSlug/account');
-  const isNotifications = useMatch('/s/:storeSlug/notifications');
-  const [logout, { isLoading: isLoggingOut }] = useLogoutMutation();
   const isCheckout = useMatch('/s/:storeSlug/checkout');
   const isCustomer = user?.role === 'customer' && (user.tenantId?._id ?? user.tenantId) === store?._id;
   const sessionUserId = user?._id ?? null;
@@ -199,9 +192,8 @@ export default function CustomerLayout() {
 
   if (isAuth) return <RouteContent><Outlet context={{ store }} /></RouteContent>;
 
-  if ((isCheckout || isNotifications) && !isCustomer) {
-    return <Navigate to={`/s/${storeSlug}/auth`} state={isCheckout
-      ? { checkout: true, buyNow: location.state?.buyNow } : { notifications: true }} replace />;
+  if (isCheckout && !isCustomer) {
+    return <Navigate to={`/s/${storeSlug}/auth`} state={{ checkout: true, buyNow: location.state?.buyNow }} replace />;
   }
 
   if (scopeKey !== expectedScope || status === 'idle' || status === 'loading') return <PageLoader className="workspace-theme" />;
@@ -221,16 +213,6 @@ export default function CustomerLayout() {
     e.preventDefault();
     setSearchEdited(false);
     navigate(searchDestination(storeSlug, location, search.trim()));
-  };
-
-  const handleLogout = async () => {
-    try {
-      await logout({ requireServerConfirmation: true }).unwrap();
-      navigate(ROUTES.STOREFRONT(storeSlug));
-      toast.success('Logged out');
-    } catch (error) {
-      toast.error(error?.data?.message || 'Could not sign out. Try again.');
-    }
   };
 
   const cartLabel = `Open cart with ${count} items`;
@@ -256,8 +238,8 @@ export default function CustomerLayout() {
                 <div className="w-7 h-7 shrink-0 workspace-mark rounded-lg flex items-center justify-center">
                   <Store size={14} aria-hidden="true" />
                 </div>
-                <span className="customer-store-name font-black text-slate-100 text-base leading-tight truncate">
-                  <small>Your neighbourhood store</small>{store?.name || 'Kirana'}
+                <span className="font-black text-slate-100 text-base leading-tight truncate max-w-40 hidden sm:block">
+                  {store?.name || 'Kirana'}
                 </span>
               </Link>
 
@@ -265,8 +247,6 @@ export default function CustomerLayout() {
               <StoreSearch value={search} storeSlug={storeSlug} onSubmit={handleSearch}
                 onChange={(value) => { setSearch(value); setSearchEdited(true); }}
                 onClear={() => { setSearch(''); setSearchEdited(false); navigate(searchDestination(storeSlug, location, '')); }} />
-
-              {isCustomer ? <NotificationBell storeSlug={storeSlug} /> : <Link to={ROUTES.STOREFRONT_AUTH(storeSlug)} state={{ notifications: true }} className="customer-guest-bell" aria-label="Sign in for notifications"><Bell size={20} aria-hidden="true" /></Link>}
 
               {/* Account */}
               {isCustomer ? (
@@ -309,7 +289,7 @@ export default function CustomerLayout() {
         </header>
 
         {/* Delivery strip */}
-        {!isOrderPage && (!store.orderSettings?.isAcceptingOrders || store.deliverySettings?.minOrderAmount > 0 || store.deliverySettings?.freeDeliveryAbove > 0) && (
+        {!isOrderPage && (
           <div className="shrink-0 bg-[var(--brand-tint)] border-b border-navy-700/30">
             <div className="page-width py-2 flex flex-wrap items-center gap-x-5 gap-y-1 text-xs text-slate-400">
               {!store.orderSettings?.isAcceptingOrders ? <span className="text-amber-300">Online ordering is currently paused.</span> : <>
@@ -332,11 +312,6 @@ export default function CustomerLayout() {
           </main>
         </div>
 
-        {isAccount && isCustomer && <div className="customer-logout-dock">
-          <div className="page-width"><button type="button" onClick={handleLogout} disabled={isLoggingOut} className="account-logout">
-            <LogOut size={16} aria-hidden="true" />{isLoggingOut ? 'Logging out...' : 'Logout'}
-          </button></div>
-        </div>}
         {!isCheckout && <MobileNavigation label="Shop navigation" items={mobileItems} className="md:hidden" />}
 
         <CartDrawer isOpen={isOpen} onClose={closeCart} />

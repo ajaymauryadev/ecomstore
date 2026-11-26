@@ -1,8 +1,5 @@
 # Free Northflank deployment
 
-For the current performance changes, measured results, cache policies, Pages
-configuration and rollback, see [the 25 November performance audit](../PERFORMANCE-2026-11-25.md).
-
 This setup builds the React frontend and runs Caddy plus the existing Node API in
 one combined service. The browser uses `/api/v1` and same-origin Socket.IO, so
 there is one HTTPS address for cookies, API calls, images and live updates.

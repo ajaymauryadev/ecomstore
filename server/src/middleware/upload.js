@@ -1,4 +1,5 @@
 import multer from 'multer';
+import sharp from 'sharp';
 import crypto from 'crypto';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -66,7 +67,6 @@ const directorySize = async (directory) => {
 
 const encodeSafeWebp = async (file) => {
   if (!hasSupportedSignature(file.buffer)) throw new Error('Image signature does not match an allowed format.');
-  const { default: sharp } = await import('sharp');
   const pipeline = sharp(file.buffer, {
     failOn: 'error',
     limitInputPixels: MAX_PIXELS,

@@ -5,7 +5,6 @@ import { requirePermission } from '../middleware/roleCheck.js';
 import { PERMISSIONS } from '../constants/permissions.js';
 import { getSalesOverview } from '../controllers/sales.controller.js';
 import { reportReadLimiter } from '../middleware/rateLimiter.js';
-import { workloadGate } from '../middleware/workloadGate.js';
 import {
   getProfitLoss, getDailySales, getMonthlySales, getYearlySales,
   getProductSales, getCategorySales, getStockReport,
@@ -13,21 +12,20 @@ import {
 } from '../controllers/reports.controller.js';
 
 const router = Router();
-const admitReport = workloadGate(2, 'Reports are busy. Please retry shortly.');
 router.use(protect, tenantIsolation, requirePermission(PERMISSIONS.REPORTS_SENSITIVE));
 
-router.get('/profit-loss', admitReport(getProfitLoss));
-router.get('/daily-sales', admitReport(getDailySales));
-router.get('/sales-overview', reportReadLimiter, admitReport(getSalesOverview));
-router.get('/monthly-sales', admitReport(getMonthlySales));
-router.get('/yearly-sales', admitReport(getYearlySales));
-router.get('/product-sales', admitReport(getProductSales));
-router.get('/category-sales', admitReport(getCategorySales));
-router.get('/stock', admitReport(getStockReport));
-router.get('/supplier-dues', admitReport(getSupplierDues));
-router.get('/customer-dues', admitReport(getCustomerDues));
-router.get('/expenses', admitReport(getExpenseReport));
-router.get('/salary', admitReport(getSalaryReport));
-router.get('/purchases', admitReport(getPurchaseReport));
+router.get('/profit-loss', getProfitLoss);
+router.get('/daily-sales', getDailySales);
+router.get('/sales-overview', reportReadLimiter, getSalesOverview);
+router.get('/monthly-sales', getMonthlySales);
+router.get('/yearly-sales', getYearlySales);
+router.get('/product-sales', getProductSales);
+router.get('/category-sales', getCategorySales);
+router.get('/stock', getStockReport);
+router.get('/supplier-dues', getSupplierDues);
+router.get('/customer-dues', getCustomerDues);
+router.get('/expenses', getExpenseReport);
+router.get('/salary', getSalaryReport);
+router.get('/purchases', getPurchaseReport);
 
 export default router;

@@ -14,7 +14,7 @@ export const inventoryApi = baseApi.injectEndpoints({
     }),
 
     getLowStockProducts: builder.query({
-      query: (params = {}) => ({ url: '/inventory/low-stock', params }),
+      query: () => '/inventory/low-stock',
       providesTags: [{ type: 'Inventory', id: 'LOW_STOCK' }],
     }),
 

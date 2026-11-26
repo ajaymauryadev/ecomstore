@@ -1,5 +1,5 @@
-import { lazy, Suspense, useEffect } from 'react';
-import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { lazy, Suspense } from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { Toaster } from 'react-hot-toast';
 import { selectCurrentUser } from './features/auth/authSlice';
@@ -12,7 +12,7 @@ import { PageLoader } from './components/ui/Spinner';
 import { ROLES } from './constants/roles';
 import { PERMISSIONS, hasAnyPermission } from './constants/permissions';
 import { dashboardRouteForRole, ROUTES } from './constants/routes';
-import { pageLoaders, prepareRoute } from './app/routePrefetch';
+import { pageLoaders } from './app/routePrefetch';
 import { loadPOS, loadProducts, loadOwnerOrders, loadStaffOrders, useWorkspaceWarmup } from './app/workspaceWarmup';
 
 const SuperAdminLayout = lazy(pageLoaders.SuperAdminLayout);
@@ -94,8 +94,6 @@ const storeRoles = [ROLES.STORE_OWNER, ROLES.STAFF, ROLES.PACKER, ROLES.DELIVERY
 const staffRoles = [ROLES.STAFF, ROLES.PACKER, ROLES.DELIVERY];
 
 export default function App() {
-  const { pathname } = useLocation();
-  useEffect(() => { void prepareRoute(pathname); }, [pathname]);
   useWorkspaceWarmup();
   return (
     <ErrorBoundary>
@@ -177,7 +175,6 @@ export default function App() {
               <Route path="orders" element={<OrderHistory />} />
               <Route path="orders/:orderId" element={<OrderTracking />} />
               <Route path="account" element={<AccountPage />} />
-              <Route path="notifications" element={<NotificationsPage />} />
               <Route path="auth" element={<CustomerAuth />} />
             </Route>
 

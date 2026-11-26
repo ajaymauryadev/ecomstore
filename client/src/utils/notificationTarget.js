@@ -1,10 +1,6 @@
 import { hasPermission, PERMISSIONS } from '../constants/permissions';
 
-export function notificationTarget(user, notification, storeSlug) {
-  if (user?.role === 'customer') {
-    return storeSlug && notification.data?.orderId
-      ? `/s/${encodeURIComponent(storeSlug)}/orders/${encodeURIComponent(notification.data.orderId)}` : null;
-  }
+export function notificationTarget(user, notification) {
   const owner = user?.role === 'store_owner';
   if (notification.type === 'low_stock' && hasPermission(user, PERMISSIONS.INVENTORY_VIEW)) return '/store/inventory/low-stock';
   const id = notification.data?.orderId;

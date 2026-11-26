@@ -4,48 +4,16 @@ import { emitToTenantRoles, emitToUser } from '../config/socket.js';
 import User from '../models/User.js';
 import { hasPermission, PERMISSIONS } from '../constants/permissions.js';
 
-export const publishNotification = (notification) => {
-  if (!notification) return;
-  try {
-    if (notification.userId) emitToUser(String(notification.userId), 'notification:new', { notification });
-    else {
-      const roles = notification.role === 'admin' ? ['store_owner']
-        : notification.role === 'staff' ? ['staff', 'packer', 'delivery'] : ['customer'];
-      emitToTenantRoles(String(notification.tenantId), roles, 'notification:new', { notification });
-    }
-  } catch { /* The persisted inbox recovers updates when sockets reconnect. */ }
-};
-
-const customerStatusMessages = {
-  accepted: ['order_accepted', 'Order accepted', 'Your order has been accepted by the store.'],
-  packing: ['packing_started', 'Your order is being packed', 'The store has started preparing your order.'],
-  packed: ['packing_completed', 'Your order is packed', 'Your items have been packed and are awaiting verification.'],
-  ready_for_pickup: ['ready_for_pickup', 'Ready for pickup', 'Your order is ready to collect from the store.'],
-  out_for_delivery: ['out_for_delivery', 'Out for delivery', 'Your order is on its way.'],
-  delivered: ['delivered', 'Order delivered', 'Your order has been delivered.'],
-  cancelled: ['order_cancelled', 'Order cancelled', 'Your order has been cancelled.'],
-  rejected: ['order_cancelled', 'Order not accepted', 'The store could not accept your order.'],
-};
-
-// Called only for a real transition, within the order transaction. A retry
-// cannot commit the status without its inbox entry or create a second entry.
-export const recordCustomerOrderUpdate = async (order, session) => {
-  const message = customerStatusMessages[order.status];
-  if (!order.customerId || !message) return null;
-  const [type, title, body] = message;
-  const reason = ['cancelled', 'rejected'].includes(order.status) ? order.cancelReason : null;
-  const [notification] = await Notification.create([{
-    tenantId: order.tenantId, userId: order.customerId, role: 'customer', type, title,
-    body: `Order #${order.orderNumber}: ${reason || body}`,
-    data: { orderId: order._id, orderNumber: order.orderNumber, status: order.status },
-  }], { session });
-  return notification;
-};
-
 export const notify = async ({ tenantId, userId, role, type, title, body = '', data = {} }) => {
   try {
     const notification = await Notification.create({ tenantId, userId, role, type, title, body, data });
-    publishNotification(notification);
+    const payload = { notification };
+    if (userId) {
+      try { emitToUser(userId.toString(), 'notification:new', payload); } catch {}
+    } else {
+      const roles = role === 'admin' ? ['store_owner'] : role === 'staff' ? ['staff', 'packer', 'delivery'] : ['customer'];
+      try { emitToTenantRoles(tenantId.toString(), roles, 'notification:new', payload); } catch {}
+    }
     return notification;
   } catch (err) {
     logger.error(`Notification write failed: ${err.message}`);

@@ -8,9 +8,6 @@ import { sendSuccess } from '../utils/response.js';
 import { runInTransaction } from '../utils/transaction.js';
 import { lockCategoryReferences } from '../services/categoryHierarchy.service.js';
 import { parseProductSpreadsheet, productSample, productImportKey } from '../services/productSpreadsheet.service.js';
-import { workloadGate } from '../middleware/workloadGate.js';
-
-const admitWorkbook = workloadGate(1, 'A workbook is being processed. Please retry shortly.');
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 2 * 1024 * 1024, files: 1, fields: 1 }, fileFilter: (req, file, done) => done(null, /\.xlsx$/i.test(file.originalname)) }).single('file');
 export const uploadProductWorkbook = (req, res, next) => upload(req, res, (error) => {
@@ -19,14 +16,14 @@ export const uploadProductWorkbook = (req, res, next) => upload(req, res, (error
   next();
 });
 
-export const downloadProductSample = admitWorkbook(asyncHandler(async (req, res) => {
+export const downloadProductSample = asyncHandler(async (req, res) => {
   const buffer = await productSample();
   res.set('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   res.set('Content-Disposition', 'attachment; filename="product-import-sample.xlsx"');
   res.send(Buffer.from(buffer));
-}));
+});
 
-export const importProducts = admitWorkbook(asyncHandler(async (req, res) => {
+export const importProducts = asyncHandler(async (req, res) => {
   const result = await runInTransaction(async (session) => {
     // Serialize catalog imports and category edits, including concurrent duplicate imports.
     await lockCategoryReferences(req.tenantId, session);
@@ -56,4 +53,4 @@ export const importProducts = admitWorkbook(asyncHandler(async (req, res) => {
     return summary;
   });
   sendSuccess(res, result, req.body.preview === 'true' ? 200 : 201);
-}));
+});

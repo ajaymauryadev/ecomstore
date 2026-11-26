@@ -1,4 +1,6 @@
 import { createAsyncThunk } from '@reduxjs/toolkit';
+import { orderApi } from '../orders/orderApi';
+import { productApi } from '../products/productApi';
 import { cartDraftLines, readCartDraft } from './cartDraftStorage';
 
 const apiOrigin = import.meta.env.VITE_API_URL?.replace('/api/v1', '') || '';
@@ -23,7 +25,6 @@ function currentCartItem(line, product) {
 }
 
 async function restoreCoupon(dispatch, slug, code, items, deliveryType) {
-  const { orderApi } = await import('../orders/orderApi');
   const request = dispatch(orderApi.endpoints.validateCoupon.initiate({
     slug,
     code,
@@ -54,8 +55,6 @@ export const restoreCartDraft = createAsyncThunk(
       if ((getState().auth.user?._id ?? null) !== sessionUserId) throw new Error('Cart account changed.');
     };
     const productIds = [...new Set(draft.items.map(({ productId }) => productId))];
-    const { productApi } = await import('../products/productApi');
-    assertCurrentAccount();
     const { data } = await dispatch(productApi.endpoints.getCartProducts.initiate(
       { slug, productIds }, { track: false }
     )).unwrap();

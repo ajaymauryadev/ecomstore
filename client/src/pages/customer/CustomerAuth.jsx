@@ -47,7 +47,7 @@ export default function CustomerAuth() {
       if (fromCheckout) transferGuestCart(cart, res.data.store._id, res.data.user._id);
       dispatch(setCredentials({ user: res.data.user, accessToken: res.data.accessToken, store: res.data.store }));
       toast.success(mode === 'login' ? 'Welcome back! 👋' : 'Account created! 🎉');
-      navigate(`/s/${storeSlug}${fromCheckout ? '/checkout' : state?.notifications ? '/notifications' : ''}`, { replace: true, state: fromCheckout && state?.buyNow ? { buyNow: state.buyNow } : undefined });
+      navigate(`/s/${storeSlug}${fromCheckout ? '/checkout' : ''}`, { replace: true, state: fromCheckout && state?.buyNow ? { buyNow: state.buyNow } : undefined });
     } catch (err) {
       toast.error(err?.data?.message || 'Something went wrong');
     }
