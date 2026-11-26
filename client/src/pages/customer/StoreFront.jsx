@@ -3,7 +3,7 @@ import { usePagination } from '../../hooks/usePagination';
 import Pagination from '../../components/ui/Pagination';
 import { useState, useEffect, useMemo } from 'react';
 import { useOutletContext, useParams, useSearchParams, useNavigate, Link } from 'react-router-dom';
-import { ShoppingCart, Plus, Minus, Flame, Star, AlertTriangle, Tag, SlidersHorizontal, X } from 'lucide-react';
+import { ShoppingCart, Plus, Minus, Star, AlertTriangle, SlidersHorizontal, X } from 'lucide-react';
 import { useGetPublicProductsQuery } from '../../features/products/productApi';
 import { useGetPublicCategoriesQuery } from '../../features/categories/categoryApi';
 import { useCart } from '../../hooks/useCart';
@@ -11,6 +11,7 @@ import { formatCurrency } from '../../utils/formatters';
 import { cn } from '../../utils/cn';
 import CategoryBrowser from '../../components/products/CategoryBrowser';
 import CatalogFilters from '../../components/products/CatalogFilters';
+import StorefrontCarousel from '../../components/products/StorefrontCarousel';
 
 const API_BASE = import.meta.env.VITE_API_URL?.replace('/api/v1', '') || '';
 
@@ -302,12 +303,7 @@ export default function StoreFront({ showCategories = false }) {
   return (
     <div className="space-y-5">
 
-      {!showCategories && !hasFilters && <div className="storefront-hero bg-[var(--brand-tint)] rounded-2xl p-6 sm:p-8 border border-[var(--brand-line)]">
-        <div className="flex items-center gap-2 mb-1"><Flame size={15} className="text-gold-500" aria-hidden="true" /><span className="text-xs font-bold text-gold-400 uppercase tracking-wider">Local shopping</span></div>
-        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-100">Welcome to {store?.name || 'the store'}</h1>
-        <p className="text-sm text-slate-400 mt-2 max-w-md leading-relaxed">Your everyday essentials, close to home. Browse current products, prices, and stock.</p>
-        {store?.deliverySettings?.freeDeliveryAbove > 0 && <div className="flex items-center gap-2 mt-3"><Tag size={11} className="text-gold-400" /><span className="text-xs text-slate-500">Free delivery above {formatCurrency(store.deliverySettings.freeDeliveryAbove)}</span></div>}
-      </div>}
+      {!showCategories && !hasFilters && <StorefrontCarousel key={storeSlug} store={store} storeSlug={storeSlug} />}
       {showCategories ? <CategoryBrowser categories={categories} activeId={activeCategoryId} onSelect={(id) => updateFilter('cat', id)}
         loading={catLoading} error={catError} onRetry={refetchCategories} storeSlug={storeSlug} storeName={store?.name} /> : <nav aria-label="Product categories" className="category-quick-links">
         <button type="button" onClick={() => navigate(`/s/${storeSlug}/categories${searchParams.size ? `?${searchParams}` : ''}`)}

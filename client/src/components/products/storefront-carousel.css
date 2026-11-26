@@ -1,0 +1,33 @@
+.storefront-carousel { min-width: 0; }
+.storefront-carousel-track { position: relative; display: flex; overflow-x: auto; scroll-snap-type: x mandatory; overscroll-behavior-x: contain; scrollbar-width: none; border-radius: 1.25rem; background: var(--brand-tint); }
+.storefront-carousel-track::-webkit-scrollbar { display: none; }
+.storefront-carousel-slide { position: relative; display: flex; align-items: center; isolation: isolate; flex: 0 0 100%; min-width: 0; height: clamp(17.5rem, 26vw, 19rem); padding: clamp(1.25rem, 3vw, 2.5rem); overflow: hidden; scroll-snap-align: start; scroll-snap-stop: always; }
+.storefront-carousel-welcome { background: linear-gradient(115deg, #122b55, #1a4e9a); }
+.storefront-carousel-offers { background: linear-gradient(115deg, #173e38, #286d59); }
+.storefront-carousel-essentials { background: linear-gradient(115deg, #2d2851, #595182); }
+.storefront-carousel-copy { position: relative; z-index: 1; width: 70%; max-width: 37rem; }
+.storefront-carousel-eyebrow { margin-bottom: 0.6rem; color: #e2ecff; font-size: 0.65rem; font-weight: 750; letter-spacing: 0.14em; text-transform: uppercase; }
+.storefront-carousel-copy :is(h1, h2) { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; color: #fff; font-size: clamp(1.3rem, 2.8vw, 2rem); line-height: 1.15; letter-spacing: -0.035em; font-weight: 750; overflow-wrap: anywhere; }
+.storefront-carousel-description { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; margin-top: 0.7rem; max-width: 28rem; color: #e2ecff; font-size: clamp(0.75rem, 1.4vw, 0.875rem); line-height: 1.55; }
+.storefront-carousel-delivery { margin-top: 0.5rem; color: #f8dc85; font-size: 0.7rem; font-weight: 650; }
+.storefront-carousel-link { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; min-height: 2.75rem; margin-top: 0.9rem; padding: 0.5rem 0.8rem; border: 1px solid #ffffff50; border-radius: var(--brand-radius); background: #ffffff12; color: #fff; font-size: 0.75rem; font-weight: 650; }
+.storefront-carousel-link:hover { background: #ffffff25; }
+.storefront-carousel-track :focus-visible { outline-color: #fff; }
+.storefront-carousel-art { position: absolute; top: 0; right: 0; bottom: 0; display: grid; place-items: center; width: 30%; pointer-events: none; }
+.storefront-carousel-art img { width: 100%; height: 100%; object-fit: cover; }
+.storefront-carousel-orbit { position: absolute; width: 170%; aspect-ratio: 1; border: 1px solid #ffffff17; border-radius: 50%; background: #ffffff07; }
+.storefront-carousel-icon { position: relative; display: grid; place-items: center; width: 70%; max-width: 10rem; aspect-ratio: 1; border: 1px solid #ffffff35; border-radius: 25%; background: #ffffff12; color: #f5db92; transform: rotate(-12deg); }
+.storefront-carousel-icon svg { width: 60%; height: 60%; }
+.storefront-carousel-spark { position: absolute; width: 0.75rem; aspect-ratio: 1; border-radius: 30%; background: #f5db92; transform: rotate(18deg); }
+.storefront-carousel-spark-one { top: 18%; right: 20%; }
+.storefront-carousel-spark-two { bottom: 18%; left: 20%; width: 0.45rem; background: #ffffff80; }
+.storefront-carousel-controls { display: flex; align-items: center; justify-content: center; gap: 0.5rem; height: 2.75rem; }
+.storefront-carousel-controls > button { display: grid; place-items: center; width: 2.75rem; height: 2.75rem; color: var(--brand-muted); border-radius: 50%; }
+.storefront-carousel-controls > button:hover:not(:disabled) { background: var(--brand-tint); color: var(--brand-blue); }
+.storefront-carousel-controls > button:disabled { opacity: 0.3; }
+.storefront-carousel-dots { display: flex; align-items: center; }
+.storefront-carousel-dots button { display: grid; place-items: center; min-width: 2rem; height: 2.75rem; }
+.storefront-carousel-dots span { width: 0.75rem; height: 0.2rem; border-radius: 1rem; background: #c4cedd; }
+.storefront-carousel-dots [aria-current="true"] span { width: 1.75rem; background: var(--brand-blue); }
+@media (min-width: 640px) { .storefront-carousel-copy { width: 65%; } .storefront-carousel-art { width: 35%; } }
+@media (prefers-reduced-motion: reduce) { .storefront-carousel-track { scroll-behavior: auto; } }
