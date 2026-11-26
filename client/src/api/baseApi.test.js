@@ -1,12 +1,26 @@
 // @vitest-environment node
 import { configureStore } from '@reduxjs/toolkit';
 import { afterAll, afterEach, beforeAll, expect, test, vi } from 'vitest';
-import { clearCredentials, setCredentials, setStore } from '../features/auth/authSlice';
+import { clearCredentials, setCredentials, setStore, updateUser } from '../features/auth/authSlice';
 
 let api;
 let store;
 let sessionReducer;
 let sessionCacheMiddleware;
+
+test('permission changes discard cached private responses, while permission reordering preserves them', async () => {
+  createStore('worker');
+  store.dispatch(updateUser({ permissions: ['inventory.view', 'reports.sensitive'] }));
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(reply(200, { data: 'Private report' })));
+  await read('queue');
+  const epoch = store.getState().auth.sessionEpoch;
+  store.dispatch(updateUser({ permissions: ['reports.sensitive', 'inventory.view'] }));
+  expect(store.getState().auth.sessionEpoch).toBe(epoch);
+  expect(api.endpoints.queue.select()(store.getState()).data).toEqual({ data: 'Private report' });
+  store.dispatch(updateUser({ permissions: ['inventory.view'] }));
+  expect(store.getState().auth.sessionEpoch).toBe(epoch + 1);
+  expect(api.endpoints.queue.select()(store.getState()).data).toBeUndefined();
+});
 
 beforeAll(async () => {
   vi.stubEnv('VITE_API_URL', 'https://shop.test/api/v1');

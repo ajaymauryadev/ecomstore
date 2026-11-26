@@ -1,7 +1,7 @@
 import Pagination from '../../../components/ui/Pagination';
 import { usePageSize, usePageState } from '../../../hooks/usePagination';
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { useAuth } from '../../../hooks/useAuth';
 import { notificationTarget } from '../../../utils/notificationTarget';
 import LoadError from '../../../components/ui/LoadError';
@@ -35,13 +35,15 @@ const ROLE_TABS = [
 
 export default function NotificationsPage() {
   const { user } = useAuth();
+  const { storeSlug } = useParams();
+  const customer = user?.role === 'customer';
   const [roleFilter, setRoleFilter] = useState('');
   const [readFilter, setReadFilter] = useState('');
   const { limit } = usePageSize('rows');
   const [page, setPage] = usePageState(limit);
 
   const params = { limit, page };
-  if (roleFilter) params.role = roleFilter;
+  if (!customer && roleFilter) params.role = roleFilter;
   if (readFilter !== '') params.isRead = readFilter;
 
   const { data, isFetching, isLoading, isError, error, refetch } = useGetNotificationsQuery(params);
@@ -56,7 +58,7 @@ export default function NotificationsPage() {
       <div className="page-header">
         <div>
           <h1 className="page-title">Notifications</h1>
-          <p className="text-slate-500 text-sm mt-1">{meta.total ?? 0} total</p>
+          <p className="text-slate-500 text-sm mt-1">{customer ? 'Your orders, payments and delivery updates' : `${meta.total ?? 0} total`}</p>
         </div>
         <button className="btn-secondary flex items-center gap-2" onClick={() => markAllRead()}>
           <CheckCheck size={16} /> Mark All Read
@@ -65,7 +67,7 @@ export default function NotificationsPage() {
 
       {/* Filters */}
       <div className="flex flex-wrap gap-3 items-center">
-        <div className="flex gap-1 bg-navy-800 p-1 rounded-xl border border-navy-700">
+        {!customer && <div className="flex gap-1 bg-navy-800 p-1 rounded-xl border border-navy-700">
           {ROLE_TABS.map((t) => (
             <button key={t.value}
               onClick={() => { setRoleFilter(t.value); setPage(1); }}
@@ -73,7 +75,7 @@ export default function NotificationsPage() {
               {t.label}
             </button>
           ))}
-        </div>
+        </div>}
         <div className="flex gap-1 bg-navy-800 p-1 rounded-xl border border-navy-700">
           {[['', 'All'], ['false', 'Unread'], ['true', 'Read']].map(([val, label]) => (
             <button key={val}
@@ -122,8 +124,8 @@ export default function NotificationsPage() {
                     </div>
                   </div>
                   <div className="flex flex-wrap items-center gap-2 mt-2">
-                    <span className="badge bg-navy-700 text-slate-500 border border-navy-600 text-[10px]">{n.role}</span>
-                    {notificationTarget(user, n) && <Link to={notificationTarget(user, n)} onClick={() => { if (!n.isRead) markRead(n._id); }} className="workspace-link">View details</Link>}
+                    {!customer && <span className="badge bg-navy-700 text-slate-500 border border-navy-600 text-[10px]">{n.role}</span>}
+                    {notificationTarget(user, n, storeSlug) && <Link to={notificationTarget(user, n, storeSlug)} onClick={() => { if (!n.isRead) markRead(n._id); }} className="workspace-link">View details</Link>}
                     {!n.isRead && <span className="w-2 h-2 rounded-full bg-gold-500 shrink-0" />}
                   </div>
                 </div>

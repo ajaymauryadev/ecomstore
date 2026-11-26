@@ -17,6 +17,7 @@ import Product from './models/Product.js';
 import { asyncHandler } from './utils/asyncHandler.js';
 import { PRIVATE_PAYMENT_ROOT, PUBLIC_UPLOADS_ROOT, UPLOADS_ROOT } from './middleware/upload.js';
 import { remoteAsset } from './services/imageStorage.service.js';
+import { requestMetrics } from './middleware/requestMetrics.js';
 
 mkdirSync(PUBLIC_UPLOADS_ROOT, { recursive: true });
 mkdirSync(PRIVATE_PAYMENT_ROOT, { recursive: true, mode: 0o700 });
@@ -40,6 +41,8 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Order-Access-Token', 'Idempotency-Key'],
   exposedHeaders: ['Content-Disposition', 'Retry-After'],
 }));
+
+if (env.isProduction) app.use('/api', requestMetrics());
 
 app.use('/api', (req, res, next) => {
   if (req.get('Authorization') || req.get('X-Order-Access-Token') || /^\/v1\/auth(?:\/|$)/i.test(req.path)) {

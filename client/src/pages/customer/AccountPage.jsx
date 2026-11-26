@@ -1,14 +1,13 @@
 import { useClientPagination } from '../../hooks/usePagination';
 import Pagination from '../../components/ui/Pagination';
 import { useRef, useState } from 'react';
-import { Link, useParams, useNavigate } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import {
-  User, Phone, MapPin, Heart, ShoppingBag, LogOut, Plus, Trash2,
+  User, Phone, MapPin, Heart, ShoppingBag, Plus, Trash2,
   Edit2, ChevronRight,
 } from 'lucide-react';
 import { useSelector } from 'react-redux';
 import { selectCurrentUser } from '../../features/auth/authSlice';
-import { useLogoutMutation } from '../../features/auth/authApi';
 import {
   useGetCustomerProfileQuery,
   useUpdateCustomerProfileMutation,
@@ -30,9 +29,7 @@ const ADDR_EMPTY = { label: 'Home', line1: '', landmark: '', city: '', state: ''
 
 export default function AccountPage() {
   const { storeSlug } = useParams();
-  const navigate = useNavigate();
   const user = useSelector(selectCurrentUser);
-  const [logout, { isLoading: isLoggingOut }] = useLogoutMutation();
 
   const skipAccountQueries = user?.role !== 'customer';
   const { data: profileData } = useGetCustomerProfileQuery(storeSlug, { skip: skipAccountQueries });
@@ -88,16 +85,6 @@ export default function AccountPage() {
       setDeleteAddrTarget(null);
     } catch (err) {
       toast.error(err?.data?.message || 'Delete failed');
-    }
-  };
-
-  const handleLogout = async () => {
-    try {
-      await logout({ requireServerConfirmation: true }).unwrap();
-      toast.success('Logged out');
-      navigate(`/s/${storeSlug}`);
-    } catch (error) {
-      toast.error(error?.data?.message || 'Could not sign out. Try again.');
     }
   };
 
@@ -253,15 +240,6 @@ export default function AccountPage() {
       )}
 
       <Pagination meta={favoritesPaging.meta} page={favoritesPaging.page} onPageChange={favoritesPaging.setPage} label="favorites" />
-
-      {/* Logout */}
-      <button
-        onClick={handleLogout}
-        disabled={isLoggingOut}
-        className="account-logout w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-red-500/20 text-red-400 hover:bg-red-500/10 text-sm font-medium transition-colors"
-      >
-        <LogOut size={16} /> {isLoggingOut ? 'Logging out…' : 'Logout'}
-      </button>
 
       {/* Edit Profile Modal */}
       <Modal isOpen={editProfile} onClose={() => setEditProfile(false)} title="Edit Profile" initialFocusRef={profileNameInput} size="sm">

@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
-import { io } from 'socket.io-client';
 import { selectAccessToken, selectCurrentUser } from '../../features/auth/authSlice';
 import { SocketContext } from '../../hooks/SocketContext';
 
@@ -26,24 +25,31 @@ export default function SocketProvider({ children }) {
 
   useEffect(() => {
     if (import.meta.env.VITE_DISABLE_WEBSOCKETS === 'true' || !token || !userId) return undefined;
-    const connection = io(import.meta.env.VITE_WS_URL || undefined, {
-      auth: { token }, transports: ['polling', 'websocket'],
-      reconnection: true, reconnectionDelay: 1000, reconnectionDelayMax: 10000,
-    });
+    let disposed = false;
+    let connection;
     const publish = (event, ...args) => {
-      if (connectionRef.current !== connection) return;
+      if (disposed || connectionRef.current !== connection) return;
       for (const handler of [...(listeners.current.get(event) || [])]) handler(...args);
     };
-    connectionRef.current = connection;
-    setSocket(connection);
-    connection.onAny(publish);
-    connection.on('connect', () => { setConnected(true); publish('connect'); });
-    connection.on('disconnect', () => { setConnected(false); publish('disconnect'); });
-    connection.on('connect_error', () => setConnected(false));
+    // Public startup and signed-out pages do not need the realtime transport.
+    void import('socket.io-client').then(({ io }) => {
+      if (disposed) return;
+      connection = io(import.meta.env.VITE_WS_URL || undefined, {
+        auth: { token }, transports: ['polling', 'websocket'],
+        reconnection: true, reconnectionDelay: 1000, reconnectionDelayMax: 10000,
+      });
+      connectionRef.current = connection;
+      setSocket(connection);
+      connection.onAny(publish);
+      connection.on('connect', () => { setConnected(true); publish('connect'); });
+      connection.on('disconnect', () => { setConnected(false); publish('disconnect'); });
+      connection.on('connect_error', () => setConnected(false));
+    }).catch(() => { if (!disposed) setConnected(false); });
     return () => {
-      connection.offAny(publish);
-      connection.removeAllListeners();
-      connection.disconnect();
+      disposed = true;
+      connection?.offAny(publish);
+      connection?.removeAllListeners();
+      connection?.disconnect();
       if (connectionRef.current === connection) connectionRef.current = null;
       setSocket(null);
       setConnected(false);

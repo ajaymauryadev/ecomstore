@@ -6,7 +6,7 @@ import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createServer as createViteServer } from 'vite';
+import { createServer as createViteServer, preview } from 'vite';
 import { test as base } from '@playwright/test';
 
 const serverRequire = createRequire(new URL('../../server/package.json', import.meta.url));
@@ -38,7 +38,14 @@ async function withStorefrontFixture(use, { realtime = false } = {}) {
       VITE_WS_URL: '',
     });
     const apiOrigin = 'http://127.0.0.1:' + api.address().port;
-    vite = await createViteServer({
+    if (process.env.STOREFRONT_PRODUCTION === 'true') {
+      const built = await preview({ preview: {
+        host: '127.0.0.1', port: 0,
+        proxy: { '/api': { target: apiOrigin, changeOrigin: true }, '/uploads': { target: apiOrigin, changeOrigin: true }, '/socket.io': { target: apiOrigin, changeOrigin: true, ws: true } },
+      } });
+      vite = { httpServer: built.httpServer, close: () => new Promise((resolve) => built.httpServer.close(resolve)) };
+    } else {
+      vite = await createViteServer({
       cacheDir: path.join(root, 'vite'),
       server: {
         host: '127.0.0.1',
@@ -46,7 +53,8 @@ async function withStorefrontFixture(use, { realtime = false } = {}) {
         proxy: { '/api': { target: apiOrigin, changeOrigin: true }, '/uploads': { target: apiOrigin, changeOrigin: true }, '/socket.io': { target: apiOrigin, changeOrigin: true, ws: true } },
       },
     });
-    await vite.listen();
+      await vite.listen();
+    }
     const origin = 'http://127.0.0.1:' + vite.httpServer.address().port;
     process.env.CORS_ORIGINS = origin;
     const { app } = await import('../../server/src/app.js');

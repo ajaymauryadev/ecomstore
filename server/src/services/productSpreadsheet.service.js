@@ -1,5 +1,3 @@
-import ExcelJS from 'exceljs';
-import unzipper from 'unzipper';
 import Product, { UNIT_VALUES } from '../models/Product.js';
 import { AppError } from '../utils/AppError.js';
 
@@ -8,6 +6,7 @@ const key = (value) => String(value ?? '').trim().toLowerCase();
 export const productImportKey = (name, brand) => JSON.stringify([key(name), key(brand)]);
 
 export async function productSample() {
+  const { default: ExcelJS } = await import('exceljs');
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet('Products');
   sheet.columns = PRODUCT_COLUMNS.map((header) => ({ header, key: header, width: ['name', 'description', 'category'].includes(header) ? 28 : 18 }));
@@ -35,6 +34,7 @@ export async function productSample() {
 }
 
 export async function parseProductSpreadsheet(buffer, { tenantId, categories = [] }) {
+  const [{ default: ExcelJS }, { default: unzipper }] = await Promise.all([import('exceljs'), import('unzipper')]);
   const workbook = new ExcelJS.Workbook();
   // XLSX is a ZIP container; bound its expanded size before the XML reader runs.
   try {

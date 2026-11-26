@@ -350,7 +350,101 @@ describe('sales and customer ledger detail', () => {
   });
 });
 
+describe('bounded inventory queries', () => {
+  test('paginates low-stock variants and resolves a notification target outside the page', async () => {
+    const products = await Product.create(Array.from({ length: 17 }, (_, i) => ({
+      tenantId: ids.storeA, name: `Low ${String(i).padStart(2, '0')}`,
+      variants: [{ name: 'Pack', retailPrice: 10, stock: i % 3, lowStockLimit: 3 }],
+    })));
+    const { product: foreign, variant: foreignVariant } = await createProduct({ tenantId: ids.storeB, stock: 0 });
+    const target = products.at(-1);
+    const first = await request(app).get('/api/v1/inventory/low-stock').set(auth(tokens.ownerA))
+      .query({ limit: 5, focusProductId: target._id.toString(), focusVariantId: target.variants[0]._id.toString() });
+    expect(first.status).toBe(200);
+    expect(first.body.meta).toMatchObject({ total: 17, totalPages: 4, page: 1, limit: 5 });
+    expect(first.body.data.products).toHaveLength(5);
+    expect(first.body.data.products.every((p) => p.variant.stock === 0)).toBe(true);
+    expect(first.body.data.focus).toMatchObject({ _id: target._id.toString(), variant: { _id: target.variants[0]._id.toString() } });
+    const last = await request(app).get('/api/v1/inventory/low-stock').set(auth(tokens.ownerA))
+      .query({ limit: 5, page: 4, focusProductId: foreign._id.toString(), focusVariantId: foreignVariant._id.toString() });
+    expect(last.status).toBe(200);
+    expect(last.body.data.products).toHaveLength(2);
+    expect(last.body.data.focus).toBeNull();
+    expect(last.body.data.products.every((p) => p.variant.stock === 2)).toBe(true);
+  });
+
+  test('matches the original stock filters and totals across pages without omitting archived variants', async () => {
+    const categories = await Category.create([
+      { tenantId: ids.storeA, name: 'Local' }, { tenantId: ids.storeB, name: 'Foreign' },
+    ]);
+    const products = await Product.create(Array.from({ length: 31 }, (_, index) => ({
+      tenantId: ids.storeA, name: `Item ${String(Math.floor(index / 2)).padStart(2, '0')}`,
+      brand: index % 2 ? 'Brand A' : 'Brand B', isActive: index !== 30,
+      categoryId: categories[0]._id, description: 'Not needed in an inventory row',
+      images: [{ url: '/first.webp' }, { url: '/main.webp', isMain: true }],
+      variants: [
+        { name: 'Active', retailPrice: 10, stock: index % 10, lowStockLimit: 3, isActive: index % 7 !== 0 },
+        { name: 'Archived', retailPrice: 20, stock: 0, lowStockLimit: 2, isActive: false },
+      ],
+    })));
+    await createProduct({ tenantId: ids.storeB, name: 'Item foreign', stock: 0 });
+    const active = products.filter((p) => p.isActive).sort((a, b) => a.name.localeCompare(b.name) || String(a._id).localeCompare(String(b._id)));
+    for (const status of ['', 'low_stock', 'out_of_stock', 'in_stock']) {
+      const matching = active.filter((p) => {
+        const hasLow = p.variants.some((v) => v.isActive && v.stock > 0 && v.stock <= v.lowStockLimit);
+        const hasOut = p.variants.some((v) => v.isActive && v.stock <= 0);
+        return status === 'low_stock' ? hasLow : status === 'out_of_stock' ? hasOut : status === 'in_stock' ? !hasLow && !hasOut : true;
+      });
+      const found = [];
+      for (let page = 1; page <= Math.ceil(matching.length / 5); page++) {
+        const response = await request(app).get('/api/v1/inventory/list').set(auth(tokens.ownerA))
+          .query({ page, limit: 5, stockStatus: status });
+        expect(response.status).toBe(200);
+        expect(response.body.meta).toMatchObject({ total: matching.length, page, limit: 5 });
+        expect(response.body.data.products.length).toBeLessThanOrEqual(5);
+        for (const product of response.body.data.products) {
+          expect(product.variants[1]).toMatchObject({ name: 'Archived', isActive: false, stock: 0 });
+          expect(product.mainImage).toBe('/main.webp');
+          expect(product.categoryId.name).toBe('Local');
+          expect(product.description).toBeUndefined();
+          found.push(product._id);
+        }
+      }
+      expect(found).toEqual(matching.map((p) => String(p._id)));
+    }
+    const searched = await request(app).get('/api/v1/inventory/list').set(auth(tokens.ownerA))
+      .query({ search: 'Brand A', categoryId: categories[0]._id.toString(), limit: 5 });
+    expect(searched.body.meta.total).toBe(15);
+    const escaped = await request(app).get('/api/v1/inventory/list').set(auth(tokens.ownerA)).query({ search: '.*' });
+    expect(escaped.body.meta.total).toBe(0);
+    const foreign = await request(app).get('/api/v1/inventory/list').set(auth(tokens.ownerA))
+      .query({ categoryId: categories[1]._id.toString() });
+    expect(foreign.body.meta.total).toBe(0);
+  });
+});
+
 describe('owner dashboard queues', () => {
+  test('preserves day boundaries, status exclusions and revenue in combined day summaries', async () => {
+    const today = accountingDay(undefined, 'Asia/Kolkata');
+    const yesterday = accountingDay(new Date(today.start.getTime() - 1), 'Asia/Kolkata');
+    const rows = [
+      { status: 'delivered', createdAt: today.start, deliveredAt: today.start, amount: 125.25 },
+      { status: 'delivered', createdAt: yesterday.start, deliveredAt: yesterday.start, amount: 70.1 },
+      { status: 'accepted', createdAt: today.start, amount: 999 },
+      { status: 'cancelled', createdAt: today.start, amount: 999 },
+      { status: 'rejected', createdAt: yesterday.start, amount: 999 },
+      { status: 'delivered', createdAt: today.end, deliveredAt: today.end, amount: 999 },
+      { status: 'delivered', createdAt: new Date(yesterday.start.getTime() - 1), deliveredAt: new Date(yesterday.start.getTime() - 1), amount: 999 },
+    ];
+    await Order.collection.insertMany(rows.map(({ amount, ...row }, i) => ({
+      ...row, tenantId: ids.storeA, orderNumber: `SUMMARY-${i}`, pricing: { grandTotal: amount },
+    })));
+    await Order.collection.insertOne({ tenantId: ids.storeB, orderNumber: 'FOREIGN-SUMMARY', status: 'delivered', createdAt: today.start, deliveredAt: today.start, pricing: { grandTotal: 9999 } });
+    const response = await request(app).get('/api/v1/dashboard').set(auth(tokens.ownerA));
+    expect(response.status).toBe(200);
+    expect(response.body.data.kpis).toMatchObject({ revenueToday: 125.25, revenueYesterday: 70.1,
+      ordersToday: 2, ordersYesterday: 1, ordersChange: 100 });
+  });
   test('counts all tenant pending orders and low-stock variants with bounded previews', async () => {
     const orders = Array.from({ length: 9 }, (_, index) => ({
       tenantId: ids.storeA, orderNumber: `OPEN-${index}`, status: 'accepted', createdAt: new Date(index),
@@ -1004,6 +1098,8 @@ describe('assignment inboxes and pending work', () => {
     const actions = saved.timeline.filter((entry) => entry.action === 'order_accepted');
     expect(actions).toHaveLength(1);
     expect(String(actions[0].performedBy.userId)).toBe(String(ids[role]));
+    const customerInbox = await request(app).get('/api/v1/notifications').set(auth(tokens.customerA)).expect(200);
+    expect(customerInbox.body.data.filter((notice) => notice.type === 'order_accepted')).toHaveLength(1);
     await request(app).patch(root + '/admin/orders/' + order._id + '/status').set(auth(tokens[role])).send({ status: 'packed' }).expect(403);
     await request(app).post('/api/v1/packing/session/' + order._id + '/start').set(auth(tokens[role])).expect(201);
     await request(app).post(endpoint).set(auth(tokens[role])).expect(409);
@@ -1087,6 +1183,60 @@ describe('assignment inboxes and pending work', () => {
 });
 
 describe('customer and guest order privacy', () => {
+  test('persists acceptance and cancellation notifications once, with the cancellation reason', async () => {
+    const { product, variant } = await createProduct();
+    const root = '/api/v1/storefront/store-alpha';
+    const placed = await request(app).post(root + '/orders').set(auth(tokens.customerA)).send(orderBody(product, variant)).expect(201);
+    const orderId = placed.body.data.order._id;
+    for (let i = 0; i < 2; i++) {
+      await request(app).patch(`${root}/admin/orders/${orderId}/status`).set(auth(tokens.ownerA)).send({ status: 'accepted' }).expect(200);
+    }
+    for (let i = 0; i < 2; i++) {
+      await request(app).post(`${root}/admin/orders/${orderId}/cancel`).set(auth(tokens.ownerA)).send({ reason: "We don't deliver there" }).expect(200);
+    }
+    const inbox = await request(app).get('/api/v1/notifications').set(auth(tokens.customerA)).expect(200);
+    expect(inbox.body.data).toHaveLength(2);
+    expect(inbox.body.data.find((notice) => notice.type === 'order_cancelled').body).toContain("We don't deliver there");
+    expect(inbox.body.data.every((notice) => notice.data.orderId === orderId)).toBe(true);
+    const other = await request(app).get('/api/v1/notifications').set(auth(tokens.customerA2)).expect(200);
+    expect(other.body.data).toHaveLength(0);
+  });
+
+  test('rolls back acceptance if its customer inbox entry cannot be saved', async () => {
+    const { product, variant } = await createProduct();
+    const root = '/api/v1/storefront/store-alpha';
+    const placed = await request(app).post(root + '/orders').set(auth(tokens.customerA)).send(orderBody(product, variant)).expect(201);
+    const { default: Notification } = await import('../src/models/Notification.js');
+    const write = vi.spyOn(Notification, 'create').mockRejectedValueOnce(new Error('Inbox temporarily unavailable'));
+    try {
+      await request(app).patch(`${root}/admin/orders/${placed.body.data.order._id}/status`)
+        .set(auth(tokens.ownerA)).send({ status: 'accepted' }).expect(500);
+      expect((await Order.findById(placed.body.data.order._id)).status).toBe('pending');
+    } finally { write.mockRestore(); }
+  });
+
+  test('customer notification inbox scopes list, counts and read actions to the signed-in customer', async () => {
+    const { default: Notification } = await import('../src/models/Notification.js');
+    const make = (tenantId, userId, role = 'customer') => ({ tenantId, userId, role,
+      type: 'order_accepted', title: 'Order update' });
+    const [own, sibling, foreign, admin] = await Notification.create([
+      make(ids.storeA, ids.customerA), make(ids.storeA, ids.customerA2),
+      make(ids.storeB, ids.customerB), make(ids.storeA, null, 'admin'),
+    ]);
+    const inbox = await request(app).get('/api/v1/notifications').set(auth(tokens.customerA)).expect(200);
+    expect(inbox.body.data.map((entry) => entry._id)).toEqual([String(own._id)]);
+    const count = await request(app).get('/api/v1/notifications/unread-count').set(auth(tokens.customerA)).expect(200);
+    expect(count.body.data.count).toBe(1);
+    for (const other of [sibling, foreign, admin]) {
+      await request(app).patch(`/api/v1/notifications/${other._id}/read`).set(auth(tokens.customerA)).expect(200);
+      expect((await Notification.findById(other._id)).isRead).toBe(false);
+    }
+    await request(app).post('/api/v1/notifications/mark-all-read').set(auth(tokens.customerA)).expect(200);
+    expect((await Notification.findById(own._id)).isRead).toBe(true);
+    expect((await Notification.findById(sibling._id)).isRead).toBe(false);
+    await request(app).get('/api/v1/notifications').expect(401);
+  });
+
   test('requires a strong token for legacy guest orders and keeps internal fields private', async () => {
     const { product, variant } = await createProduct();
     const created = await request(app).post('/api/v1/storefront/store-alpha/orders').set(auth(tokens.customerA)).send(orderBody(product, variant, { quantity: 2 }));

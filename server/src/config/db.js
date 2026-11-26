@@ -9,6 +9,10 @@ export const connectDB = async (retries = 0) => {
   try {
     const conn = await mongoose.connect(env.MONGODB_URI, {
       maxPoolSize: 10,
+      minPoolSize: 0,
+      maxConnecting: 2,
+      maxIdleTimeMS: 60000,
+      waitQueueTimeoutMS: 5000,
       serverSelectionTimeoutMS: 5000,
       socketTimeoutMS: 45000,
     });

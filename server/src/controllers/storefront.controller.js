@@ -15,7 +15,7 @@ import {
   generateTokens, hashToken, setRefreshCookie, getTokenExpiry,
 } from '../utils/jwt.js';
 import { emitToTenant, emitToUser, emitToWorkers } from '../config/socket.js';
-import { notifyAdmin, notifyCustomer, notifyStaff, notifyTeam } from '../services/notification.service.js';
+import { notifyAdmin, notifyCustomer, notifyStaff, notifyTeam, recordCustomerOrderUpdate, publishNotification } from '../services/notification.service.js';
 import { logAudit } from '../services/audit.service.js';
 import { calculateOrderQuote } from '../services/checkout.service.js';
 import {
@@ -600,10 +600,10 @@ export const getOrder = asyncHandler(async (req, res, next) => {
 export const cancelOrder = asyncHandler(async (req, res, next) => {
   const store = await findStore(req.params.slug);
   if (!store) return next(new AppError('Store not found.', 404));
-  const order = await runInTransaction(async (session) => {
+  const { order, notification } = await runInTransaction(async (session) => {
     const current = await Order.findOne({ _id: req.order._id, tenantId: store._id }).session(session);
     if (!current) throw new AppError('Order not found.', 404);
-    if (current.status === 'cancelled') return current;
+    if (current.status === 'cancelled') return { order: current };
     if (!canTransitionOrder(current.status, 'cancelled')) {
       throw new AppError(`Cannot cancel order in ${current.status} status.`, 409);
     }
@@ -619,8 +619,9 @@ export const cancelOrder = asyncHandler(async (req, res, next) => {
       session,
       note: `Customer cancellation for ${current.orderNumber}`,
     });
-    return current;
+    return { order: current, notification: await recordCustomerOrderUpdate(current, session) };
   });
+  publishNotification(notification);
 
   safeEmitTenant(store._id, 'order:cancelled', {
     orderId: order._id,
@@ -889,10 +890,10 @@ export const updateOrderStatus = asyncHandler(async (req, res, next) => {
   const allowedTargets = new Set(['accepted', 'packing', 'packed', 'ready_for_pickup', 'out_for_delivery', 'delivered']);
   if (!allowedTargets.has(status)) return next(new AppError('Invalid administrative status target.', 400));
 
-  const order = await runInTransaction(async (session) => {
+  const { order, notification } = await runInTransaction(async (session) => {
     const current = await Order.findOne({ _id: req.params.orderId, tenantId: req.tenantId }).session(session);
     if (!current) throw new AppError('Order not found.', 404);
-    if (current.status === status) return current;
+    if (current.status === status) return { order: current };
     if (!canTransitionOrder(current.status, status)) {
       throw new AppError(`Order cannot transition from ${current.status} to ${status}.`, 409);
     }
@@ -915,8 +916,9 @@ export const updateOrderStatus = asyncHandler(async (req, res, next) => {
       action: 'status_updated', orderId: current._id, orderNumber: current.orderNumber,
       metadata: { status },
     }], { session });
-    return current;
+    return { order: current, notification: await recordCustomerOrderUpdate(current, session) };
   });
+  publishNotification(notification);
 
   if (order.customerId) {
     safeEmitUser(order.customerId, 'order:status_updated', {
@@ -934,10 +936,10 @@ export const updateOrderStatus = asyncHandler(async (req, res, next) => {
 
 export const adminCancelOrder = asyncHandler(async (req, res, next) => {
   const reason = String(req.body.reason || 'Cancelled by store').trim().slice(0, 300);
-  const order = await runInTransaction(async (session) => {
+  const { order, notification } = await runInTransaction(async (session) => {
     const current = await Order.findOne({ _id: req.params.orderId, tenantId: req.tenantId }).session(session);
     if (!current) throw new AppError('Order not found.', 404);
-    if (current.status === 'cancelled') return current;
+    if (current.status === 'cancelled') return { order: current };
     if (!canTransitionOrder(current.status, 'cancelled')) {
       throw new AppError(`Cannot cancel order in ${current.status} status.`, 409);
     }
@@ -962,8 +964,9 @@ export const adminCancelOrder = asyncHandler(async (req, res, next) => {
         session,
       });
     }
-    return current;
+    return { order: current, notification: await recordCustomerOrderUpdate(current, session) };
   });
+  publishNotification(notification);
   if (order.customerId) safeEmitUser(order.customerId, 'order:cancelled', {
     orderId: order._id, orderNumber: order.orderNumber, reason,
   });
@@ -973,10 +976,10 @@ export const adminCancelOrder = asyncHandler(async (req, res, next) => {
 
 export const rejectOrder = asyncHandler(async (req, res, next) => {
   const reason = String(req.body.reason || 'Rejected by store').trim().slice(0, 300);
-  const order = await runInTransaction(async (session) => {
+  const { order, notification } = await runInTransaction(async (session) => {
     const current = await Order.findOne({ _id: req.params.orderId, tenantId: req.tenantId }).session(session);
     if (!current) throw new AppError('Order not found.', 404);
-    if (current.status === 'rejected') return current;
+    if (current.status === 'rejected') return { order: current };
     if (!canTransitionOrder(current.status, 'rejected')) {
       throw new AppError(`Cannot reject order in ${current.status} status.`, 409);
     }
@@ -1001,8 +1004,9 @@ export const rejectOrder = asyncHandler(async (req, res, next) => {
         session,
       });
     }
-    return current;
+    return { order: current, notification: await recordCustomerOrderUpdate(current, session) };
   });
+  publishNotification(notification);
   if (order.customerId) safeEmitUser(order.customerId, 'order:rejected', {
     orderId: order._id, orderNumber: order.orderNumber, reason,
   });

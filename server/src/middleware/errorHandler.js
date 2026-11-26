@@ -31,9 +31,9 @@ export const errorHandler = (err, req, res, next) => {
   const statusCode = error.statusCode || 500;
   const status = error.status || 'error';
   if (statusCode >= 500) {
-    logger.error(`${req.method} ${req.originalUrl} - ${err.message}`, {
-      stack: err.stack,
-      requestId: req.id,
+    logger.error({ event: 'api_error', method: req.method,
+      route: String(req.route?.path ?? 'unmatched'), status: statusCode, errorType: err.name,
+      ...(process.env.NODE_ENV !== 'production' && { message: err.message, stack: err.stack }),
     });
   }
 

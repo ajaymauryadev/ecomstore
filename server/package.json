@@ -11,6 +11,8 @@
     "test": "vitest run --pool=forks --poolOptions.forks.singleFork=true",
     "test:watch": "vitest",
     "perf:smoke": "node scripts/performance-smoke.js",
+    "perf:workflows": "node scripts/performance-workflows.js",
+    "perf:startup": "node scripts/performance-startup.js",
     "images:verify": "node scripts/imagekit.js verify",
     "images:migrate": "node scripts/imagekit.js migrate",
     "images:status": "node scripts/imagekit.js status",

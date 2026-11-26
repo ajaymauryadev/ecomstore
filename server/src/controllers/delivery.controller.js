@@ -8,7 +8,7 @@ import { consumeOrderReservation } from '../services/stock.service.js';
 import { runInTransaction } from '../utils/transaction.js';
 import { emitToUser, emitToWorkers } from '../config/socket.js';
 import { hasPermission, PERMISSIONS } from '../constants/permissions.js';
-import { notifyAdmin } from '../services/notification.service.js';
+import { notifyAdmin, recordCustomerOrderUpdate, publishNotification } from '../services/notification.service.js';
 import { logAudit } from '../services/audit.service.js';
 import { recordOrderAction } from '../utils/orderAttribution.js';
 import StaffActivityLog from '../models/StaffActivityLog.js';
@@ -81,10 +81,11 @@ export const updateDeliveryStatus = asyncHandler(async (req, res, next) => {
       tenantId: req.tenantId, staffId: req.user._id, staffName: req.user.name, staffRole: req.user.role,
       action, orderId: current._id, orderNumber: current.orderNumber,
     }], { session });
-    return { order: current, changed: true };
+    return { order: current, changed: true, notification: await recordCustomerOrderUpdate(current, session) };
   });
   const updated = order.order;
   if (order.changed) {
+    publishNotification(order.notification);
     try { emitToWorkers(req.tenantId, 'order:updated', { orderId: updated._id, status: updated.status }); } catch {}
     if (updated.customerId) safeEmitUser(updated.customerId, 'order:status_updated', {
       orderId: updated._id, orderNumber: updated.orderNumber, status: updated.status,
