@@ -1,21 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, ArrowUpRight, Search, X, ChevronRight, LayoutGrid } from 'lucide-react';
+import { ArrowLeft, Search, X, ChevronRight, LayoutGrid } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { cn } from '../../utils/cn';
 import Modal from '../ui/Modal';
-
-const API_BASE = import.meta.env.VITE_API_URL?.replace('/api/v1', '') || '';
+import CategoryArtwork from './CategoryArtwork';
 
 function CategoryTile({ category, selected, onSelect }) {
-  const [failedImage, setFailedImage] = useState(null);
-  const image = category.image?.startsWith('/') ? `${API_BASE}${category.image}` : category.image;
   return <button type="button" aria-pressed={selected} onClick={() => onSelect(category._id)}
     className={cn('category-tile', selected && 'is-selected')}>
     <span className="category-tile-art" aria-hidden="true">
-      {image && failedImage !== image
-        ? <img src={image} alt="" loading="lazy" onError={() => setFailedImage(image)} />
-        : <span>{category.emoji || '📦'}</span>}
-      <span className="category-tile-arrow"><ArrowUpRight size={13} /></span>
+      <CategoryArtwork category={category} />
     </span>
     <span className="category-tile-name">{category.name}</span>
   </button>;
@@ -51,6 +45,13 @@ export default function CategoryBrowser({ categories, activeId, onSelect, loadin
     return (!group || rootId === group._id)
       && `${category.name} ${groups.get(rootId)?.name || ''}`.toLocaleLowerCase().includes(normalizedQuery);
   });
+  const sections = new Map();
+  for (const category of matches) {
+    const root = categoryGroups.get(category._id);
+    if (!sections.has(root)) sections.set(root, []);
+    sections.get(root).push(category);
+  }
+  const showGroups = !group && !normalizedQuery && categories.some((category) => category.parentId);
   useEffect(() => {
     const rail = tabsRef.current;
     const activeTab = rail?.querySelector('[aria-pressed="true"]');
@@ -96,7 +97,9 @@ export default function CategoryBrowser({ categories, activeId, onSelect, loadin
           View all <ChevronRight size={14} aria-hidden="true" />
         </button>
       </div>
-      {renderState() || renderTiles(matches.slice(0, 12))}
+      {renderState() || (showGroups ? [...sections].map(([id, items]) => <section key={id} className="category-collection">
+        <h3>{groups.get(id)?.name}</h3>{renderTiles(items, true)}
+      </section>) : renderTiles(matches, true))}
     </div>
     <Modal isOpen={directoryOpen} onClose={() => setDirectoryOpen(false)} title="Explore categories" size="lg"
       className="catalog-sheet category-directory" initialFocusRef={directorySearchRef} closeLabel="Close categories">

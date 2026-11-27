@@ -6,8 +6,8 @@ import { afterEach, expect, test, vi } from 'vitest';
 import authReducer from '../../../features/auth/authSlice';
 import AuthInit from '../AuthInit';
 
-const { refresh } = vi.hoisted(() => ({ refresh: vi.fn() }));
-vi.mock('../../../features/auth/authApi', () => ({ useRefreshTokenMutation: () => [refresh] }));
+const { refresh, logout } = vi.hoisted(() => ({ refresh: vi.fn(), logout: vi.fn() }));
+vi.mock('../../../features/auth/authApi', () => ({ useRefreshTokenMutation: () => [refresh], useLogoutMutation: () => [logout] }));
 afterEach(() => vi.resetAllMocks());
 
 function mount() {
@@ -44,4 +44,5 @@ test('allows an anonymous visitor only when the server confirms there is no sess
   await waitFor(() => expect(store.getState().auth.isInitialized).toBe(true));
   expect(screen.getByText('Store content')).toBeInTheDocument();
   expect(store.getState().auth.user).toBeNull();
+  expect(store.getState().auth.sessionEpoch).toBe(0);
 });

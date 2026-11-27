@@ -3,10 +3,10 @@ import { test } from './storefront-fixture.js';
 
 test.describe.configure({ timeout: 90000 });
 
-test('warms only the adjacent catalog page and reuses it on Next', async ({ page, storefront }) => {
+test('fetches only one catalog batch at a time and reuses downloaded products on navigation', async ({ page, storefront }) => {
   const slug = 'progressive-cache';
   const { store } = await storefront.seedStore(slug);
-  await storefront.Product.create(Array.from({ length: 15 }, (_, index) => ({
+  await storefront.Product.create(Array.from({ length: 45 }, (_, index) => ({
     tenantId: store._id, name: `Catalog item ${index}`, isOnline: true,
     variants: [{ name: 'Pack', retailPrice: 25, stock: 50 }],
   })));
@@ -16,17 +16,18 @@ test('warms only the adjacent catalog page and reuses it on Next', async ({ page
     if (url.pathname === `/api/v1/storefront/${slug}/products`) requests.push(url.searchParams.get('page'));
   });
   await page.goto(`${storefront.origin}/s/${slug}`);
-  await expect(page.getByRole('navigation', { name: 'products pagination' })).toContainText('Page 1 of 4');
-  await expect.poll(() => requests).toEqual(['1', '2']);
+  await expect(page.locator('.storefront-product')).toHaveCount(20);
+  await expect.poll(() => requests).toEqual(['1']);
   // Waiting beyond several scheduler ticks must not recursively fetch the catalog.
   await page.waitForTimeout(1200);
-  expect(requests).toEqual(['1', '2']);
-  await page.getByRole('button', { name: 'Next', exact: true }).click();
-  await expect(page.getByRole('navigation', { name: 'products pagination' })).toContainText('Page 2 of 4');
-  await expect.poll(() => requests).toEqual(['1', '2', '3']);
+  expect(requests).toEqual(['1']);
+  await page.locator('.customer-scroll').evaluate((node) => { node.scrollTop = node.scrollHeight; });
+  await expect(page.locator('.storefront-product')).toHaveCount(40);
+  await expect.poll(() => requests).toEqual(['1', '2']);
   expect(requests.filter((number) => number === '2')).toHaveLength(1);
-  await page.getByRole('button', { name: 'Previous', exact: true }).click();
-  await expect(page.getByRole('navigation', { name: 'products pagination' })).toContainText('Page 1 of 4');
+  await page.getByRole('link', { name: 'Login', exact: true }).click();
+  await page.goBack();
+  await expect(page.locator('.storefront-product')).toHaveCount(40);
   expect(requests.filter((number) => number === '1')).toHaveLength(1);
 });
 

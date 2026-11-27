@@ -1,3 +1,4 @@
+import { useSavedViewState } from '../../../offline/useSavedViewState';
 import { usePageSize } from '../../../hooks/usePagination';
 import { useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
@@ -97,8 +98,8 @@ function OrderDetailDrawer({ orderId, slug, onClose }) {
 
   const [statusPick, setStatusPick] = useState('');
   const [statusMsg, setStatusMsg] = useState('');
-  const [cancelReason, setCancelReason] = useState('');
-  const [activeTab, setActiveTab] = useState('details'); // details | payment | items | timeline
+  const [cancelReason, setCancelReason] = useSavedViewState(`order:${orderId}:cancel-reason`, '');
+  const [activeTab, setActiveTab] = useSavedViewState(`order:${orderId}:tab`, 'details'); // details | payment | items | timeline
 
   const order = data?.data?.order;
   const validNext = order ? ORDER_ADMIN_STATUS_TRANSITIONS[order.status] || [] : [];
@@ -366,9 +367,9 @@ export default function OrdersManagement() {
   const { store } = useAuth();
   const slug = store?.slug;
 
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useSavedViewState('OrdersManagement:OrdersManagement:search', '');
   const settledSearch = useDebouncedValue(search.trim());
-  const [statusFilter, setStatusFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useSavedViewState('OrdersManagement:OrdersManagement:statusFilter', '');
   const { limit } = usePageSize('rows');
   const paging = useCursorPages(`${slug}:${statusFilter}:${settledSearch}:${limit}`);
   const page = paging.page;
@@ -404,7 +405,7 @@ export default function OrdersManagement() {
           aria-label="Refresh orders"
           className="workspace-row-action text-slate-400"
         >
-          <RefreshCw size={18} className={cn(isFetching && 'animate-spin')} />
+          <RefreshCw size={18} className={cn(isFetching && !data && 'animate-spin')} />
         </button>
       </div>
 

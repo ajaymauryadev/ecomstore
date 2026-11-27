@@ -13,14 +13,14 @@ const PLAN_COLORS = { trial: 'default', basic: 'info', premium: 'gold', enterpri
 
 export default function SuperAdminDashboard() {
   const { user } = useAuth();
-  const { data, isLoading } = useGetSystemStatsQuery(undefined, { pollingInterval: 60000 });
+  const { data, isLoading } = useGetSystemStatsQuery(undefined, { pollingInterval: 0 });
 
   const stats = data?.data;
   const planDist = stats?.planDistribution ?? [];
   const recentStores = stats?.recentStores ?? [];
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6">
       <div>
         <h1 className="text-xl font-bold text-slate-100">System Overview</h1>
         <p className="text-slate-400 text-sm mt-0.5">

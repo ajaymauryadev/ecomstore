@@ -1,3 +1,4 @@
+import { useSavedViewState } from '../../../offline/useSavedViewState';
 import { usePageSize, usePageState } from '../../../hooks/usePagination';
 import { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -136,12 +137,12 @@ export default function UdharPage() {
   const { limit } = usePageSize('rows');
   const [customerPage, setCustomerPage] = usePageState(limit);
   const timeZone = resolveStoreTimeZone(store?.settings?.timezone);
-  const [search, setSearch] = useState('');
-  const [activeTab, setActiveTab] = useState('all'); // all | dues
-  const [selectedAccount, setSelectedCustomer] = useState(() => /^[a-f\d]{24}$/i.test(searchParams.get('customerId') || '') ? { _id: searchParams.get('customerId') } : null);
+  const [search, setSearch] = useSavedViewState('UdharPage:UdharPage:search', '');
+  const [activeTab, setActiveTab] = useSavedViewState('UdharPage:UdharPage:activeTab', 'all'); // all | dues
+  const [selectedAccount, setSelectedCustomer] = useSavedViewState('selected-account', () => /^[a-f\d]{24}$/i.test(searchParams.get('customerId') || '') ? { _id: searchParams.get('customerId') } : null);
   const [showAddModal, setShowAddModal] = useState(() => (searchParams.get('new') === '1' || Boolean(searchParams.get('phone'))) && canManage);
   const [showTxModal, setShowTxModal] = useState(null);
-  const [historyTab, setHistoryTab] = useState('bills');
+  const [historyTab, setHistoryTab] = useSavedViewState('UdharPage:UdharPage:historyTab', 'bills');
   const ledgerPaging = useCursorPages(`${selectedAccount?._id}:${limit}`);
   const ledgerPage = ledgerPaging.page;
 
@@ -331,7 +332,7 @@ export default function UdharPage() {
                 {historyTab === 'bills' ? <CustomerBillsPanel customerId={selectedCustomer._id} timeZone={timeZone} onReceive={canManage ? (bill) => setShowTxModal({ bill }) : undefined} /> : <>
                 <div className="flex flex-wrap items-center justify-between gap-2 mb-3"><h2 className="text-base font-bold">Purchases & payments</h2><span className="text-xs text-slate-500">{ledgerMeta.total || 0} entries</span></div>
                 {ledgerData?.data?.summary && <div className="grid grid-cols-2 gap-3 rounded-xl bg-navy-750 p-3 mb-3 text-sm"><div><p className="text-xs text-slate-500">Purchases on Udhar</p><p className="font-bold mt-1">{fmt(ledgerData.data.summary.totalDebits)}</p></div><div><p className="text-xs text-slate-500">Payments & adjustments</p><p className="font-bold mt-1 text-emerald-400">{fmt(ledgerData.data.summary.totalCredits)}</p></div></div>}
-                {ledgerLoading && <p role="status" className="text-sm text-slate-500">Loading transactions…</p>}
+                {ledgerLoading && !ledgerData && <p role="status" className="text-sm text-slate-500">Loading transactions…</p>}
                 {ledgerData?.data?.entries?.length === 0 ? (
                   <p className="text-sm text-slate-500 text-center py-6">No transactions yet</p>
                 ) : (

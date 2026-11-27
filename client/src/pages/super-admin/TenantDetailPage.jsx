@@ -1,3 +1,4 @@
+import { useSavedViewState } from '../../offline/useSavedViewState';
 import { useClientPagination } from '../../hooks/usePagination';
 import Pagination from '../../components/ui/Pagination';
 import { useState } from 'react';
@@ -23,7 +24,7 @@ const PLAN_VARIANTS = { trial: 'default', basic: 'info', premium: 'gold', enterp
 
 export default function TenantDetailPage() {
   const { id } = useParams();
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useSavedViewState('TenantDetailPage:TenantDetailPage:activeTab', 'overview');
   const [accessReason, setAccessReason] = useState('');
 
   const { data, isLoading } = useGetStoreDetailQuery(id);

@@ -17,6 +17,7 @@ import Product from './models/Product.js';
 import { asyncHandler } from './utils/asyncHandler.js';
 import { PRIVATE_PAYMENT_ROOT, PUBLIC_UPLOADS_ROOT, UPLOADS_ROOT } from './middleware/upload.js';
 import { remoteAsset } from './services/imageStorage.service.js';
+import { trackSavedDataChanges } from './middleware/savedDataSync.js';
 
 mkdirSync(PUBLIC_UPLOADS_ROOT, { recursive: true });
 mkdirSync(PRIVATE_PAYMENT_ROOT, { recursive: true, mode: 0o700 });
@@ -97,7 +98,7 @@ app.get('/uploads/:filename', asyncHandler(async (req, res, next) => {
   if (!isProductImage || !existsSync(filePath)) return next(new AppError('Image not found.', 404));
   res.set('Cross-Origin-Resource-Policy', 'cross-origin').sendFile(filePath);
 }));
-app.use('/api/v1', routes);
+app.use('/api/v1', trackSavedDataChanges, routes);
 
 app.get('/health', (req, res) => {
   res.set('Cache-Control', 'no-store');

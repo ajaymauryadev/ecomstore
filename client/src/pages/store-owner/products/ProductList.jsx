@@ -1,3 +1,4 @@
+import { useSavedViewState } from '../../../offline/useSavedViewState';
 import Pagination from '../../../components/ui/Pagination';
 import { usePageSize, usePageState } from '../../../hooks/usePagination';
 import { useState } from 'react';
@@ -81,12 +82,12 @@ export default function ProductList() {
   const canCreate = hasPermission(user, PERMISSIONS.PRODUCTS_CREATE);
   const canDelete = hasPermission(user, PERMISSIONS.PRODUCTS_DELETE);
   const canViewCategories = hasPermission(user, PERMISSIONS.CATEGORIES_VIEW);
-  const [search, setSearch] = useState('');
-  const [searchInput, setSearchInput] = useState('');
-  const [categoryId, setCategoryId] = useState('');
-  const [isActive, setIsActive] = useState('');
-  const [lowStock, setLowStock] = useState(false);
-  const [view, setView] = useState('cards');
+  const [search, setSearch] = useSavedViewState('ProductList:ProductList:search', '');
+  const [searchInput, setSearchInput] = useSavedViewState('ProductList:ProductList:searchInput', '');
+  const [categoryId, setCategoryId] = useSavedViewState('ProductList:ProductList:categoryId', '');
+  const [isActive, setIsActive] = useSavedViewState('ProductList:ProductList:isActive', '');
+  const [lowStock, setLowStock] = useSavedViewState('ProductList:ProductList:lowStock', false);
+  const [view, setView] = useSavedViewState('ProductList:ProductList:view', 'cards');
   const { limit, contentRef } = usePageSize(view === 'cards' ? 'products' : 'compact');
   const [page, setPage] = usePageState(limit);
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -136,7 +137,7 @@ export default function ProductList() {
   };
 
   return (
-    <div className="space-y-5 animate-fade-in">
+    <div className="space-y-5">
       {/* Header */}
       <div className="page-header">
         <div>
@@ -228,9 +229,6 @@ export default function ProductList() {
         </div>
       ) : (
         <div ref={contentRef} className="table-container relative" aria-busy={isFetching}>
-          {isFetching && (
-            <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-gold animate-pulse" />
-          )}
           <div className="workspace-table-scroll" role="region" aria-label="Product list" tabIndex={0}>
           <table className="table workspace-list md:min-w-[820px]" role="table">
             <thead>

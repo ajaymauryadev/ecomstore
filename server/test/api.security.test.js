@@ -22,6 +22,7 @@ import AuditLog from '../src/models/AuditLog.js';
 import { hashGuestOrderToken } from '../src/utils/orderAccessToken.js';
 import { accountingDay } from '../src/utils/accountingDay.js';
 import { parseTrustedProxies } from '../src/config/trustedProxies.js';
+const settleRevisionWrites = async () => (await import('../src/middleware/savedDataSync.js')).settleRevisionWrites();
 
 const PASSWORD = 'CorrectHorse123!';
 const NEW_PASSWORD = 'NewCorrectHorse456!';
@@ -174,6 +175,7 @@ beforeEach(async () => {
 });
 
 afterAll(async () => {
+  await settleRevisionWrites();
   await new Promise((resolve) => setTimeout(resolve, 250));
   await mongoose.disconnect();
   await new Promise((resolve) => setTimeout(resolve, 500));
@@ -3393,5 +3395,53 @@ describe('Excel product import', () => {
       expect(await Product.countDocuments({ tenantId: ids.storeA })).toBe(0);
       expect(await StockLedger.countDocuments({ tenantId: ids.storeA })).toBe(0);
     } finally { spy.mockRestore(); }
+  });
+});
+
+
+describe('saved-data revision checks', () => {
+  test('replays saved packing work once, preserves recording time, and rejects changed assignments or stale item states', async () => {
+    const { product, variant } = await createProduct();
+    const placed = await request(app).post('/api/v1/storefront/store-alpha/orders').set(auth(tokens.customerA)).send(orderBody(product, variant)).expect(201);
+    const order = placed.body.data.order;
+    const ownerOrder = '/api/v1/storefront/store-alpha/admin/orders/' + order._id;
+    await request(app).patch(ownerOrder + '/status').set(auth(tokens.ownerA)).send({ status: 'accepted' }).expect(200);
+    await request(app).patch(ownerOrder + '/assign').set(auth(tokens.ownerA)).send({ staffId: ids.packer }).expect(200);
+    const packing = '/api/v1/packing/session/' + order._id;
+    const started = await request(app).post(packing + '/start').set(auth(tokens.packer)).expect(201);
+    const item = started.body.data.session.items[0];
+    const endpoint = packing + '/item/' + item._id;
+    const recordedAt = new Date(Date.now() - 60000).toISOString();
+    const saved = { operationId: randomUUID(), action: 'pick', expectedStatus: 'pending', recordedAt };
+    await request(app).patch(endpoint).set(auth(tokens.packer)).send(saved).expect(200);
+    await request(app).patch(endpoint).set(auth(tokens.packer)).send(saved).expect(200);
+    const Activity = mongoose.model('StaffActivityLog');
+    const logs = await Activity.find({ orderId: order._id, 'metadata.operationId': saved.operationId });
+    expect(logs).toHaveLength(1);
+    expect(logs[0].metadata.recordedAt).toBe(recordedAt);
+    expect(Date.parse(logs[0].metadata.confirmedAt)).toBeGreaterThan(Date.parse(recordedAt));
+    await request(app).patch(endpoint).set(auth(tokens.packer)).send({ ...saved, action: 'missing' }).expect(409);
+    await request(app).patch(endpoint).set(auth(tokens.packer)).send({ ...saved, operationId: randomUUID() }).expect(409);
+    await Order.updateOne({ _id: order._id }, { assignedTo: ids.staff });
+    await request(app).patch(endpoint).set(auth(tokens.packer)).send({ operationId: randomUUID(), action: 'pack', expectedStatus: 'picked', recordedAt }).expect(409);
+    const confirmed = await mongoose.model('PackingSession').findById(started.body.data.session._id);
+    expect(confirmed.items[0].status).toBe('picked');
+  });
+  test('checks revisions without exposing records and changes only the affected tenant after a confirmed write', async () => {
+    await settleRevisionWrites();
+    const revision = async (token) => (await request(app).get('/api/v1/sync/revision').set(auth(token)).expect(200)).body.data.revision;
+    await request(app).get('/api/v1/sync/revision').expect(401);
+    const beforeA = await revision(tokens.ownerA);
+    const beforeB = await revision(tokens.ownerB);
+    await request(app).patch('/api/v1/stores/mine').set(auth(tokens.ownerA)).send({ name: 'Saved Alpha' }).expect(200);
+    await settleRevisionWrites();
+    expect(await revision(tokens.ownerA)).toBeGreaterThan(beforeA);
+    expect(await revision(tokens.ownerB)).toBe(beforeB);
+    const publicCheck = await request(app).get('/api/v1/storefront/store-alpha/sync-revision').expect(200);
+    expect(Object.keys(publicCheck.body.data)).toEqual(['revision']);
+    const committed = await revision(tokens.ownerA);
+    await request(app).patch('/api/v1/stores/mine').set(auth(tokens.ownerA)).send({ paymentSettings: { upiId: 'bad' } }).expect(400);
+    await settleRevisionWrites();
+    expect(await revision(tokens.ownerA)).toBe(committed);
   });
 });

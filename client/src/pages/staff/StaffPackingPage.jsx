@@ -1,4 +1,8 @@
-import { useState } from 'react';
+import { useSavedViewState } from '../../offline/useSavedViewState';
+import { useEffect, useState } from 'react';
+import { useSelector, useStore } from 'react-redux';
+import { accountScope } from '../../offline/storage';
+import { enqueuePacking, packingIntents } from '../../offline/packingOutbox';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Package, AlertTriangle, CheckCircle2, XCircle, ChevronDown,
@@ -6,7 +10,6 @@ import {
 } from 'lucide-react';
 import {
   useGetPackingSessionQuery,
-  useUpdateItemStatusMutation,
   useCompletePackingSessionMutation,
 } from '../../features/packing/packingApi';
 import { ROUTES } from '../../constants/routes';
@@ -46,7 +49,7 @@ function MissingReasonModal({ item, onConfirm, onClose }) {
         {item.isHighValue && (
           <div className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/30 rounded-xl px-3 py-2.5">
             <ShieldAlert size={15} className="text-amber-400 shrink-0" />
-            <p className="text-xs text-amber-300 font-medium">High-value item — admin will be notified immediately</p>
+            <p className="text-xs text-amber-300 font-medium">High-value item — admin will be notified after server confirmation</p>
           </div>
         )}
         <div>
@@ -116,7 +119,7 @@ function PackingItem({ item, onAction, loading }) {
                   <AlertTriangle size={13} className="text-amber-400" />
                 )}
                 <span className={cn('text-[10px] font-semibold px-2 py-0.5 rounded-full capitalize', STATUS_BADGE[item.status])}>
-                  {item.status}
+                  {item.localPending ? `Draft: ${item.status} · pending sync` : item.status}
                 </span>
               </div>
             </div>
@@ -176,7 +179,7 @@ function PackingItem({ item, onAction, loading }) {
         {item.status === 'packed' && (
           <div className="px-4 pb-3 flex items-center gap-2">
             <CheckCircle2 size={15} className="text-emerald-400" />
-            <p className="text-xs text-emerald-400 font-medium flex-1">Packed</p>
+            <p className="text-xs text-emerald-400 font-medium flex-1">{item.localPending ? 'Packed locally — pending sync' : 'Packed'}</p>
             <button
               onClick={() => setExpanded(!expanded)}
               className="text-slate-500 text-xs flex items-center gap-1"
@@ -195,30 +198,46 @@ function PackingItem({ item, onAction, loading }) {
 }
 
 export default function StaffPackingPage({ packingPath = ROUTES.STAFF.PACKING }) {
+  const reduxStore = useStore();
+  const account = useSelector((state) => accountScope(state.auth));
+  const [, setOutboxVersion] = useState(0);
+  const [queuing, setQueuing] = useState(false);
+  useEffect(() => {
+    const changed = () => setOutboxVersion((value) => value + 1);
+    window.addEventListener('saved-outbox-changed', changed);
+    return () => window.removeEventListener('saved-outbox-changed', changed);
+  }, []);
   const { user } = useAuth();
   const canPerform = hasPermission(user, PERMISSIONS.PACKING_PERFORM);
   const { orderId } = useParams();
   const navigate = useNavigate();
   const { data, isLoading, refetch } = useGetPackingSessionQuery({ orderId }, {
-    pollingInterval: 30000, skipPollingIfUnfocused: true, refetchOnReconnect: true,
+    pollingInterval: 0, skipPollingIfUnfocused: true, refetchOnReconnect: true,
   });
-  const [updateItem, { isLoading: updating }] = useUpdateItemStatusMutation();
   const [completeSession, { isLoading: completing }] = useCompletePackingSessionMutation();
-  const [staffNotes, setStaffNotes] = useState('');
+  const [staffNotes, setStaffNotes] = useSavedViewState('StaffPackingPage:StaffPackingPage:staffNotes', '');
   const [showComplete, setShowComplete] = useState(false);
 
   const session = data?.data?.session;
   const order = data?.data?.order;
+  const localQueue = packingIntents(account, orderId);
+  const projected = (item) => {
+    const last = localQueue.filter((intent) => intent.payload.itemId === item._id).at(-1);
+    return last ? { ...item, status: { pick: 'picked', pack: 'packed', missing: 'missing' }[last.payload.action], missingReason: last.payload.missingReason, localPending: true } : item;
+  };
 
   const handleAction = async (itemId, action, reason) => {
+    setQueuing(true);
     try {
-      await updateItem({ orderId, itemId, action, missingReason: reason }).unwrap();
+      const item = session?.items.find((entry) => entry._id === itemId);
+      await enqueuePacking(reduxStore, orderId, projected(item), action, reason);
     } catch (err) {
-      toast.error(err?.data?.message || 'Failed to update item');
-    }
+      toast.error(err?.data?.message || 'Could not save this checklist change on this device.');
+    } finally { setQueuing(false); }
   };
 
   const handleComplete = async () => {
+    if (localQueue.length) return toast.error('Confirm the pending checklist changes before completing packing.');
     const remaining = session?.items?.filter((i) => !['packed', 'missing'].includes(i.status)).length ?? 0;
     if (remaining > 0) {
       toast.error(`${remaining} item${remaining > 1 ? 's' : ''} still pending — mark as packed or missing first`);
@@ -226,6 +245,7 @@ export default function StaffPackingPage({ packingPath = ROUTES.STAFF.PACKING })
     }
     try {
       await completeSession({ orderId, staffNotes }).unwrap();
+      setStaffNotes('');
       toast.success('Packing complete! Awaiting admin verification.');
       navigate(packingPath);
     } catch (err) {
@@ -261,6 +281,7 @@ export default function StaffPackingPage({ packingPath = ROUTES.STAFF.PACKING })
 
   return (
     <div className="space-y-5">
+      {localQueue.length > 0 && <p role="status" className="workspace-feedback">{localQueue.length} local checklist change(s) pending server confirmation. The progress totals below show confirmed work only. Rejected changes remain saved for review.</p>}
       {/* Header */}
       <div className="flex items-center gap-3">
         <button
@@ -327,12 +348,12 @@ export default function StaffPackingPage({ packingPath = ROUTES.STAFF.PACKING })
           ...items.filter((i) => i.status === 'packed'),
           ...items.filter((i) => i.status === 'missing'),
         ].map((item) => (
-          <PackingItem key={item._id} item={item} onAction={handleAction} loading={updating || isCompleted || !canPerform} />
+          <PackingItem key={item._id} item={projected(item)} onAction={handleAction} loading={queuing || isCompleted || !canPerform} />
         ))}
       </div>
 
       {/* Complete section */}
-      {canPerform && !isCompleted && pendingCount === 0 && (
+      {canPerform && !isCompleted && pendingCount === 0 && localQueue.length === 0 && (
         <div className="packing-actions">
           {showComplete ? (
             <Modal isOpen onClose={() => !completing && setShowComplete(false)} title="Submit packing for verification" size="lg"><div className="space-y-4">

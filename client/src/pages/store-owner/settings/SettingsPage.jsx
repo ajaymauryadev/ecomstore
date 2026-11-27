@@ -1,4 +1,5 @@
-import { useState, useEffect, useId, cloneElement } from 'react';
+import { useSavedViewState } from '../../../offline/useSavedViewState';
+import { useEffect, useId, cloneElement } from 'react';
 import { Store, CreditCard, Truck, Clock, ShoppingBag, Receipt, Plus, Trash2, Save, ToggleLeft, ToggleRight } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useGetMyStoreQuery, useUpdateMyStoreMutation, useUploadPaymentQrMutation } from '../../../features/store/storeApi';
@@ -45,7 +46,7 @@ function Toggle({ value, onChange, label }) {
 }
 
 export default function SettingsPage() {
-  const [activeTab, setActiveTab] = useState('shop');
+  const [activeTab, setActiveTab] = useSavedViewState('SettingsPage:SettingsPage:activeTab', 'shop');
   const { data, isLoading } = useGetMyStoreQuery();
   const [updateStore, { isLoading: isSaving }] = useUpdateMyStoreMutation();
   const [uploadPaymentQr, { isLoading: isUploadingQr }] = useUploadPaymentQrMutation();
@@ -53,10 +54,10 @@ export default function SettingsPage() {
   const store = data?.data?.store;
 
   // Local form state
-  const [form, setForm] = useState(null);
+  const [form, setForm] = useSavedViewState('settings-draft', null);
 
   useEffect(() => {
-    if (store) {
+    if (store && !form) {
       setForm({
         name: store.name || '',
         branding: {
@@ -110,7 +111,7 @@ export default function SettingsPage() {
         },
       });
     }
-  }, [store]);
+  }, [store, form, setForm]);
 
   const set = (section, key, val) => setForm((f) => ({ ...f, [section]: { ...f[section], [key]: val } }));
 

@@ -49,7 +49,10 @@ export default function LiveUpdates() {
       if (String(user?._id) !== String(store.getState().auth.user?._id)) return;
       clearPending();
       dispatch(updateUser(user));
-      dispatch(baseApi.util.resetApiState());
+      if (selectSessionEpoch(store.getState()) !== epoch) dispatch(baseApi.util.resetApiState());
+    }));
+    cleanups.push(on('data:changed', () => {
+      invalidate(Object.keys(store.getState().api.provided.tags).map((type) => ({ type })));
     }));
     cleanups.push(on('notification:new', (payload) => {
       invalidate(notifications);

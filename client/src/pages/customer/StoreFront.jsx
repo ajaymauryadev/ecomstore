@@ -1,10 +1,8 @@
-import { useNextPagePrefetch } from '../../hooks/useNextPagePrefetch';
-import { usePagination } from '../../hooks/usePagination';
-import Pagination from '../../components/ui/Pagination';
-import { useState, useEffect, useMemo } from 'react';
-import { useOutletContext, useParams, useSearchParams, useNavigate, Link } from 'react-router-dom';
-import { ShoppingCart, Plus, Minus, Star, AlertTriangle, SlidersHorizontal, X } from 'lucide-react';
-import { useGetPublicProductsQuery } from '../../features/products/productApi';
+import { useInfiniteProducts } from '../../hooks/useInfiniteProducts';
+import { memo, useState, useMemo } from 'react';
+import { useOutletContext, useParams, useNavigate, Link } from 'react-router-dom';
+import { useSavedSearchParams } from '../../offline/useSavedSearchParams';
+import { ShoppingCart, Plus, Minus, Star, AlertTriangle, LayoutGrid, Tag, Sparkles, X } from 'lucide-react';
 import { useGetPublicCategoriesQuery } from '../../features/categories/categoryApi';
 import { useCart } from '../../hooks/useCart';
 import { formatCurrency } from '../../utils/formatters';
@@ -12,6 +10,7 @@ import { cn } from '../../utils/cn';
 import CategoryBrowser from '../../components/products/CategoryBrowser';
 import CatalogFilters from '../../components/products/CatalogFilters';
 import StorefrontCarousel from '../../components/products/StorefrontCarousel';
+import CategoryArtwork from '../../components/products/CategoryArtwork';
 
 const API_BASE = import.meta.env.VITE_API_URL?.replace('/api/v1', '') || '';
 
@@ -87,16 +86,16 @@ function CartControl({ product, variant }) {
         aria-label={`Add ${product.name} to cart`}
         disabled={!cartReady}
         onClick={(e) => { e.stopPropagation(); addItem(cartItem); }}
-        className="w-11 h-11 rounded-xl bg-gold-500 text-white flex items-center justify-center hover:brightness-110 active:scale-90 transition-all duration-150 shadow-sm"
+        className="storefront-add"
       >
-        <Plus size={16} />
+        ADD <Plus size={15} aria-hidden="true" />
       </button>
     );
   }
 
   return (
     <div
-      className="flex items-center justify-between gap-0 w-full max-w-36"
+      className="storefront-quantity flex items-center justify-between gap-0 w-full"
       onClick={(e) => e.stopPropagation()}
     >
       <button
@@ -123,16 +122,12 @@ function CartControl({ product, variant }) {
 }
 
 /* ─── Product Card ──────────────────────────────────────── */
-function ProductCard({ product }) {
+const ProductCard = memo(function ProductCard({ product }) {
   const { storeSlug } = useParams();
   const activeVariants = useMemo(() => product.variants?.filter((v) => v.isActive) || [], [product.variants]);
   const defaultVariant = activeVariants.find((v) => v.stock > 0) ?? activeVariants[0];
-  const [selectedVariant, setSelectedVariant] = useState(defaultVariant);
-
-  useEffect(() => {
-    const inStock = activeVariants.find((v) => v.stock > 0) ?? activeVariants[0];
-    setSelectedVariant(inStock);
-  }, [product._id, activeVariants]);
+  const [selectedVariantId, setSelectedVariantId] = useState(defaultVariant?._id);
+  const selectedVariant = activeVariants.find((variant) => variant._id === selectedVariantId) ?? defaultVariant;
 
   if (!selectedVariant || !activeVariants.length) return null;
 
@@ -148,7 +143,7 @@ function ProductCard({ product }) {
       {/* Image — clicking goes to product detail */}
       <Link to={`/s/${storeSlug}/p/${product._id}`} aria-label={`View ${product.name}`} className="relative aspect-square bg-navy-750 overflow-hidden block">
         {mainImg ? (
-          <img src={mainImg} alt={product.name} className="w-full h-full object-cover" loading="lazy" />
+          <img src={mainImg} alt={product.name} className="w-full h-full object-cover" loading="lazy" decoding="async" width="240" height="240" />
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-navy-700/50">
             <ShoppingCart size={28} strokeWidth={1} className="text-navy-500" />
@@ -189,7 +184,7 @@ function ProductCard({ product }) {
       {/* Info */}
       <div className="p-3 flex flex-col gap-2 flex-1">
         <div className="flex-1 min-h-0">
-          <p className="text-[11px] text-slate-500 leading-tight">
+          <p className="storefront-product-brand">
             {product.categoryId?.emoji} {product.brand || product.categoryId?.name || ''}
           </p>
           <Link to={`/s/${storeSlug}/p/${product._id}`} className="text-base font-semibold text-slate-200 leading-snug mt-1 line-clamp-2 break-words hover:text-gold-400 transition-colors block">
@@ -200,13 +195,14 @@ function ProductCard({ product }) {
           <VariantSelector
             variants={activeVariants}
             selected={selectedVariant}
-            onSelect={setSelectedVariant}
+            onSelect={(variant) => setSelectedVariantId(variant._id)}
           />
+          {activeVariants.length === 1 && <p className="storefront-pack-size">{selectedVariant.name}</p>}
         </div>
 
         {/* Price + Add */}
-        <div className="flex flex-wrap items-end justify-between gap-2 mt-auto pt-1">
-          <div>
+        <div className="storefront-product-footer mt-auto">
+          <div className="storefront-product-price">
             <p className="font-bold text-slate-100 leading-tight">{formatCurrency(price)}</p>
             {discount && (
               <p className="text-[11px] text-slate-500 line-through leading-tight">{formatCurrency(retail)}</p>
@@ -217,7 +213,7 @@ function ProductCard({ product }) {
       </div>
     </article>
   );
-}
+});
 
 /* ─── Skeleton card ─────────────────────────────────────── */
 function SkeletonCard() {
@@ -239,24 +235,19 @@ function SkeletonCard() {
 
 /* ─── Main StoreFront ───────────────────────────────────── */
 function ProductResults({ storeSlug, filters, title, onReset, hasFilters }) {
-  const paging = usePagination(JSON.stringify([storeSlug, filters]), 'storefront');
-  const args = { slug: storeSlug, page: paging.page, limit: paging.limit, ...filters };
-  const { currentData, isFetching, isError, refetch } = useGetPublicProductsQuery(args);
-  useNextPagePrefetch('getPublicProducts', args, currentData?.meta, { skip: isFetching || isError });
-  const meta = currentData?.meta || {};
-  const products = currentData?.data || [];
+  const { products, meta, sentinel, hasMore, fetching, initialLoading, error, retry, loadMore, offline } = useInfiniteProducts(storeSlug, filters);
 
   return (
-    <section aria-label="Product results" aria-busy={isFetching} className="space-y-3">
+    <section aria-label="Product results" aria-busy={fetching} className="storefront-results space-y-3">
       <div className="flex items-center justify-between gap-2">
         <h2 className="font-bold text-slate-100 break-words min-w-0">{title}</h2>
-        <p role="status" className="text-xs text-slate-500 shrink-0">{isFetching ? 'Loading…' : `${meta.total ?? 0} product${meta.total === 1 ? '' : 's'}`}</p>
+        <p role="status" className="text-xs text-slate-500 shrink-0">{meta ? `${meta.total} product${meta.total === 1 ? '' : 's'}` : ''}</p>
       </div>
-      {isError ? <div role="alert" className="card p-6 text-center">
+      {error && !products.length ? <div role="alert" className="card p-6 text-center">
         <AlertTriangle size={32} className="mx-auto text-amber-400" aria-hidden="true" />
         <h3 className="font-semibold text-slate-100 mt-3">Products could not be loaded</h3>
-        <button type="button" onClick={refetch} className="btn btn-secondary btn-sm min-h-11 mt-4">Try again</button>
-      </div> : isFetching && !products.length ? <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+        <button type="button" onClick={retry} className="btn btn-secondary btn-sm min-h-11 mt-4">Try again</button>
+      </div> : initialLoading ? <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
         {Array.from({ length: 8 }).map((_, index) => <SkeletonCard key={index} />)}
       </div> : !products.length ? <div className="flex flex-col items-center text-center py-12 text-slate-500">
         <ShoppingCart size={40} strokeWidth={1} className="mb-3" aria-hidden="true" />
@@ -264,11 +255,17 @@ function ProductResults({ storeSlug, filters, title, onReset, hasFilters }) {
         {hasFilters && <><p className="text-sm mt-1">Try another category or clear your filters.</p>
           <button type="button" onClick={onReset} className="btn btn-secondary min-h-11 mt-4">Clear all filters</button></>}
       </div> : <>
-        <div ref={paging.contentRef} className={cn('grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3', isFetching && 'opacity-80')}>
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
           {products.map((product) => <ProductCard key={product._id} product={product} />)}
         </div>
-        <Pagination meta={meta} page={paging.page} onPageChange={paging.setPage} isFetching={isFetching} label="products" hideOnSinglePage />
       </>}
+      <div ref={sentinel} className="storefront-scroll-end" aria-label="Continue exploring products">
+        {products.length > 0 && (error ? <p role="status">More products could not be loaded. <button type="button" onClick={retry}>Try again</button></p>
+          : fetching ? <p role="status">Finding more favourites…</p>
+            : hasMore && offline ? <p role="status">You’re offline. Your saved products are still here.</p>
+              : hasMore ? <button type="button" className={globalThis.IntersectionObserver ? 'sr-only focus:not-sr-only' : undefined} onClick={loadMore}>Explore more products</button>
+                : <p>You’ve explored this collection.</p>)}
+      </div>
     </section>
   );
 }
@@ -277,7 +274,7 @@ export default function StoreFront({ showCategories = false }) {
   const navigate = useNavigate();
   const { storeSlug } = useParams();
   const { store } = useOutletContext() || {};
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSavedSearchParams();
   const search = (searchParams.get('q') || '').trim();
   const activeCategoryId = searchParams.get('cat') || 'all';
   const sort = ['price_asc', 'price_desc', 'newest', 'name'].includes(searchParams.get('sort')) ? searchParams.get('sort') : 'recommended';
@@ -301,18 +298,24 @@ export default function StoreFront({ showCategories = false }) {
   const clearFilters = () => setSearchParams({});
 
   return (
-    <div className="space-y-5">
+    <div className="storefront-home space-y-4">
 
-      {!showCategories && !hasFilters && <StorefrontCarousel key={storeSlug} store={store} storeSlug={storeSlug} />}
       {showCategories ? <CategoryBrowser categories={categories} activeId={activeCategoryId} onSelect={(id) => updateFilter('cat', id)}
         loading={catLoading} error={catError} onRetry={refetchCategories} storeSlug={storeSlug} storeName={store?.name} /> : <nav aria-label="Product categories" className="category-quick-links">
-        <button type="button" onClick={() => navigate(`/s/${storeSlug}/categories${searchParams.size ? `?${searchParams}` : ''}`)}
-          className="category-all is-selected"><SlidersHorizontal size={15} aria-hidden="true" /> Browse categories</button>
-        {categories.slice(0, 8).map((category) => <button key={category._id} type="button" aria-pressed={activeCategoryId === category._id}
-          onClick={() => updateFilter('cat', category._id)} className={cn('category-all', activeCategoryId === category._id && 'is-selected')}>
-          <span aria-hidden="true">{category.emoji}</span> {category.name}
+        <button type="button" aria-label="Browse categories" onClick={() => navigate(`/s/${storeSlug}/categories${searchParams.size ? `?${searchParams}` : ''}`)}
+          className={cn('storefront-category', activeCategoryId === 'all' && 'is-selected')}><span className="storefront-category-art"><LayoutGrid size={23} aria-hidden="true" /></span><span>For you</span></button>
+        {categories.map((category) => <button key={category._id} type="button" aria-pressed={activeCategoryId === category._id}
+          onClick={() => updateFilter('cat', category._id)} className={cn('storefront-category', activeCategoryId === category._id && 'is-selected')}>
+          <span className="storefront-category-art" aria-hidden="true"><CategoryArtwork category={category} /></span><span>{category.name}</span>
         </button>)}
       </nav>}
+      {!showCategories && !hasFilters && <>
+        <StorefrontCarousel key={storeSlug} store={store} storeSlug={storeSlug} />
+        <nav className="storefront-discover" aria-label="Discover your store">
+          <Link to={`/s/${storeSlug}?offer=true`}><Tag size={17} aria-hidden="true" /><span>Explore offers</span></Link>
+          <Link to={`/s/${storeSlug}?featured=true`}><Sparkles size={17} aria-hidden="true" /><span>Store favourites</span></Link>
+        </nav>
+      </>}
       <CatalogFilters params={searchParams} onChange={setSearchParams} categories={categories} storeSlug={storeSlug} />
       {hasFilters && <div className="catalog-applied" role="group" aria-label="Applied filters">
         <div className="catalog-applied-chips">

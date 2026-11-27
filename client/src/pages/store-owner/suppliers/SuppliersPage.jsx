@@ -1,3 +1,4 @@
+import { useSavedViewState } from '../../../offline/useSavedViewState';
 import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
 import { usePagination } from '../../../hooks/usePagination';
 import Pagination from '../../../components/ui/Pagination';
@@ -92,7 +93,7 @@ function SupplierCard({ supplier, onEdit, onDelete, onPayment }) {
 }
 
 export default function SuppliersPage() {
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useSavedViewState('SuppliersPage:SuppliersPage:search', '');
   const settledSearch = useDebouncedValue(search.trim(), 250);
   const supplierNameInput = useRef(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -152,7 +153,7 @@ export default function SuppliersPage() {
   const setAddress = (field, val) => setForm((f) => ({ ...f, address: { ...f.address, [field]: val } }));
 
   return (
-    <div className="space-y-5 animate-fade-in">
+    <div className="space-y-5">
       <div className="page-header">
         <div>
           <h1 className="page-title">Suppliers</h1>

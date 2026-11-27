@@ -1,3 +1,4 @@
+import { useSavedViewState } from '../../../offline/useSavedViewState';
 import { usePagination } from '../../../hooks/usePagination';
 import Pagination from '../../../components/ui/Pagination';
 import { useState } from 'react';
@@ -38,7 +39,7 @@ function fmt(n) {
 
 /* ── Product search for return item picker ── */
 function ProductSearch({ onSelect, placeholder = 'Search product...' }) {
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useSavedViewState('ReturnsPage:ProductSearch:search', '');
   const [open, setOpen] = useState(false);
   const { data } = useGetProductsQuery({ search, isActive: true, limit: 10 }, { skip: search.length < 2 });
   const products = data?.data ?? [];
@@ -84,7 +85,7 @@ function CreateReturnForm({ type, onSuccess, onCancel }) {
   const [orderSearch, setOrderSearch] = useState('');
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [adjustBalance, setAdjustBalance] = useState(true);
-  const [notes, setNotes] = useState('');
+  const [notes, setNotes] = useSavedViewState('ReturnsPage:CreateReturnForm:notes', '');
   const [showVariantPicker, setShowVariantPicker] = useState(null);
 
   const { data: ordersData } = useGetAdminOrdersQuery(
@@ -454,9 +455,9 @@ function ReturnRow({ ret }) {
 
 /* ── Main Page ── */
 export default function ReturnsPage() {
-  const [activeType, setActiveType] = useState('customer_return');
+  const [activeType, setActiveType] = useSavedViewState('ReturnsPage:ReturnsPage:activeType', 'customer_return');
   const [showCreate, setShowCreate] = useState(false);
-  const [statusFilter, setStatusFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useSavedViewState('ReturnsPage:ReturnsPage:statusFilter', '');
 
   const paging = usePagination(`${activeType}:${statusFilter}`);
   const { data, isLoading, isFetching, refetch } = useGetReturnsQuery({

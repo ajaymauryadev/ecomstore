@@ -34,7 +34,7 @@ export default function LowStockPage() {
   }, [products, adjustTarget, searchParams, setSearchParams]);
 
   return (
-    <div className="space-y-5 animate-fade-in">
+    <div className="space-y-5">
       {/* Header */}
       <div className="page-header">
         <div className="flex items-center gap-3">

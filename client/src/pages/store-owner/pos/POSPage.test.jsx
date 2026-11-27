@@ -4,6 +4,14 @@ import POSPage from './POSPage';
 
 const { createOrder, getProducts, getAccounts } = vi.hoisted(() => ({ createOrder: vi.fn(), getProducts: vi.fn(), getAccounts: vi.fn() }));
 vi.mock('../../../hooks/useNextPagePrefetch', () => ({ useNextPagePrefetch: vi.fn() }));
+vi.mock('../../../offline/outbox', () => {
+  const outboxMemory = new Map();
+  return {
+    outboxMemory, outboxKey: (account, scope) => JSON.stringify([account, scope]),
+    saveIntent: async (record) => { outboxMemory.set(record.id, record); },
+    removeIntent: async (id) => { outboxMemory.delete(id); },
+  };
+});
 
 vi.mock('../../../hooks/useAuth', () => ({
   useAuth: () => ({ store: { _id: 'shop' }, user: { _id: 'cashier' } }),

@@ -159,7 +159,7 @@ export default function CategoriesPage() {
   };
 
   return (
-    <div className="space-y-5 animate-fade-in">
+    <div className="space-y-5">
       <div className="page-header">
         <div>
           <h1 className="page-title">Categories</h1>

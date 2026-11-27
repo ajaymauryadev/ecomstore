@@ -4,11 +4,15 @@ import { restoreCartDraft } from './restoreCartDraft';
 
 const initialState = {
   items: [],
+  slug: null,
+  draftRevision: 0,
   scopeKey: null,
   userId: null,
   status: 'idle',
   restoreRequestId: null,
   restoredWithChanges: false,
+  provisional: false,
+  pendingCouponCode: null,
   isOpen: false,
   deliveryType: 'home_delivery',
   deliveryCharge: 0,
@@ -20,7 +24,27 @@ const cartSlice = createSlice({
   name: 'cart',
   initialState,
   reducers: {
+    reconcileProducts: (state, { payload }) => {
+      state.items = payload;
+      state.restoredWithChanges = true;
+      if (state.coupon) {
+        state.pendingCouponCode = state.coupon.code;
+        state.coupon = null;
+        state.couponDiscount = 0;
+        state.provisional = true;
+      }
+    },
+    showSavedDraft: (state, { payload }) => {
+      if (state.scopeKey === payload.scopeKey && state.restoreRequestId === payload.requestId) {
+        state.items = payload.items;
+        state.deliveryType = payload.deliveryType;
+        state.status = 'ready';
+        state.provisional = true;
+        state.pendingCouponCode = payload.pendingCouponCode ?? null;
+      }
+    },
     addItem: (state, action) => {
+      state.draftRevision++;
       const existing = state.items.find((i) => i._id === action.payload._id);
       if (existing) {
         existing.quantity = Math.min(existing.quantity + 1, action.payload.stock ?? 999);
@@ -30,10 +54,12 @@ const cartSlice = createSlice({
     },
 
     removeItem: (state, action) => {
+      state.draftRevision++;
       state.items = state.items.filter((i) => i._id !== action.payload);
     },
 
     updateQuantity: (state, action) => {
+      state.draftRevision++;
       const { id, quantity } = action.payload;
       if (quantity <= 0) {
         state.items = state.items.filter((i) => i._id !== id);
@@ -45,7 +71,7 @@ const cartSlice = createSlice({
 
     clearCart: (state, action) => {
       if (state.scopeKey === action.payload) {
-        return { ...initialState, scopeKey: state.scopeKey, userId: state.userId, status: 'ready' };
+        return { ...initialState, scopeKey: state.scopeKey, userId: state.userId, slug: state.slug, status: 'ready' };
       }
     },
 
@@ -54,6 +80,7 @@ const cartSlice = createSlice({
     closeCart: (state) => { state.isOpen = false; },
 
     setDeliveryType: (state, action) => {
+      state.draftRevision++;
       state.deliveryType = action.payload; // 'home_delivery' | 'self_pickup'
       if (action.payload === 'self_pickup') state.deliveryCharge = 0;
     },
@@ -65,12 +92,16 @@ const cartSlice = createSlice({
     applyCoupon: (state, action) => {
       const { scopeKey, coupon, discount } = action.payload;
       if (state.scopeKey === scopeKey && state.status === 'ready' && state.items.length) {
+        state.draftRevision++;
+        state.pendingCouponCode = null;
         state.coupon = coupon;
         state.couponDiscount = discount;
       }
     },
 
     removeCoupon: (state) => {
+      state.draftRevision++;
+      state.pendingCouponCode = null;
       state.coupon = null;
       state.couponDiscount = 0;
     },
@@ -86,6 +117,7 @@ const cartSlice = createSlice({
       ...initialState,
       scopeKey: meta.arg.scopeKey,
       userId: meta.arg.userId,
+      slug: meta.arg.slug,
       restoreRequestId: meta.requestId,
       status: 'loading',
     }))

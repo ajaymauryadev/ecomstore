@@ -10,7 +10,6 @@ export function prefetchQuery(store, endpoint, args) {
   const query = baseApi.endpoints[endpoint];
   if (!query) return;
   const cached = query.select(args)(store.getState());
-  if (cached.status === 'pending' || (cached.fulfilledTimeStamp && Date.now() - cached.fulfilledTimeStamp < 30000)) return;
-  // No persistent subscription: unused pages expire normally in RTK Query.
-  return store.dispatch(query.initiate(args, { subscribe: false, forceRefetch: true }));
+  if (cached.status === 'pending' || cached.data !== undefined || globalThis.navigator?.onLine === false) return;
+  return store.dispatch(query.initiate(args, { subscribe: false }));
 }

@@ -8,6 +8,7 @@ import ProtectedRoute from './components/shared/ProtectedRoute';
 import ErrorBoundary from './components/shared/ErrorBoundary';
 import SocketProvider from './components/shared/SocketProvider';
 import LiveUpdates from './components/shared/LiveUpdates';
+import SavedDataStatus, { SavedScroll } from './offline/SavedDataStatus';
 import { PageLoader } from './components/ui/Spinner';
 import { ROLES } from './constants/roles';
 import { PERMISSIONS, hasAnyPermission } from './constants/permissions';
@@ -100,6 +101,8 @@ export default function App() {
       <AuthInit>
         <SocketProvider>
         <LiveUpdates />
+        <SavedDataStatus />
+        <SavedScroll />
         <Suspense fallback={<PageLoader />}>
           <Routes>
             <Route path={ROUTES.LOGIN} element={<Login />} />

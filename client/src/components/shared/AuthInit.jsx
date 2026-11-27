@@ -1,42 +1,51 @@
 import { useEffect, useRef, useState } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import { setCredentials, setInitialized, selectIsInitialized } from '../../features/auth/authSlice';
-import { useRefreshTokenMutation } from '../../features/auth/authApi';
+import { useDispatch, useSelector, useStore } from 'react-redux';
+import { setCredentials, clearCredentials, setInitialized } from '../../features/auth/authSlice';
+import { useRefreshTokenMutation, useLogoutMutation } from '../../features/auth/authApi';
 import { PageLoader } from '../ui/Spinner';
 import Button from '../ui/Button';
 
 export default function AuthInit({ children }) {
   const dispatch = useDispatch();
-  const isInitialized = useSelector(selectIsInitialized);
+  const store = useStore();
+  const isInitialized = useSelector((state) => state.auth.isInitialized);
+  const offlineSession = useSelector((state) => state.auth.offlineSession);
+  const logoutPending = useSelector((state) => state.savedData?.logoutPending);
   const [refresh] = useRefreshTokenMutation();
+  const [logout] = useLogoutMutation();
   const pending = useRef(null);
   const [attempt, setAttempt] = useState(0);
   const [recovering, setRecovering] = useState(false);
   const [retrying, setRetrying] = useState(false);
 
   useEffect(() => {
-    if (isInitialized) return;
+    if (isInitialized && !logoutPending) return;
     let active = true;
     let timer;
     const retry = () => setAttempt((value) => value + 1);
     const init = async () => {
       setRetrying(true);
       // StrictMode replays effects; both effects must await the same rotation.
-      const request = pending.current ??= refresh().unwrap();
+      const request = pending.current ??= (logoutPending ? logout({ requireServerConfirmation: true }) : refresh()).unwrap();
       try {
         const result = await request;
         if (!active) return;
+        if (logoutPending) { dispatch(clearCredentials()); dispatch(setInitialized()); return; }
         if (!result?.data?.accessToken || !result.data.user) throw new Error('Invalid session response');
         dispatch(setCredentials(result.data));
       } catch (error) {
         if (!active) return;
         if ([401, 403].includes(error.status)) {
+          // Confirming an existing guest is not a session change: resetting the
+          // cache here would interrupt public reads and hide saved storefronts.
+          const auth = store.getState().auth;
+          if (auth.user || auth.accessToken) dispatch(clearCredentials());
           dispatch(setInitialized());
         } else {
           // A failed server/network request does not establish that the user is signed out.
           setRecovering(true);
-          const delay = error.data?.retryAt ? Math.max(1000, error.data.retryAt - Date.now()) : 5000;
-          timer = setTimeout(retry, delay);
+          const delay = error.data?.retryAt ? Math.max(1000, error.data.retryAt - Date.now()) : Math.min(60000, 5000 * 2 ** Math.min(attempt, 4));
+          if (navigator.onLine !== false) timer = setTimeout(retry, delay);
         }
       } finally {
         if (pending.current === request) pending.current = null;
@@ -50,9 +59,9 @@ export default function AuthInit({ children }) {
       clearTimeout(timer);
       window.removeEventListener('online', retry);
     };
-  }, [attempt, dispatch, isInitialized, refresh]);
+  }, [attempt, dispatch, store, isInitialized, refresh, logout, logoutPending]);
 
-  if (isInitialized) return children;
+  if (isInitialized || offlineSession || window.location.pathname.startsWith('/s/')) return children;
   if (!recovering) return <PageLoader />;
   return (
     <main className="workspace-theme min-h-screen bg-navy-950 flex items-center justify-center p-6">

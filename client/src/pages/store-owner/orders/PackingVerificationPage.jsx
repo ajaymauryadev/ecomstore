@@ -10,7 +10,6 @@ import {
   useGetAdminPackingSessionQuery,
   useVerifyPackingSessionMutation,
 } from '../../../features/packing/packingApi';
-import { useSocket } from '../../../hooks/useSocket';
 import toast from 'react-hot-toast';
 import { cn } from '../../../utils/cn';
 import Modal from '../../../components/ui/Modal';
@@ -309,15 +308,6 @@ export default function PackingVerificationPage() {
     { skip: false }
   );
   const [selectedId, setSelectedId] = useState(null);
-  const { socket } = useSocket();
-
-  useEffect(() => {
-    if (!socket) return;
-    const handler = () => refetch();
-    socket.on('packing:completed', handler);
-    return () => socket.off('packing:completed', handler);
-  }, [socket, refetch]);
-
   const sessions = data?.data ?? [];
 
   if (isLoading) {

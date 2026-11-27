@@ -1,3 +1,4 @@
+import { useSavedViewState } from '../../../offline/useSavedViewState';
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Save } from 'lucide-react';
@@ -119,7 +120,7 @@ function ProductEditor({ id, initialData, reloadProduct }) {
   const isEdit = Boolean(id);
   const navigate = useNavigate();
 
-  const [form, setForm] = useState(() => isEdit ? formFromProduct(initialData) : EMPTY_PRODUCT());
+  const [form, setForm] = useSavedViewState('ProductForm:ProductEditor:form', () => isEdit ? formFromProduct(initialData) : EMPTY_PRODUCT());
   const [errors, setErrors] = useState({});
   const [conflict, setConflict] = useState('');
   const [isReloading, setIsReloading] = useState(false);
@@ -208,6 +209,7 @@ function ProductEditor({ id, initialData, reloadProduct }) {
         toast.success('Product updated successfully!');
       } else {
         await createProduct(payload).unwrap();
+        setForm(EMPTY_PRODUCT());
         toast.success('Product created successfully!');
         navigate('/store/products');
       }
@@ -227,7 +229,7 @@ function ProductEditor({ id, initialData, reloadProduct }) {
   };
 
   return (
-    <div className="animate-fade-in">
+    <div>
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <div className="flex items-center gap-3">

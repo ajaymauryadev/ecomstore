@@ -41,6 +41,9 @@ router.patch('/session/:orderId/item/:itemId', staffRoles, requirePermission(PER
   body('action').isIn(['pick', 'pack', 'missing']),
   body('pickedQty').optional().isInt({ min: 1, max: 1000 }),
   body('missingReason').optional().isString().isLength({ max: 300 }),
+  body('operationId').optional().isUUID(),
+  body('expectedStatus').optional().isIn(['pending', 'picked', 'packed', 'missing']),
+  body('recordedAt').optional().isISO8601(),
   validate,
 ], updateItemStatus);
 router.post('/session/:orderId/item/:itemId/replacement', staffRoles, requirePermission(PERMISSIONS.PACKING_PERFORM), [

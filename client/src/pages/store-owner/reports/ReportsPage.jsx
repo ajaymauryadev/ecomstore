@@ -1,6 +1,6 @@
+import { useSavedViewState } from '../../../offline/useSavedViewState';
 import { usePagination, useClientPagination } from '../../../hooks/usePagination';
 import Pagination from '../../../components/ui/Pagination';
-import { useState } from 'react';
 import LoadError from '../../../components/ui/LoadError';
 import {
   BarChart2, ShoppingCart, Package, Layers, Warehouse, Truck, Users,
@@ -72,7 +72,7 @@ function SectionCard({ title, children, className }) {
 
 function DailySalesReport({ timeZone }) {
   const today = accountingDate(undefined, timeZone);
-  const [date, setDate] = useState(today);
+  const [date, setDate] = useSavedViewState('ReportsPage:DailySalesReport:date', today);
   const { data, isLoading, isError, error, refetch } = useGetDailySalesQuery({ date });
   if (isError) return <LoadError title="Could not load report" error={error} retry={refetch} />;
   const hours = data?.data?.hours ?? [];
@@ -97,7 +97,7 @@ function DailySalesReport({ timeZone }) {
                 <XAxis dataKey="label" tick={{ fill: '#64748b', fontSize: 10 }} />
                 <YAxis tickFormatter={fmt} tick={{ fill: '#64748b', fontSize: 10 }} width={50} />
                 <Tooltip {...tooltipStyle} formatter={(v) => fmtFull(v)} labelFormatter={(l) => `Hour: ${l}`} />
-                <Bar dataKey="sales" fill="var(--brand-blue)" radius={[3, 3, 0, 0]} name="Sales" />
+                <Bar isAnimationActive={false} dataKey="sales" fill="var(--brand-blue)" radius={[3, 3, 0, 0]} name="Sales" />
               </BarChart>
             </ResponsiveContainer>
           )}
@@ -123,8 +123,8 @@ function DailySalesReport({ timeZone }) {
 
 function MonthlySalesReport({ timeZone }) {
   const [currentYear, currentMonth] = accountingDate(undefined, timeZone).split('-').map(Number);
-  const [year, setYear] = useState(currentYear);
-  const [month, setMonth] = useState(currentMonth - 1);
+  const [year, setYear] = useSavedViewState('ReportsPage:MonthlySalesReport:year', currentYear);
+  const [month, setMonth] = useSavedViewState('ReportsPage:MonthlySalesReport:month', currentMonth - 1);
   const { data, isLoading, isError, error, refetch } = useGetMonthlySalesQuery({ year, month });
   if (isError) return <LoadError title="Could not load report" error={error} retry={refetch} />;
   const days = data?.data?.days ?? [];
@@ -159,7 +159,7 @@ function MonthlySalesReport({ timeZone }) {
                 <XAxis dataKey="day" tick={{ fill: '#64748b', fontSize: 11 }} />
                 <YAxis tickFormatter={fmt} tick={{ fill: '#64748b', fontSize: 10 }} width={50} />
                 <Tooltip {...tooltipStyle} formatter={(v) => fmtFull(v)} labelFormatter={(l) => `Day ${l}`} />
-                <Area type="monotone" dataKey="sales" stroke="var(--brand-blue)" strokeWidth={2} fill="url(#salesGrad)" name="Sales" />
+                <Area isAnimationActive={false} type="monotone" dataKey="sales" stroke="var(--brand-blue)" strokeWidth={2} fill="url(#salesGrad)" name="Sales" />
               </AreaChart>
             </ResponsiveContainer>
           )}
@@ -170,7 +170,7 @@ function MonthlySalesReport({ timeZone }) {
 }
 
 function YearlySalesReport({ timeZone }) {
-  const [year, setYear] = useState(() => Number(accountingDate(undefined, timeZone).slice(0, 4)));
+  const [year, setYear] = useSavedViewState('ReportsPage:YearlySalesReport:year', () => Number(accountingDate(undefined, timeZone).slice(0, 4)));
   const { data, isLoading, isError, error, refetch } = useGetYearlySalesQuery({ year });
   if (isError) return <LoadError title="Could not load report" error={error} retry={refetch} />;
   const months = data?.data?.months ?? [];
@@ -194,7 +194,7 @@ function YearlySalesReport({ timeZone }) {
                 <XAxis dataKey="label" tick={{ fill: '#64748b', fontSize: 11 }} />
                 <YAxis tickFormatter={fmt} tick={{ fill: '#64748b', fontSize: 10 }} width={55} />
                 <Tooltip {...tooltipStyle} formatter={(v) => fmtFull(v)} />
-                <Bar dataKey="sales" fill="var(--brand-blue)" radius={[4, 4, 0, 0]} name="Sales" />
+                <Bar isAnimationActive={false} dataKey="sales" fill="var(--brand-blue)" radius={[4, 4, 0, 0]} name="Sales" />
               </BarChart>
             </ResponsiveContainer>
           )}
@@ -207,9 +207,9 @@ function YearlySalesReport({ timeZone }) {
 function ProductSalesReport({ timeZone }) {
   const today = accountingDate(undefined, timeZone);
   const firstOfMonth = today.slice(0, 8) + '01';
-  const [startDate, setStartDate] = useState(firstOfMonth);
-  const [endDate, setEndDate] = useState(today);
-  const paging = usePagination(`${startDate}:${endDate}`, 'compact');
+  const [startDate, setStartDate] = useSavedViewState('ReportsPage:ProductSalesReport:startDate', firstOfMonth);
+  const [endDate, setEndDate] = useSavedViewState('ReportsPage:ProductSalesReport:endDate', today);
+  const paging = usePagination(`${startDate}:${endDate}`, 'compact', 'ProductSalesReport:pagination');
   const { data, isLoading, isFetching, isError, error, refetch } = useGetProductSalesQuery({ startDate, endDate, page: paging.page, limit: paging.limit });
   if (isError) return <LoadError title="Could not load report" error={error} retry={refetch} />;
   const products = data?.data?.products ?? [];
@@ -238,7 +238,7 @@ function ProductSalesReport({ timeZone }) {
                   <XAxis type="number" tickFormatter={fmt} tick={{ fill: '#64748b', fontSize: 10 }} />
                   <YAxis type="category" dataKey="productName" tick={{ fill: '#94a3b8', fontSize: 11 }} width={80} />
                   <Tooltip {...tooltipStyle} formatter={(v) => fmtFull(v)} />
-                  <Bar dataKey="totalRevenue" fill="var(--brand-blue)" radius={[0, 4, 4, 0]} name="Revenue" />
+                  <Bar isAnimationActive={false} dataKey="totalRevenue" fill="var(--brand-blue)" radius={[0, 4, 4, 0]} name="Revenue" />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -265,12 +265,12 @@ function ProductSalesReport({ timeZone }) {
 function CategorySalesReport({ timeZone }) {
   const today = accountingDate(undefined, timeZone);
   const firstOfMonth = today.slice(0, 8) + '01';
-  const [startDate, setStartDate] = useState(firstOfMonth);
-  const [endDate, setEndDate] = useState(today);
+  const [startDate, setStartDate] = useSavedViewState('ReportsPage:CategorySalesReport:startDate', firstOfMonth);
+  const [endDate, setEndDate] = useSavedViewState('ReportsPage:CategorySalesReport:endDate', today);
   const { data, isLoading, isFetching, isError, error, refetch } = useGetCategorySalesQuery({ startDate, endDate });
 
   const categories = data?.data?.categories ?? [];
-  const paging = useClientPagination(categories, `${startDate}:${endDate}`, 'compact');
+  const paging = useClientPagination(categories, `${startDate}:${endDate}`, 'compact', 'CategorySalesReport:pagination');
   if (isError) return <LoadError title="Could not load report" error={error} retry={refetch} />;
 
   return (
@@ -291,7 +291,7 @@ function CategorySalesReport({ timeZone }) {
             <div className="p-4">
               <ResponsiveContainer width="100%" height={250}>
                 <PieChart>
-                  <Pie data={categories} cx="50%" cy="50%" innerRadius={65} outerRadius={100} paddingAngle={3} dataKey="totalRevenue" nameKey="categoryName">
+                  <Pie isAnimationActive={false} data={categories} cx="50%" cy="50%" innerRadius={65} outerRadius={100} paddingAngle={3} dataKey="totalRevenue" nameKey="categoryName">
                     {categories.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
                   </Pie>
                   <Tooltip {...tooltipStyle} formatter={(v) => fmtFull(v)} />
@@ -325,7 +325,7 @@ function CategorySalesReport({ timeZone }) {
 }
 
 function StockReport() {
-  const paging = usePagination('', 'compact');
+  const paging = usePagination('', 'compact', 'StockReport:pagination');
   const { data, isLoading, isFetching, isError, error, refetch } = useGetStockReportQuery({ page: paging.page, limit: paging.limit });
   if (isError) return <LoadError title="Could not load report" error={error} retry={refetch} />;
   const products = data?.data ?? [];
@@ -360,7 +360,7 @@ function StockReport() {
 }
 
 function SupplierDuesReport() {
-  const paging = usePagination('', 'compact');
+  const paging = usePagination('', 'compact', 'SupplierDuesReport:pagination');
   const { data, isLoading, isFetching, isError, error, refetch } = useGetSupplierDuesReportQuery({ page: paging.page, limit: paging.limit });
   if (isError) return <LoadError title="Could not load report" error={error} retry={refetch} />;
   const suppliers = data?.data?.suppliers ?? [];
@@ -398,7 +398,7 @@ function SupplierDuesReport() {
 }
 
 function CustomerDuesReport() {
-  const paging = usePagination('', 'compact');
+  const paging = usePagination('', 'compact', 'CustomerDuesReport:pagination');
   const { data, isLoading, isFetching, isError, error, refetch } = useGetCustomerDuesReportQuery({ page: paging.page, limit: paging.limit });
   if (isError) return <LoadError title="Could not load report" error={error} retry={refetch} />;
   const customers = data?.data?.customers ?? [];
@@ -437,8 +437,8 @@ function CustomerDuesReport() {
 function ExpenseReport({ timeZone }) {
   const today = accountingDate(undefined, timeZone);
   const firstOfMonth = today.slice(0, 8) + '01';
-  const [startDate, setStartDate] = useState(firstOfMonth);
-  const [endDate, setEndDate] = useState(today);
+  const [startDate, setStartDate] = useSavedViewState('ReportsPage:ExpenseReport:startDate', firstOfMonth);
+  const [endDate, setEndDate] = useSavedViewState('ReportsPage:ExpenseReport:endDate', today);
   const { data, isLoading, isError, error, refetch } = useGetExpenseReportQuery({ startDate, endDate });
   if (isError) return <LoadError title="Could not load report" error={error} retry={refetch} />;
   const byCategory = data?.data?.byCategory ?? [];
@@ -483,8 +483,8 @@ function ExpenseReport({ timeZone }) {
 }
 
 function SalaryReport({ timeZone }) {
-  const [monthYear, setMonthYear] = useState(() => accountingDate(undefined, timeZone).slice(0, 7));
-  const paging = usePagination(monthYear, 'compact');
+  const [monthYear, setMonthYear] = useSavedViewState('ReportsPage:SalaryReport:monthYear', () => accountingDate(undefined, timeZone).slice(0, 7));
+  const paging = usePagination(monthYear, 'compact', 'SalaryReport:pagination');
   const { data, isLoading, isFetching, isError, error, refetch } = useGetSalaryReportQuery({ monthYear, page: paging.page, limit: paging.limit });
   if (isError) return <LoadError title="Could not load report" error={error} retry={refetch} />;
   const records = data?.data?.records ?? [];
@@ -532,12 +532,12 @@ function SalaryReport({ timeZone }) {
 function PurchaseReport({ timeZone }) {
   const today = accountingDate(undefined, timeZone);
   const firstOfMonth = today.slice(0, 8) + '01';
-  const [startDate, setStartDate] = useState(firstOfMonth);
-  const [endDate, setEndDate] = useState(today);
+  const [startDate, setStartDate] = useSavedViewState('ReportsPage:PurchaseReport:startDate', firstOfMonth);
+  const [endDate, setEndDate] = useSavedViewState('ReportsPage:PurchaseReport:endDate', today);
   const { data, isLoading, isFetching, isError, error, refetch } = useGetPurchaseReportQuery({ startDate, endDate });
 
   const bySupplier = data?.data?.bySupplier ?? [];
-  const paging = useClientPagination(bySupplier, `${startDate}:${endDate}`, 'compact');
+  const paging = useClientPagination(bySupplier, `${startDate}:${endDate}`, 'compact', 'PurchaseReport:pagination');
   if (isError) return <LoadError title="Could not load report" error={error} retry={refetch} />;
   const total = data?.data?.total ?? 0;
   const paid = data?.data?.paid ?? 0;
@@ -601,7 +601,7 @@ const REPORT_COMPONENTS = {
 export default function ReportsPage() {
   const { store } = useAuth();
   const timeZone = resolveStoreTimeZone(store?.settings?.timezone);
-  const [activeTab, setActiveTab] = useState('daily');
+  const [activeTab, setActiveTab] = useSavedViewState('ReportsPage:ReportsPage:activeTab', 'daily');
   const ActiveReport = REPORT_COMPONENTS[activeTab];
 
   return (

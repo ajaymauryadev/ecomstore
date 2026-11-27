@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useSavedViewState } from '../../offline/useSavedViewState';
+import { useEffect, useMemo } from 'react';
 import { useNavigate, useParams, useLocation, Link } from 'react-router-dom';
 import {
   MapPin, User, FileText, Truck, Store,
@@ -55,13 +56,13 @@ export default function Checkout() {
   const store = storeData?.data?.store;
 
   const [createOrder, { isLoading }] = useCreateOrderMutation();
-  const { submit, retryPending } = useIdempotentSubmission(createOrder, `${storeSlug}:${user?._id}`);
+  const { submit, retryPending } = useIdempotentSubmission(createOrder, `${storeSlug}:${user?._id}:checkout`, { persist: true });
 
-  const [orderType, setOrderType] = useState(ORDER_TYPES.some((type) => type.value === deliveryType) ? deliveryType : 'home_delivery');
-  const [paymentMethod, setPaymentMethod] = useState('cod');
-  const [selectedAddressId, setSelectedAddressId] = useState(null);
+  const [orderType, setOrderType] = useSavedViewState('Checkout:Checkout:orderType', ORDER_TYPES.some((type) => type.value === deliveryType) ? deliveryType : 'home_delivery');
+  const [paymentMethod, setPaymentMethod] = useSavedViewState('Checkout:Checkout:paymentMethod', 'cod');
+  const [selectedAddressId, setSelectedAddressId] = useSavedViewState('Checkout:Checkout:selectedAddressId', null);
 
-  const [form, setForm] = useState({
+  const [form, setForm] = useSavedViewState('Checkout:Checkout:form', {
     name: profile?.name || user?.name || '',
     phone: profile?.phone || user?.phone || '',
     email: profile?.email || '',
@@ -82,7 +83,7 @@ export default function Checkout() {
       const def = profile.savedAddresses?.find((a) => a.isDefault);
       if (def) setSelectedAddressId(def._id);
     }
-  }, [profile]);
+  }, [profile, setForm, setSelectedAddressId]);
 
   // Prefill from saved address
   useEffect(() => {
@@ -99,7 +100,7 @@ export default function Checkout() {
         },
       }));
     }
-  }, [selectedAddressId, savedAddresses]);
+  }, [selectedAddressId, savedAddresses, setForm]);
 
   // Reset payment method when order type changes
   useEffect(() => {
@@ -107,7 +108,7 @@ export default function Checkout() {
     if (!available.find((m) => m.value === paymentMethod)) {
       setPaymentMethod(available[0]?.value || 'cod');
     }
-  }, [orderType, paymentMethod]);
+  }, [orderType, paymentMethod, setPaymentMethod]);
 
   const availablePaymentMethods = ALL_PAYMENT_METHODS.filter((m) => m.forTypes.includes(orderType) || m.disabled);
   const needsAddress = orderType === 'home_delivery';
@@ -197,7 +198,7 @@ export default function Checkout() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto animate-fade-in pb-8">
+    <div className="max-w-6xl mx-auto pb-8">
       <div className="flex items-center gap-3 mb-5">
         <Link to={`/s/${storeSlug}/cart`} aria-label="Back to cart" className="workspace-row-action rounded-xl hover:bg-navy-800 text-slate-400 transition-colors">
           <ArrowLeft size={18} />

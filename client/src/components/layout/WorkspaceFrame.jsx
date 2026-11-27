@@ -6,6 +6,7 @@ import { cn } from '../../utils/cn';
 import Modal from '../ui/Modal';
 import MobileNavigation from './MobileNavigation';
 import RouteContent from './RouteContent';
+import { WorkspaceSyncStatus } from '../../offline/SavedDataStatus';
 import { WorkspaceTheme } from './WorkspaceTheme';
 import './workspace.css';
 
@@ -117,6 +118,7 @@ export default function WorkspaceFrame({ sections, accordionNavigation = false, 
               <p className="workspace-wordmark truncate lg:hidden">{name}</p>
               <p className="hidden lg:flex items-center gap-2 text-slate-500"><span>{staffTabs ? 'Team workspace' : 'Store workspace'}</span><ChevronRight size={14} aria-hidden="true" /><span className="font-semibold text-slate-200">{activePage}</span></p>
             </div>
+            <WorkspaceSyncStatus />
             {notifications}
             <div className="flex shrink-0 items-center gap-2">
               <span className="grid h-9 w-9 place-items-center rounded-full bg-gold-500/10 text-sm font-bold text-gold-400" aria-hidden="true">

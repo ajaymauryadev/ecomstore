@@ -21,7 +21,7 @@ export const useAuth = () => {
   const role = useSelector(selectUserRole);
   const [logoutMutation, { isLoading: isLoggingOut }] = useLogoutMutation();
   useGetMeQuery(undefined, {
-    skip: !isAuthenticated,
+    skip: !accessToken,
     pollingInterval: 60000, skipPollingIfUnfocused: true,
     refetchOnFocus: true, refetchOnReconnect: true,
   });

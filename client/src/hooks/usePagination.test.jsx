@@ -21,6 +21,9 @@ test('filter changes reset the page while viewport changes preserve it', () => {
   expect(result.current.page).toBe(4);
   rerender({ scope: 'filtered' });
   expect(result.current.page).toBe(1);
+  rerender({ scope: 'all' });
+  expect(result.current.page).toBe(1);
+  rerender({ scope: 'filtered' });
   act(() => result.current.setPage(3));
   const original = window.innerHeight;
   act(() => { window.innerHeight = 1400; window.dispatchEvent(new Event('resize')); });

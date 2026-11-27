@@ -54,7 +54,7 @@ export default function OrderHistory() {
   if (isError) return <LoadError title="Orders could not be loaded" error={error} retry={refetch} />;
 
   return (
-    <div className="max-w-4xl mx-auto animate-fade-in space-y-4 pb-8">
+    <div className="max-w-4xl mx-auto space-y-4 pb-8">
       <div className="flex items-center gap-3">
         <Link to={`/s/${storeSlug}/account`} aria-label="Back to account" className="workspace-row-action rounded-xl hover:bg-navy-800 text-slate-400 transition-colors">
           <ArrowLeft size={18} />
@@ -72,7 +72,7 @@ export default function OrderHistory() {
           <Link to={`/s/${storeSlug}`} className="btn btn-primary btn-sm">Start Shopping</Link>
         </div>
       ) : (
-        <div className={cn('space-y-3', isFetching && 'opacity-75')}>
+        <div className="space-y-3" aria-busy={isFetching}>
           {orders.map((order) => {
             const sm = STATUS_META[order.status] || {};
             return (

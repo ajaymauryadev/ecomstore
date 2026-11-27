@@ -1,3 +1,4 @@
+import { useSavedViewState } from '../../../offline/useSavedViewState';
 import { usePagination } from '../../../hooks/usePagination';
 import Pagination from '../../../components/ui/Pagination';
 import { useState } from 'react';
@@ -52,9 +53,9 @@ export default function ExpensesPage() {
   const today = accountingDate(undefined, timeZone);
   const firstOfMonth = today.slice(0, 8) + '01';
 
-  const [startDate, setStartDate] = useState(firstOfMonth);
-  const [endDate, setEndDate] = useState(today);
-  const [filterCat, setFilterCat] = useState('');
+  const [startDate, setStartDate] = useSavedViewState('ExpensesPage:ExpensesPage:startDate', firstOfMonth);
+  const [endDate, setEndDate] = useSavedViewState('ExpensesPage:ExpensesPage:endDate', today);
+  const [filterCat, setFilterCat] = useSavedViewState('ExpensesPage:ExpensesPage:filterCat', '');
   const [showModal, setShowModal] = useState(false);
   const [editingExpense, setEditingExpense] = useState(null);
   const [form, setForm] = useState(() => emptyForm(timeZone));
@@ -174,7 +175,7 @@ export default function ExpensesPage() {
               <p className="text-xs text-slate-500 uppercase tracking-wide mb-3">By Category</p>
               <ResponsiveContainer width="100%" height={200}>
                 <PieChart>
-                  <Pie data={pieData} cx="50%" cy="50%" innerRadius={55} outerRadius={80} paddingAngle={3} dataKey="value">
+                  <Pie isAnimationActive={false} data={pieData} cx="50%" cy="50%" innerRadius={55} outerRadius={80} paddingAngle={3} dataKey="value">
                     {pieData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
                   </Pie>
                   <Tooltip formatter={(v) => fmt(v)} contentStyle={{ background: '#0f2740', border: '1px solid #1e3a5f', borderRadius: 8 }} labelStyle={{ color: '#94a3b8' }} itemStyle={{ color: '#f1f5f9' }} />

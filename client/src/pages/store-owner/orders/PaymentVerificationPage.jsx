@@ -1,6 +1,6 @@
 import Pagination from '../../../components/ui/Pagination';
 import { usePageSize, usePageState } from '../../../hooks/usePagination';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import {
   ShieldCheck, ShieldX, RefreshCw,
   Phone, CreditCard, Clock,
@@ -10,7 +10,6 @@ import {
   useVerifyPaymentMutation,
 } from '../../../features/orders/orderApi';
 import { useAuth } from '../../../hooks/useAuth';
-import { useSocket } from '../../../hooks/useSocket';
 import { formatCurrency } from '../../../utils/formatters';
 import { cn } from '../../../utils/cn';
 import Button from '../../../components/ui/Button';
@@ -194,24 +193,16 @@ function PaymentCard({ order, slug, onRefresh }) {
 export default function PaymentVerificationPage() {
   const { store } = useAuth();
   const slug = store?.slug;
-  const { on } = useSocket();
   const { limit } = usePageSize('rows');
   const [page, setPage] = usePageState(limit);
 
   const { data, isLoading, isFetching, refetch } = useGetPaymentQueueQuery(
     { slug, page, limit },
-    { skip: !slug, pollingInterval: 30000, skipPollingIfUnfocused: true }
+    { skip: !slug, pollingInterval: 0, skipPollingIfUnfocused: true }
   );
 
   const orders = data?.data || [];
   const pagination = data?.meta;
-
-  useEffect(() => {
-    const fns = [
-      on('order:payment_submitted', () => { refetch(); }),
-    ];
-    return () => fns.forEach((fn) => fn?.());
-  }, [on, refetch]);
 
   return (
     <div className="space-y-5">
@@ -229,7 +220,7 @@ export default function PaymentVerificationPage() {
           onClick={refetch}
           aria-label="Refresh payment queue"
           title="Refresh"
-          className={cn('min-w-11 min-h-11 flex items-center justify-center rounded-xl hover:bg-navy-800 text-slate-400 transition-colors', isFetching && 'animate-spin')}
+          className={cn('min-w-11 min-h-11 flex items-center justify-center rounded-xl hover:bg-navy-800 text-slate-400 transition-colors', isFetching && !data && 'animate-spin')}
         >
           <RefreshCw size={18} />
         </button>

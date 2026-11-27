@@ -1,11 +1,11 @@
 import { createAsyncThunk } from '@reduxjs/toolkit';
 import { orderApi } from '../orders/orderApi';
 import { productApi } from '../products/productApi';
-import { cartDraftLines, readCartDraft } from './cartDraftStorage';
+import { cartDraftLines, readCartDraft, readCartSnapshot } from './cartDraftStorage';
 
 const apiOrigin = import.meta.env.VITE_API_URL?.replace('/api/v1', '') || '';
 
-function currentCartItem(line, product) {
+export function currentCartItem(line, product) {
   const variant = product?.variants.find((option) => option._id === line.variantId);
   if (!variant || !Number.isSafeInteger(variant.stock) || variant.stock <= 0) return null;
   const price = variant.offerPrice ?? variant.retailPrice;
@@ -46,7 +46,7 @@ async function restoreCoupon(dispatch, slug, code, items, deliveryType) {
 
 export const restoreCartDraft = createAsyncThunk(
   'cart/restoreDraft',
-  async ({ scopeKey, slug, userId, sessionUserId = userId }, { dispatch, getState, signal }) => {
+  async ({ scopeKey, slug, userId, sessionUserId = userId }, { dispatch, getState, signal, requestId }) => {
     const draft = readCartDraft(scopeKey);
     if (!draft?.items.length) return {};
 
@@ -55,16 +55,34 @@ export const restoreCartDraft = createAsyncThunk(
       if ((getState().auth.user?._id ?? null) !== sessionUserId) throw new Error('Cart account changed.');
     };
     const productIds = [...new Set(draft.items.map(({ productId }) => productId))];
-    const { data } = await dispatch(productApi.endpoints.getCartProducts.initiate(
-      { slug, productIds }, { track: false }
-    )).unwrap();
+    const savedItems = readCartSnapshot(scopeKey, draft);
+    if (savedItems) dispatch({ type: 'cart/showSavedDraft', payload: { items: savedItems, deliveryType: draft.deliveryType, pendingCouponCode: draft.couponCode, scopeKey, requestId } });
+    const originalRevision = getState().cart.draftRevision;
+    let response;
+    try {
+      response = await dispatch(productApi.endpoints.getCartProducts.initiate(
+        { slug, productIds }, { subscribe: false, forceRefetch: true }
+      )).unwrap();
+    } catch (error) {
+      assertCurrentAccount();
+      if (savedItems && ![401, 403].includes(error.status)) return { provisional: true };
+      throw error;
+    }
+    const { data } = response;
     if (!Array.isArray(data?.products)) throw new Error('Unexpected product response.');
     const byId = new Map(data.products.map((product) => [product._id, product]));
     const items = draft.items.map((line) => currentCartItem(line, byId.get(line.productId))).filter(Boolean);
     assertCurrentAccount();
-    const coupon = draft.couponCode && items.length
-      ? await restoreCoupon(dispatch, slug, draft.couponCode, items, draft.deliveryType)
-      : {};
+    // A background check must never undo edits made while it was in flight.
+    if (savedItems && getState().cart.draftRevision !== originalRevision) return { provisional: true };
+    let coupon = {};
+    try {
+      if (draft.couponCode && items.length) coupon = await restoreCoupon(dispatch, slug, draft.couponCode, items, draft.deliveryType);
+    } catch (error) {
+      assertCurrentAccount();
+      if (savedItems && ![401, 403].includes(error.status)) return { provisional: true };
+      throw error;
+    }
     assertCurrentAccount();
     const savedQuantity = draft.items.reduce((sum, item) => sum + item.quantity, 0);
     const currentQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
@@ -72,7 +90,10 @@ export const restoreCartDraft = createAsyncThunk(
       items,
       deliveryType: draft.deliveryType,
       ...coupon,
-      restoredWithChanges: savedQuantity !== currentQuantity || Boolean(draft.couponCode && !coupon.coupon),
+      restoredWithChanges: savedQuantity !== currentQuantity || Boolean(draft.couponCode && !coupon.coupon) ||
+        Boolean(savedItems && items.some((item) => savedItems.find((saved) => saved._id === item._id)?.price !== item.price)),
+      provisional: false,
+      pendingCouponCode: null,
     };
   }
 );

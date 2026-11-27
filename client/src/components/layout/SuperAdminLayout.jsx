@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import RouteContent from './RouteContent';
+import { WorkspaceSyncStatus } from '../../offline/SavedDataStatus';
 import { CreditCard, LayoutDashboard, LogOut, Menu, ScrollText, Shield, Store, X } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { ROUTES } from '../../constants/routes';
@@ -43,7 +44,7 @@ export default function SuperAdminLayout() {
         <header className="h-16 bg-navy-900/80 backdrop-blur-xl border-b border-navy-700/60 flex items-center justify-between px-4 sm:px-6 sticky top-0 z-40">
           <button type="button" onClick={() => setMobileOpen(true)} aria-label="Open navigation" title="Open navigation" className="lg:hidden min-w-11 min-h-11 inline-flex items-center justify-center rounded-xl hover:bg-navy-700 text-slate-400"><Menu size={21} /></button>
           <p className="text-sm font-semibold text-slate-200 lg:hidden">System control</p>
-          <div className="text-right"><p className="text-sm font-medium text-slate-200">{user?.name}</p><p className="text-[11px] text-purple-400">Super Admin</p></div>
+          <div className="ml-auto flex items-center gap-3"><WorkspaceSyncStatus /><div className="text-right"><p className="text-sm font-medium text-slate-200">{user?.name}</p><p className="text-[11px] text-purple-400">Super Admin</p></div></div>
         </header>
         <main id="main-content" className="page-width flex-1 py-4 sm:py-6"><RouteContent><Outlet /></RouteContent></main>
       </div>

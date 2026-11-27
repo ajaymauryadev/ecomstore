@@ -12,7 +12,7 @@ export default function RecordSupplierPaymentDialog({
   const [form, setForm] = useState({
     amount: defaultFullAmount ? String(target.pendingAmount) : '', method: 'cash', note: '',
   });
-  const { submit, retryPending } = useIdempotentSubmission(recordPayment, target._id);
+  const { submit, retryPending } = useIdempotentSubmission(recordPayment, `${accountPayment ? 'supplier-account' : 'supplier-invoice'}:${target._id}`, { persist: true });
 
   const close = () => {
     if (isSaving) return;

@@ -76,11 +76,11 @@ export default function StoreOwnerLayout() {
 
   const { data: payments } = useGetPaymentQueueQuery(
     { slug: store?.slug, limit: 1 },
-    { skip: !store?.slug || !hasPermission(user, PERMISSIONS.ORDERS_PAYMENT_VERIFY), pollingInterval: 30000, skipPollingIfUnfocused: true }
+    { skip: !store?.slug || !hasPermission(user, PERMISSIONS.ORDERS_PAYMENT_VERIFY), pollingInterval: 0, skipPollingIfUnfocused: true }
   );
   const { data: packing } = useGetPackingQueueQuery(
     { limit: 1 },
-    { skip: !hasPermission(user, PERMISSIONS.PACKING_VERIFY), pollingInterval: 30000, skipPollingIfUnfocused: true }
+    { skip: !hasPermission(user, PERMISSIONS.PACKING_VERIFY), pollingInterval: 0, skipPollingIfUnfocused: true }
   );
   return (
     <WorkspaceFrame

@@ -26,8 +26,12 @@ import backupRoutes from './backup.routes.js';
 import superAdminRoutes from './superAdmin.routes.js';
 import dashboardRoutes from './dashboard.routes.js';
 import deliveryRoutes from './delivery.routes.js';
+import { protect } from '../middleware/auth.js';
+import { getSyncRevision } from '../middleware/savedDataSync.js';
 
 const router = Router();
+router.get('/sync/revision', protect, getSyncRevision);
+router.get('/storefront/:slug/sync-revision', getSyncRevision);
 
 router.use('/auth', authRoutes);
 router.use('/stores', storeRoutes);

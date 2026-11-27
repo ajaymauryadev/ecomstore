@@ -1,3 +1,4 @@
+import { useSavedViewState } from '../../../offline/useSavedViewState';
 import { useState, useCallback, useRef } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { Plus, Trash2, ArrowLeft, Search, Package, Truck } from 'lucide-react';
@@ -194,16 +195,16 @@ export default function PurchaseForm() {
   const [createPurchase, { isLoading }] = useCreatePurchaseMutation();
 
   // Form state
-  const [supplierId, setSupplierId] = useState('');
-  const [supplierName, setSupplierName] = useState('');
-  const [invoiceNumber, setInvoiceNumber] = useState('');
-  const [purchaseDate, setPurchaseDate] = useState(new Date().toISOString().split('T')[0]);
-  const [vehicleType, setVehicleType] = useState('other');
-  const [vehicleNumber, setVehicleNumber] = useState('');
-  const [items, setItems] = useState([{ ...EMPTY_ITEM }]);
-  const [paidAmount, setPaidAmount] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState('cash');
-  const [note, setNote] = useState('');
+  const [supplierId, setSupplierId] = useSavedViewState('PurchaseForm:PurchaseForm:supplierId', '');
+  const [supplierName, setSupplierName] = useSavedViewState('PurchaseForm:PurchaseForm:supplierName', '');
+  const [invoiceNumber, setInvoiceNumber] = useSavedViewState('PurchaseForm:PurchaseForm:invoiceNumber', '');
+  const [purchaseDate, setPurchaseDate] = useSavedViewState('PurchaseForm:PurchaseForm:purchaseDate', new Date().toISOString().split('T')[0]);
+  const [vehicleType, setVehicleType] = useSavedViewState('PurchaseForm:PurchaseForm:vehicleType', 'other');
+  const [vehicleNumber, setVehicleNumber] = useSavedViewState('PurchaseForm:PurchaseForm:vehicleNumber', '');
+  const [items, setItems] = useSavedViewState('PurchaseForm:PurchaseForm:items', [{ ...EMPTY_ITEM }]);
+  const [paidAmount, setPaidAmount] = useSavedViewState('PurchaseForm:PurchaseForm:paidAmount', '');
+  const [paymentMethod, setPaymentMethod] = useSavedViewState('PurchaseForm:PurchaseForm:paymentMethod', 'cash');
+  const [note, setNote] = useSavedViewState('PurchaseForm:PurchaseForm:note', '');
   const productSearchInput = useRef(null);
   const [pickerIndex, setPickerIndex] = useState(null); // which item row is picking
 
@@ -234,7 +235,7 @@ export default function PurchaseForm() {
       return updated;
     });
     setPickerIndex(null);
-  }, [pickerIndex]);
+  }, [pickerIndex, setItems]);
 
   const updateItem = (idx, field, value) => {
     setItems((prev) => {
@@ -273,6 +274,10 @@ export default function PurchaseForm() {
         paidAmount: parseFloat(paidAmount) || 0,
         paymentMethod, note,
       }).unwrap();
+      setItems([{ ...EMPTY_ITEM }]);
+      setInvoiceNumber('');
+      setPaidAmount('');
+      setNote('');
       toast.success('Purchase entry saved! Stock updated.');
       navigate(ROUTES.STORE.PURCHASES);
     } catch (err) {
@@ -283,7 +288,7 @@ export default function PurchaseForm() {
   // View mode
   if (id) {
     return (
-      <div className="space-y-5 animate-fade-in">
+      <div className="space-y-5">
         <div className="flex items-center gap-3">
           <Link to={ROUTES.STORE.PURCHASES} className="p-2 rounded-xl hover:bg-navy-800 text-slate-400 transition-colors">
             <ArrowLeft size={18} />
@@ -296,7 +301,7 @@ export default function PurchaseForm() {
   }
 
   return (
-    <div className="space-y-5 animate-fade-in">
+    <div className="space-y-5">
       {/* Header */}
       <div className="flex items-center gap-3">
         <Link to={ROUTES.STORE.PURCHASES} className="p-2 rounded-xl hover:bg-navy-800 text-slate-400 transition-colors">

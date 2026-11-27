@@ -1,6 +1,6 @@
 import Pagination from '../../../components/ui/Pagination';
 import { usePageSize, usePageState } from '../../../hooks/usePagination';
-import { useState } from 'react';
+import { useSavedViewState } from '../../../offline/useSavedViewState';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, ArrowUp, ArrowDown, BookOpen } from 'lucide-react';
 import { useGetStockLedgerQuery } from '../../../features/inventory/inventoryApi';
@@ -29,8 +29,8 @@ function formatDate(str) {
 
 export default function StockLedgerPage() {
   const { productId } = useParams();
-  const [variantId, setVariantId] = useState('');
-  const [movementType, setMovementType] = useState('');
+  const [variantId, setVariantId] = useSavedViewState('variant-filter', '');
+  const [movementType, setMovementType] = useSavedViewState('movement-filter', '');
   const { limit } = usePageSize('compact');
   const [page, setPage] = usePageState(limit);
 
@@ -43,7 +43,7 @@ export default function StockLedgerPage() {
   const variants = product?.variants || [];
 
   return (
-    <div className="space-y-5 animate-fade-in">
+    <div className="space-y-5">
       {/* Header */}
       <div className="page-header">
         <div className="flex items-center gap-3">
@@ -94,7 +94,7 @@ export default function StockLedgerPage() {
           <p className="text-slate-400 font-medium">No ledger entries yet</p>
         </div>
       ) : (
-        <div className={cn('space-y-2', isFetching && 'opacity-75')}>
+        <div className="space-y-2" aria-busy={isFetching}>
           {entries.map((entry) => {
             const meta = MOVEMENT_META[entry.movementType] || {};
             const isIn = entry.quantityChange > 0;

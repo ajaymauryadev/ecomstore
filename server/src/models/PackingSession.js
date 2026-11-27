@@ -67,6 +67,11 @@ const packingSessionSchema = new mongoose.Schema({
   completedBy: actorSnapshotSchema,
 
   items: [packingItemSchema],
+  operationReceipts: { type: [{
+    operationId: String, payloadHash: String,
+    recordedAt: Date, confirmedAt: Date,
+    userId: mongoose.Schema.Types.ObjectId,
+  }], select: false, default: [] },
 
   status: { type: String, enum: PACKING_SESSION_STATUSES, default: 'in_progress' },
 
@@ -88,7 +93,7 @@ const packingSessionSchema = new mongoose.Schema({
   highValueMissingCount: { type: Number, default: 0 },
 }, {
   timestamps: true,
-  toJSON: { virtuals: true },
+  toJSON: { virtuals: true, transform: (_doc, value) => { delete value.operationReceipts; return value; } },
 });
 
 packingSessionSchema.index({ tenantId: 1, status: 1, createdAt: -1 });

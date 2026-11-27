@@ -1,3 +1,4 @@
+import { useSavedViewState } from '../../../offline/useSavedViewState';
 import { usePageSize, usePageState } from '../../../hooks/usePagination';
 import { memo, useState, useRef, useMemo, useCallback, useDeferredValue, useEffect } from 'react';
 import {
@@ -71,35 +72,35 @@ const CartRow = memo(function CartRow({ item, onQty, onRemove, onDiscount, onSet
 /* ── Main POS page ───────────────────────────── */
 export default function POSPage() {
   const { store, user } = useAuth();
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useSavedViewState('POSPage:POSPage:search', '');
   const debouncedSearch = useDebouncedValue(search.trim());
   const deferredSearch = useDeferredValue(search.trim());
   const searchInput = useRef(null);
   const { limit: catalogLimit } = usePageSize('cards');
-  const [catalogPage, setCatalogPage] = usePageState(catalogLimit);
+  const [catalogPage, setCatalogPage] = usePageState(catalogLimit, 'catalog-page');
   const [announcement, setAnnouncement] = useState('');
   const [pendingScan, setPendingScan] = useState('');
-  const [cart, setCart] = useState([]);
+  const [cart, setCart] = useSavedViewState('POSPage:POSPage:cart', []);
   const quantities = useMemo(() => Object.fromEntries(cart.map((item) => [item.variantId, item.qty])), [cart]);
-  const [paymentMethod, setPaymentMethod] = useState('counter');
-  const [cashAmount, setCashAmount] = useState('');
-  const [upiAmount, setUpiAmount] = useState('');
-  const [accountSearch, setAccountSearch] = useState('');
+  const [paymentMethod, setPaymentMethod] = useSavedViewState('POSPage:POSPage:paymentMethod', 'counter');
+  const [cashAmount, setCashAmount] = useSavedViewState('POSPage:POSPage:cashAmount', '');
+  const [upiAmount, setUpiAmount] = useSavedViewState('POSPage:POSPage:upiAmount', '');
+  const [accountSearch, setAccountSearch] = useSavedViewState('POSPage:POSPage:accountSearch', '');
   const { limit: accountLimit } = usePageSize('compact');
-  const [accountPage, setAccountPage] = usePageState(accountLimit);
-  const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [accountPage, setAccountPage] = usePageState(accountLimit, 'account-page');
+  const [selectedCustomer, setSelectedCustomer] = useSavedViewState('POSPage:POSPage:selectedCustomer', null);
   const debouncedAccountSearch = useDebouncedValue(accountSearch.trim());
-  const [customerName, setCustomerName] = useState('');
-  const [customerPhone, setCustomerPhone] = useState('');
+  const [customerName, setCustomerName] = useSavedViewState('POSPage:POSPage:customerName', '');
+  const [customerPhone, setCustomerPhone] = useSavedViewState('POSPage:POSPage:customerPhone', '');
   const [customerErrors, setCustomerErrors] = useState({});
-  const [overallDiscount, setOverallDiscount] = useState('');
-  const [saleType, setSaleType] = useState('instant');
-  const [packingAssigneeId, setPackingAssigneeId] = useState(user?._id || null);
+  const [overallDiscount, setOverallDiscount] = useSavedViewState('POSPage:POSPage:overallDiscount', '');
+  const [saleType, setSaleType] = useSavedViewState('POSPage:POSPage:saleType', 'instant');
+  const [packingAssigneeId, setPackingAssigneeId] = useSavedViewState('POSPage:POSPage:packingAssigneeId', user?._id || null);
   const [billOrder, setBillOrder] = useState(null);
   const [billError, setBillError] = useState(null);
 
   const [createOrder, { isLoading: submitting }] = useCreatePOSOrderMutation();
-  const { submit, retryPending, retryAt } = useIdempotentSubmission(createOrder, `${store?._id}:${user?._id}`);
+  const { submit, retryPending, retryAt } = useIdempotentSubmission(createOrder, `${store?._id}:${user?._id}:pos`, { persist: true });
   const retrySeconds = useRetryCountdown(retryAt);
   const draftLocked = submitting || Boolean(retryAt);
 
@@ -146,7 +147,7 @@ export default function POSPage() {
       ];
     });
     setAnnouncement(`${product.name} ${variant.name} selected. Check the quantity in your bill.`);
-  }, []);
+  }, [setCart]);
 
   useEffect(() => {
     if (!pendingScan || pendingScan !== debouncedSearch || searchPending || draftLocked) return;
@@ -160,7 +161,7 @@ export default function POSPage() {
     } else {
       setAnnouncement('Select the correct pack to add it.');
     }
-  }, [pendingScan, debouncedSearch, searchPending, products, addToCart, draftLocked]);
+  }, [pendingScan, debouncedSearch, searchPending, products, addToCart, draftLocked, setSearch]);
 
   const updateQty = useCallback((id, delta) => {
     setCart((c) =>
@@ -168,13 +169,13 @@ export default function POSPage() {
         .map((i) => i.id === id ? { ...i, qty: Math.max(1, Math.min(i.qty + delta, i.maxStock, 1000)) } : i)
         .filter((i) => i.qty > 0)
     );
-  }, []);
+  }, [setCart]);
   const setQty = useCallback((id, value) => setCart((c) => c.map((i) => i.id === id
-    ? { ...i, qty: Math.max(1, Math.min(Math.trunc(Number(value)) || 1, i.maxStock, 1000)) } : i)), []);
+    ? { ...i, qty: Math.max(1, Math.min(Math.trunc(Number(value)) || 1, i.maxStock, 1000)) } : i)), [setCart]);
 
-  const removeItem = useCallback((id) => setCart((c) => c.filter((i) => i.id !== id)), []);
+  const removeItem = useCallback((id) => setCart((c) => c.filter((i) => i.id !== id)), [setCart]);
 
-  const setItemDiscount = useCallback((id, pct) => setCart((c) => c.map((i) => i.id === id ? { ...i, discount: pct } : i)), []);
+  const setItemDiscount = useCallback((id, pct) => setCart((c) => c.map((i) => i.id === id ? { ...i, discount: pct } : i)), [setCart]);
 
   const subtotal = +cart.reduce((s, i) => {
     const lineTotal = i.price * i.qty;
@@ -244,7 +245,11 @@ export default function POSPage() {
 
     try {
       const res = await submit(payload);
-      if (res) setBillOrder(res.data.order);
+      if (res) {
+        // Confirmed bills must not return as an unsubmitted draft after restart.
+        handleNewSale();
+        setBillOrder(res.data.order);
+      }
     } catch (err) {
       if (err?.status === 429) return;
       const fieldErrors = Object.fromEntries(
@@ -316,7 +321,7 @@ export default function POSPage() {
             placeholder="Search items by name or barcode..."
             className="input pl-10 pr-10 text-base"
           />
-          {searchPending && (
+          {searchPending && !activeQuery.currentData && (
             <div className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-gold-500/30 border-t-gold-500 rounded-full animate-spin" />
           )}
           </div>
@@ -328,7 +333,7 @@ export default function POSPage() {
             <h2 className="font-semibold">{search.trim() ? 'Search results' : 'Tap an item to add it'}</h2>
             {search && <button type="button" onClick={() => { setSearch(''); searchInput.current?.focus(); }} className="workspace-link">Show all items</button>}
           </div>
-          {searchError && <div className="workspace-feedback text-sm">
+          {searchError && !activeQuery.currentData && <div className="workspace-feedback text-sm">
             <p role="alert">{searchError.data?.message || 'Could not load items. Check your connection and try again.'}</p>
             <button type="button" disabled={searchRetrySeconds > 0 || searching} onClick={retrySearch} className="workspace-link">
               {searchRetrySeconds > 0 ? 'Retry shortly' : 'Try again'}
@@ -455,8 +460,8 @@ export default function POSPage() {
                 {udharCustomer && !accountOptions.some((option) => option._id === udharCustomer._id) && <option value={udharCustomer._id}>{udharCustomer.name} · {udharCustomer.phone}</option>}
                 {accountOptions.map((customer) => <option key={customer._id} value={customer._id}>{customer.name} · {customer.phone}</option>)}
               </select>
-              {findingUdhar && <p role="status" className="text-xs text-slate-500">Finding accounts…</p>}
-              {udharError && <div role="alert" className="text-xs text-red-400">Could not load accounts. <button type="button" onClick={refetchAccounts} className="workspace-link">Try again</button></div>}
+              {findingUdhar && !udharData && <p role="status" className="text-xs text-slate-500">Finding accounts…</p>}
+              {udharError && !udharData && <div role="alert" className="text-xs text-red-400">Could not load accounts. <button type="button" onClick={refetchAccounts} className="workspace-link">Try again</button></div>}
               {!findingUdhar && !udharError && !accountOptions.length && <p className="text-xs text-slate-500">No matching accounts. Try a name or mobile number.</p>}
               {udharData?.meta?.totalPages > 1 && <div className="flex justify-between items-center text-xs gap-2"><button type="button" disabled={accountPage === 1 || findingUdhar} className="workspace-link" onClick={() => setAccountPage((page) => page - 1)}>Previous</button><span>Page {accountPage}</span><button type="button" disabled={!udharData.meta.hasNextPage || findingUdhar} className="workspace-link" onClick={() => setAccountPage((page) => page + 1)}>More accounts</button></div>}
               {customerErrors.customerPhone && <p id="pos-account-error" role="alert" className="text-xs text-red-400">{customerErrors.customerPhone}</p>}

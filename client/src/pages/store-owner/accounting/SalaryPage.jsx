@@ -1,3 +1,4 @@
+import { useSavedViewState } from '../../../offline/useSavedViewState';
 import { usePagination } from '../../../hooks/usePagination';
 import Pagination from '../../../components/ui/Pagination';
 import { useState } from 'react';
@@ -48,7 +49,7 @@ const MONTHS = getMonthYears();
 const currentMonth = MONTHS[0].value;
 
 export default function SalaryPage() {
-  const [selectedMonth, setSelectedMonth] = useState(currentMonth);
+  const [selectedMonth, setSelectedMonth] = useSavedViewState('SalaryPage:SalaryPage:selectedMonth', currentMonth);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showPayModal, setShowPayModal] = useState(null);
   const [addForm, setAddForm] = useState({ staffId: '', monthlySalary: '', notes: '' });

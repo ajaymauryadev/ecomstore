@@ -1,5 +1,7 @@
 import { baseApi } from '../../api/baseApi';
 import { setCredentials, clearCredentials, selectSessionEpoch, updateUser } from './authSlice';
+import { savedStorage } from '../../offline/storage';
+import { savedDataStatus } from '../../offline/savedDataSlice';
 
 export const authApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
@@ -35,9 +37,16 @@ export const authApi = baseApi.injectEndpoints({
       query: () => ({ url: '/auth/logout', method: 'POST' }),
       async onQueryStarted({ requireServerConfirmation = false } = {}, { dispatch, getState, queryFulfilled }) {
         const epoch = selectSessionEpoch(getState());
+        const remembered = savedStorage.put('identity', 'logoutPending', true).catch(() => {
+          dispatch(savedDataStatus({ storageError: 'Sign-out could not be saved on this device. Connect online to finish signing out.' }));
+        });
         try {
           await queryFulfilled;
+          dispatch(savedDataStatus({ logoutPending: false }));
+          void remembered.then(() => savedStorage.delete('identity', 'logoutPending')).catch(() => {});
         } catch {
+          await remembered;
+          dispatch(savedDataStatus({ logoutPending: true }));
           if (requireServerConfirmation) return;
         }
         if (selectSessionEpoch(getState()) !== epoch) return;

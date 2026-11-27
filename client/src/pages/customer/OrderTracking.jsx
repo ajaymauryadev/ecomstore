@@ -1,3 +1,4 @@
+import { useSavedViewState } from '../../offline/useSavedViewState';
 import { useParams, Link } from 'react-router-dom';
 import {
   CheckCircle, Clock, Package, Truck, MapPin, ShoppingBag,
@@ -66,8 +67,8 @@ function PaymentPanel({ order, paymentInfo, slug, onRefresh }) {
   const [submitProof, { isLoading }] = useSubmitPaymentProofMutation();
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(null);
-  const [utrNumber, setUtrNumber] = useState('');
-  const [notes, setNotes] = useState('');
+  const [utrNumber, setUtrNumber] = useSavedViewState('OrderTracking:PaymentPanel:utrNumber', '');
+  const [notes, setNotes] = useSavedViewState('OrderTracking:PaymentPanel:notes', '');
   const fileRef = useRef();
   useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); }, [preview]);
 
@@ -253,7 +254,7 @@ function PaymentPanel({ order, paymentInfo, slug, onRefresh }) {
 export default function OrderTracking() {
   const { storeSlug, orderId } = useParams();
   const [cancelModal, setCancelModal] = useState(false);
-  const [cancelReason, setCancelReason] = useState('');
+  const [cancelReason, setCancelReason] = useSavedViewState('OrderTracking:OrderTracking:cancelReason', '');
   const { on } = useSocket();
 
   const { data, isLoading, isFetching, isError, error, refetch } = useGetOrderQuery({ slug: storeSlug, orderId });
@@ -265,13 +266,13 @@ export default function OrderTracking() {
   // Realtime socket listeners
   useEffect(() => {
     const cleanupFns = [
-      on('order:payment_verified', (d) => { if (d.orderId === orderId) { toast.success('Payment verified!'); refetch(); } }),
-      on('order:payment_rejected', (d) => { if (d.orderId === orderId) { toast.error(`Payment rejected: ${d.reason}`); refetch(); } }),
-      on('order:status_updated', (d) => { if (d.orderId === orderId) { toast(d.message || `Order status: ${d.status}`); refetch(); } }),
-      on('order:cancelled', (d) => { if (d.orderId === orderId) { toast.error('Order cancelled by store'); refetch(); } }),
+      on('order:payment_verified', (d) => { if (d.orderId === orderId) toast.success('Payment verified!'); }),
+      on('order:payment_rejected', (d) => { if (d.orderId === orderId) toast.error(`Payment rejected: ${d.reason}`); }),
+      on('order:status_updated', (d) => { if (d.orderId === orderId) toast(d.message || `Order status: ${d.status}`); }),
+      on('order:cancelled', (d) => { if (d.orderId === orderId) toast.error('Order cancelled by store'); }),
     ];
     return () => cleanupFns.forEach((fn) => fn?.());
-  }, [orderId, on, refetch]);
+  }, [orderId, on]);
 
   if (isLoading) return (
     <div className="flex items-center justify-center min-h-[50vh]">
@@ -312,7 +313,7 @@ export default function OrderTracking() {
   };
 
   return (
-    <div className="order-tracking animate-fade-in space-y-6 pb-4">
+    <div className="order-tracking space-y-6 pb-4">
       {/* Header */}
       <div className="flex items-center gap-3">
         <Link to={`/s/${storeSlug}/orders`} aria-label="Back to orders" className="workspace-row-action border border-navy-700 bg-navy-900 text-slate-400 transition-colors">
@@ -323,7 +324,7 @@ export default function OrderTracking() {
           <p className="mt-1 text-xs text-slate-400 font-mono break-all">{order.orderNumber}</p>
         </div>
         <button type="button" onClick={refetch} disabled={isFetching} aria-label="Refresh order" className="workspace-row-action ml-auto shrink-0 border border-navy-700 bg-navy-900 text-slate-400 transition-colors disabled:opacity-50">
-          <RotateCcw size={16} className={isFetching ? 'animate-spin' : ''} />
+          <RotateCcw size={16} className={isFetching && !data ? 'animate-spin' : ''} />
         </button>
       </div>
 

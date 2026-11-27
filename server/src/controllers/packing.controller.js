@@ -1,4 +1,5 @@
 import Order from '../models/Order.js';
+import { createHash } from 'node:crypto';
 import { fulfilledDiscountMinor, snapshotRefundLines } from '../utils/refundAmounts.js';
 import Product from '../models/Product.js';
 import PackingSession from '../models/PackingSession.js';
@@ -193,21 +194,39 @@ export const getPackingSession = asyncHandler(async (req, res, next) => {
 });
 
 export const updateItemStatus = asyncHandler(async (req, res, next) => {
-  const { action, pickedQty, missingReason } = req.body;
+  const { action, pickedQty, missingReason, operationId, expectedStatus, recordedAt } = req.body;
   if (!['pick', 'pack', 'missing'].includes(action)) {
     return next(new AppError('Action must be pick, pack, or missing.', 400));
   }
+  if (operationId && (!expectedStatus || !recordedAt || new Date(recordedAt).getTime() > Date.now() + 300000)) {
+    throw new AppError('Queued packing work requires its original status and recording time.', 400);
+  }
+  const payloadHash = operationId && createHash('sha256').update(JSON.stringify([
+    req.params.orderId, req.params.itemId, action, pickedQty ?? null, missingReason ?? null, expectedStatus, recordedAt,
+  ])).digest('hex');
 
   const result = await runInTransaction(async (mongoSession) => {
     const packing = await PackingSession.findOne({
       orderId: req.params.orderId,
       ...sessionScope(req),
       tenantId: req.tenantId,
-      status: 'in_progress',
-    }).session(mongoSession);
+    }).select('+operationReceipts').session(mongoSession);
     if (!packing) throw new AppError('Active packing session not found.', 404);
     const item = packing.items.id(req.params.itemId);
     if (!item) throw new AppError('Item not found in packing session.', 404);
+    if (operationId) {
+      const order = await Order.findOne({ _id: packing.orderId, tenantId: req.tenantId }).select('assignedTo status').session(mongoSession);
+      if (!order || (!managesPacking(req) && String(order.assignedTo) !== String(req.user._id))) throw new AppError('The packing assignment changed. Review your saved checklist.', 409);
+      const receipt = packing.operationReceipts.find((entry) => entry.operationId === operationId);
+      if (receipt) {
+        if (receipt.payloadHash !== payloadHash || String(receipt.userId) !== String(req.user._id)) throw new AppError('This operation ID was already used for different packing work.', 409);
+        return { session: packing, item: item.toObject(), replayed: true };
+      }
+      if (order.status !== 'packing') throw new AppError('The order moved to another workflow. Review your saved checklist.', 409);
+      if (packing.operationReceipts.length >= 500) throw new AppError('This session has reached its saved-operation limit. Review it online.', 409);
+    }
+    if (packing.status !== 'in_progress') throw new AppError('The packing session is no longer active. Review your saved work.', 409);
+    if (expectedStatus && item.status !== expectedStatus) throw new AppError('This item changed while you were offline. Review your saved checklist.', 409);
 
     const now = new Date();
     let activity;
@@ -244,6 +263,7 @@ export const updateItemStatus = asyncHandler(async (req, res, next) => {
       };
     }
 
+    if (operationId) packing.operationReceipts.push({ operationId, payloadHash, userId: req.user._id, recordedAt, confirmedAt: now });
     await packing.save({ session: mongoSession });
     await StaffActivityLog.create([{
       tenantId: req.tenantId,
@@ -259,12 +279,12 @@ export const updateItemStatus = asyncHandler(async (req, res, next) => {
       variantName: item.variantName,
       qty: activity.qty,
       isHighValue: item.isHighValue,
-      metadata: activity.metadata,
+      metadata: { ...activity.metadata, ...(operationId && { operationId, recordedAt, confirmedAt: now.toISOString() }) },
     }], { session: mongoSession });
     return { session: packing, item: item.toObject() };
   });
 
-  if (action === 'missing' && result.item.isHighValue) {
+  if (!result.replayed && action === 'missing' && result.item.isHighValue) {
     safeEmitTenant(req.tenantId, 'packing:high_value_missing', {
       orderId: result.session.orderId,
       orderNumber: result.session.orderNumber,
@@ -283,7 +303,7 @@ export const updateItemStatus = asyncHandler(async (req, res, next) => {
     );
   }
 
-  refreshPacking(req);
+  if (!result.replayed) refreshPacking(req);
   sendSuccess(res, { session: result.session });
 });
 export const suggestReplacement = asyncHandler(async (req, res) => {

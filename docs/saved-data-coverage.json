@@ -1,0 +1,1257 @@
+{
+  "schema": 1,
+  "scope": "Production web/PWA. Native builds are not present in this repository.",
+  "reviewDate": "2026-11-27",
+  "readCoverage": [
+    {
+      "role": "customer",
+      "areas": [
+        "storefront",
+        "categories",
+        "product detail",
+        "search and filters",
+        "cart",
+        "checkout draft",
+        "profile and addresses",
+        "favorites",
+        "order history",
+        "order tracking",
+        "customer authentication"
+      ],
+      "sharedCache": true,
+      "durableAuthorizedSnapshots": true,
+      "initialLoadingOnlyWithoutSavedResult": true
+    },
+    {
+      "role": "store_owner",
+      "areas": [
+        "dashboard",
+        "POS",
+        "products and product editor",
+        "categories",
+        "suppliers",
+        "purchases and purchase entry/detail",
+        "inventory dashboard/list",
+        "low stock",
+        "stock ledger",
+        "orders and order detail",
+        "payment verification queue",
+        "packing verification",
+        "packing work and checklist",
+        "deliveries",
+        "staff activity, missing items and high-value alerts",
+        "staff management",
+        "daily closing and history",
+        "returns and exchanges",
+        "Udhar and customer ledger",
+        "expenses",
+        "salary",
+        "supplier payments and reconciliation",
+        "profit/loss",
+        "daily/monthly/yearly/product/category/stock/supplier/customer/expense/salary/purchase reports",
+        "sales and collections",
+        "coupons",
+        "offers",
+        "settings",
+        "notifications",
+        "backup and restore",
+        "audit logs"
+      ],
+      "sharedCache": true,
+      "durableAuthorizedSnapshots": true,
+      "initialLoadingOnlyWithoutSavedResult": true
+    },
+    {
+      "role": "staff",
+      "areas": [
+        "dashboard",
+        "permitted operational/admin orders",
+        "permitted POS",
+        "packing assignments and checklist",
+        "permitted deliveries",
+        "every granted /store permission route"
+      ],
+      "sharedCache": true,
+      "durableAuthorizedSnapshots": true,
+      "initialLoadingOnlyWithoutSavedResult": true
+    },
+    {
+      "role": "packer",
+      "areas": [
+        "dashboard",
+        "packing assignments and checklist",
+        "every granted /store permission route"
+      ],
+      "sharedCache": true,
+      "durableAuthorizedSnapshots": true,
+      "initialLoadingOnlyWithoutSavedResult": true
+    },
+    {
+      "role": "delivery",
+      "areas": [
+        "dashboard",
+        "delivery assignments and details",
+        "collection records",
+        "every granted /store permission route"
+      ],
+      "sharedCache": true,
+      "durableAuthorizedSnapshots": true,
+      "initialLoadingOnlyWithoutSavedResult": true
+    },
+    {
+      "role": "super_admin",
+      "areas": [
+        "system dashboard",
+        "stores",
+        "tenant detail and subscription/modules/limits/support access",
+        "plans",
+        "platform audit logs"
+      ],
+      "sharedCache": true,
+      "durableAuthorizedSnapshots": true,
+      "initialLoadingOnlyWithoutSavedResult": true
+    }
+  ],
+  "architecture": {
+    "cache": "One RTK Query cache; durable namespace is account + tenant/store + role + sorted permissions. RTK serializes endpoint + all record/filter/search/page/sort/date arguments. Session epoch prevents old responses crossing scopes.",
+    "navigation": "No time expiry or mount-driven refetch. Adjacent-page prefetch only fills missing entries.",
+    "updates": "Existing socket events plus generic tenant change events; Mongo-backed revision checks every 60 seconds while visible, focus/reconnect checks, and 5-minute reconciliation fallback. Stored results stay visible throughout.",
+    "persistence": "IndexedDB v2: snapshots, drafts, identity and outbox. Snapshot schema v1 ignores incompatible data. Tokens/headers and mutation payload caches are not persisted as snapshots.",
+    "limits": {
+      "cachedQueriesPerScope": 240,
+      "snapshotBytesPerScope": 20971520,
+      "publicViewedImages": 160,
+      "offlineAuthorizationHours": 12
+    },
+    "shell": "Build-generated versioned service worker precaches all route chunks, CSS and app icons. Public same-origin uploads and public ImageKit images cache after successful readable download. New worker waits for old tabs; no API/token/proof service-worker cache."
+  },
+  "offlineActions": [
+    {
+      "policy": "available offline",
+      "actions": [
+        "read prepared authorized pages",
+        "view exact saved report ranges",
+        "search previously downloaded exact queries",
+        "edit cart using saved product details",
+        "edit persisted page choices and drafts"
+      ]
+    },
+    {
+      "policy": "queued for confirmation",
+      "actions": [
+        "packing item pick/pack/missing, ordered per order with stable UUIDs, original recording time, current assignment/status validation and transactional server receipts",
+        "server sign-out revocation after local sign-out"
+      ]
+    },
+    {
+      "policy": "draft only until online confirmation",
+      "actions": [
+        "POS bills",
+        "checkout details",
+        "product editor",
+        "purchase entry",
+        "daily closing inputs",
+        "settings",
+        "packing notes"
+      ]
+    },
+    {
+      "policy": "requires online connection",
+      "actions": [
+        "new login/registration/password changes",
+        "checkout acceptance and POS bill acceptance",
+        "online payments and proof upload/verification",
+        "cash/UPI collections and supplier payments",
+        "stock adjustments and purchases posting",
+        "order acceptance/cancellation/status/assignment changes",
+        "packing completion/replacements/admin verification",
+        "delivery status/collection confirmation",
+        "returns/refunds/exchanges",
+        "financial closing/approvals",
+        "staff/role/plan/subscription changes",
+        "image uploads",
+        "backup export/import and spreadsheet imports"
+      ]
+    }
+  ],
+  "confirmationIntents": "POS, checkout, bill collections and supplier payment retries preserve their original payload/request ID durably before sending. Financial intents require explicit confirmation in their original form; they are never automatically booked on reconnect. Packing alone replays automatically after current authentication.",
+  "limitations": [
+    "Only downloaded exact query variants are available offline; an unvisited filter/page/report range must be downloaded online.",
+    "Guest order tracking uses a tab-scoped access secret and is intentionally excluded from durable public snapshots. Signed-in customer tracking is persisted.",
+    "Unseen images, private payment proof files, unsupported remote image hosts and external Google font downloads are not guaranteed offline; system font fallback remains available.",
+    "Financial/privileged/delivery workflow confirmations remain online-only; pending local work is not included in confirmed totals.",
+    "View/draft restoration covers explicit useSavedViewState fields and cart storage; modal visibility, microphones, files and arbitrary transient form state are not persisted.",
+    "Offline authorization cannot discover remote revocation until reconnect; offline authorization expires 12 hours after the last actual identity confirmation and explicit 401/403 responses discard the active scope.",
+    "Direct maintenance/database changes reconcile within the 5-minute fallback; ordinary API writes publish shared revisions and realtime events."
+  ],
+  "endpointPolicies": [
+    {
+      "module": "auditLog",
+      "endpoint": "getAuditLogs",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "auditLog",
+      "endpoint": "getAuditStats",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "auth",
+      "endpoint": "login",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "auth",
+      "endpoint": "register",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "auth",
+      "endpoint": "logout",
+      "kind": "mutation",
+      "offlinePolicy": "local sign-out, durable pending server revocation"
+    },
+    {
+      "module": "auth",
+      "endpoint": "refreshToken",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "auth",
+      "endpoint": "getMe",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "auth",
+      "endpoint": "updatePassword",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "categories",
+      "endpoint": "getCategories",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "categories",
+      "endpoint": "createCategory",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "categories",
+      "endpoint": "updateCategory",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "categories",
+      "endpoint": "deleteCategory",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "categories",
+      "endpoint": "reorderCategories",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "categories",
+      "endpoint": "getPublicCategories",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "coupons",
+      "endpoint": "getCoupons",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "coupons",
+      "endpoint": "createCoupon",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "coupons",
+      "endpoint": "updateCoupon",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "coupons",
+      "endpoint": "deleteCoupon",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "customer",
+      "endpoint": "customerRegister",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "customer",
+      "endpoint": "customerLogin",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "customer",
+      "endpoint": "getCustomerProfile",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "customer",
+      "endpoint": "updateCustomerProfile",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "customer",
+      "endpoint": "saveAddress",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "customer",
+      "endpoint": "deleteAddress",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "customer",
+      "endpoint": "toggleFavorite",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "customer",
+      "endpoint": "getFavorites",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "dailyClosing",
+      "endpoint": "getDailySummary",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "dailyClosing",
+      "endpoint": "saveDailyClosing",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "dailyClosing",
+      "endpoint": "finalizeDailyClosing",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "dailyClosing",
+      "endpoint": "correctDailyClosing",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "dailyClosing",
+      "endpoint": "getDailyClosings",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "dailyClosing",
+      "endpoint": "getDailyClosing",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "dashboard",
+      "endpoint": "getDashboard",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "delivery",
+      "endpoint": "getDeliveryOrders",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "delivery",
+      "endpoint": "updateDeliveryStatus",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "expenses",
+      "endpoint": "getExpenses",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "expenses",
+      "endpoint": "getExpenseStats",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "expenses",
+      "endpoint": "createExpense",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "expenses",
+      "endpoint": "updateExpense",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "expenses",
+      "endpoint": "deleteExpense",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "inventory",
+      "endpoint": "getInventoryDashboard",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "inventory",
+      "endpoint": "getInventoryList",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "inventory",
+      "endpoint": "getLowStockProducts",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "inventory",
+      "endpoint": "getStockValueReport",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "inventory",
+      "endpoint": "adjustStock",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "inventory",
+      "endpoint": "getStockLedger",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "notifications",
+      "endpoint": "getNotifications",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "notifications",
+      "endpoint": "getUnreadCount",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "notifications",
+      "endpoint": "markRead",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "notifications",
+      "endpoint": "markAllRead",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "offers",
+      "endpoint": "getOffers",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "offers",
+      "endpoint": "createOffer",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "offers",
+      "endpoint": "updateOffer",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "offers",
+      "endpoint": "deleteOffer",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "orders",
+      "endpoint": "getAdminOrderPayments",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "orders",
+      "endpoint": "createOrder",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "orders",
+      "endpoint": "getOrders",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "orders",
+      "endpoint": "getOrder",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "orders",
+      "endpoint": "cancelOrder",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "orders",
+      "endpoint": "submitPaymentProof",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "orders",
+      "endpoint": "validateCoupon",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "orders",
+      "endpoint": "getAdminOrders",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "orders",
+      "endpoint": "getAdminOrder",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "orders",
+      "endpoint": "getPaymentQueue",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "orders",
+      "endpoint": "updateOrderStatus",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "orders",
+      "endpoint": "adminCancelOrder",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "orders",
+      "endpoint": "rejectOrder",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "orders",
+      "endpoint": "verifyPayment",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "orders",
+      "endpoint": "partialFulfillOrder",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "orders",
+      "endpoint": "assignStaff",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "orders",
+      "endpoint": "assignDelivery",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "packing",
+      "endpoint": "getMyPackingOrders",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "packing",
+      "endpoint": "acceptPackingOrder",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "packing",
+      "endpoint": "getPackingSession",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "packing",
+      "endpoint": "startPackingSession",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "packing",
+      "endpoint": "updateItemStatus",
+      "kind": "mutation",
+      "offlinePolicy": "durable ordered packing outbox, server deduplication and conflict checks"
+    },
+    {
+      "module": "packing",
+      "endpoint": "suggestReplacement",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "packing",
+      "endpoint": "completePackingSession",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "packing",
+      "endpoint": "getPackingQueue",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "packing",
+      "endpoint": "getStaffPackingSessions",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "packing",
+      "endpoint": "getAdminPackingSession",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "packing",
+      "endpoint": "verifyPackingSession",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "packing",
+      "endpoint": "getStaffActivityLogs",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "packing",
+      "endpoint": "getMissingItemsReport",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "packing",
+      "endpoint": "getHighValueAlerts",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "plans",
+      "endpoint": "getPlans",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "plans",
+      "endpoint": "createPlan",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "plans",
+      "endpoint": "updatePlan",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "plans",
+      "endpoint": "deletePlan",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "plans",
+      "endpoint": "seedPlans",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "pos",
+      "endpoint": "createPOSOrder",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "pos",
+      "endpoint": "getPOSUdharCustomer",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "pos",
+      "endpoint": "getPOSUdharCustomers",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "pos",
+      "endpoint": "getPOSOrders",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "products",
+      "endpoint": "getProducts",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "products",
+      "endpoint": "getProduct",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "products",
+      "endpoint": "createProduct",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "products",
+      "endpoint": "importProducts",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "products",
+      "endpoint": "downloadProductSample",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "products",
+      "endpoint": "updateProduct",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "products",
+      "endpoint": "deleteProduct",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "products",
+      "endpoint": "toggleProductField",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "products",
+      "endpoint": "updateVariantStock",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "products",
+      "endpoint": "getPublicProducts",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "products",
+      "endpoint": "getPublicProduct",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "products",
+      "endpoint": "getCartProducts",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "products",
+      "endpoint": "uploadImage",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "purchases",
+      "endpoint": "getPurchases",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "purchases",
+      "endpoint": "getPurchase",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "purchases",
+      "endpoint": "getPurchaseStats",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "purchases",
+      "endpoint": "createPurchase",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "purchases",
+      "endpoint": "recordPurchasePayment",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "reports",
+      "endpoint": "getSalesOverview",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "reports",
+      "endpoint": "getProfitLoss",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "reports",
+      "endpoint": "getDailySales",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "reports",
+      "endpoint": "getMonthlySales",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "reports",
+      "endpoint": "getYearlySales",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "reports",
+      "endpoint": "getProductSales",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "reports",
+      "endpoint": "getCategorySales",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "reports",
+      "endpoint": "getStockReport",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "reports",
+      "endpoint": "getSupplierDuesReport",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "reports",
+      "endpoint": "getCustomerDuesReport",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "reports",
+      "endpoint": "getExpenseReport",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "reports",
+      "endpoint": "getSalaryReport",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "reports",
+      "endpoint": "getPurchaseReport",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "returns",
+      "endpoint": "createReturn",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "returns",
+      "endpoint": "processReturn",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "returns",
+      "endpoint": "getReturns",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "returns",
+      "endpoint": "getReturn",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "returns",
+      "endpoint": "getReturnStats",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "salary",
+      "endpoint": "getSalaryRecords",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "salary",
+      "endpoint": "getSalaryStats",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "salary",
+      "endpoint": "getStaffList",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "salary",
+      "endpoint": "getStaffSalaryHistory",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "salary",
+      "endpoint": "upsertSalaryRecord",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "salary",
+      "endpoint": "recordSalaryPayment",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "staff",
+      "endpoint": "getStaff",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "staff",
+      "endpoint": "createStaff",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "staff",
+      "endpoint": "updateStaff",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "staff",
+      "endpoint": "deactivateStaff",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "store",
+      "endpoint": "getMyStore",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "store",
+      "endpoint": "updateMyStore",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "store",
+      "endpoint": "uploadPaymentQr",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "storefront",
+      "endpoint": "getStorefrontInfo",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "superAdmin",
+      "endpoint": "getSystemStats",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "superAdmin",
+      "endpoint": "getSAStores",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "superAdmin",
+      "endpoint": "getStoreDetail",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "superAdmin",
+      "endpoint": "createStore",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "superAdmin",
+      "endpoint": "updateSubscription",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "superAdmin",
+      "endpoint": "toggleStoreStatus",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "superAdmin",
+      "endpoint": "updateModules",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "superAdmin",
+      "endpoint": "updateLimits",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "superAdmin",
+      "endpoint": "logSupportAccess",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "superAdmin",
+      "endpoint": "getSupportAccessLogs",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "superAdmin",
+      "endpoint": "getSAAuditLogs",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "suppliers",
+      "endpoint": "getSuppliers",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "suppliers",
+      "endpoint": "getSupplierReconciliation",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "suppliers",
+      "endpoint": "getSupplier",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "suppliers",
+      "endpoint": "createSupplier",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "suppliers",
+      "endpoint": "updateSupplier",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "suppliers",
+      "endpoint": "deleteSupplier",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "suppliers",
+      "endpoint": "recordSupplierPayment",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "udhar",
+      "endpoint": "getCustomerBills",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "udhar",
+      "endpoint": "getBillPayments",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "udhar",
+      "endpoint": "previewUdharPayment",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "udhar",
+      "endpoint": "reverseUdharPayment",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "udhar",
+      "endpoint": "getLegacyCreditBills",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "udhar",
+      "endpoint": "getUdharCustomers",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "udhar",
+      "endpoint": "getUdharStats",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "udhar",
+      "endpoint": "getUdharDues",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "udhar",
+      "endpoint": "createUdharCustomer",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "udhar",
+      "endpoint": "updateUdharCustomer",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "udhar",
+      "endpoint": "getCustomerLedger",
+      "kind": "query",
+      "offlinePolicy": "saved snapshot, except fresh authorization and guest-private tracking"
+    },
+    {
+      "module": "udhar",
+      "endpoint": "addUdharDebit",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    },
+    {
+      "module": "udhar",
+      "endpoint": "addUdharCredit",
+      "kind": "mutation",
+      "offlinePolicy": "requires online server confirmation"
+    }
+  ],
+  "validation": {
+    "status": "Passed",
+    "clientUnitTests": 107,
+    "serverTests": 156,
+    "lint": "Passed: zero errors; three pre-existing layout fast-refresh export warnings.",
+    "productionBuild": "passes",
+    "roleNavigation": "5 additional role scenarios passed, including all owner module routes.",
+    "productionBrowser": "15 scenarios passed: all six role areas reuse saved reads and reload offline; delayed online restoration, missing offline data, durable packing replay, offline logout, live staff/delivery propagation, reconnect recovery and progressive catalog loading.",
+    "serverTestCommand": "npm test -- --reporter=dot --testTimeout=15000",
+    "serverTimingNote": "The disposable MongoDB suite exceeded its default 5-second individual-test budget under concurrent local browser/build load; the complete suite passed with a 15-second integration-test budget.",
+    "clientTestCommand": "npm test -- --reporter=dot",
+    "productionBuildCommand": "VITE_API_URL=/api/v1 VITE_WS_URL='' npm run build (PowerShell environment variables were used)",
+    "productionBrowserCommand": "STOREFRONT_PRODUCTION=true npx playwright test --config playwright.storefront.config.js saved-data.spec.js realtime-work.spec.js performance-loading.spec.js",
+    "totalBrowserScenarios": 20,
+    "staleResponses": "Affected in-flight reads are aborted after confirmed mutations; automated tests verify that older responses cannot overwrite replacements.",
+    "independentIntents": "Independent pending financial submissions have unique durable IDs; confirming one cannot overwrite or delete another."
+  },
+  "deployment": "Not deployed"
+}

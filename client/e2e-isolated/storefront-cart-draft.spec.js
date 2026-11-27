@@ -51,10 +51,13 @@ test('restores a guest draft and revalidates price, stock, variants and coupon',
   const abortProduct = (route) => route.abort('internetdisconnected');
   await page.route(productApi, abortProduct);
   await page.reload();
-  await expect(page.getByRole('heading', { name: 'Cart could not be checked' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'My Cart', exact: true })).toBeVisible();
+  await expect(cartCount(page, 3)).toBeVisible();
+  await expect(cartPage.getByText(/Saved cart — prices, stock and coupons need online confirmation/)).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Cart could not be checked' })).toHaveCount(0);
   expect(await page.evaluate((draftKey) => JSON.parse(sessionStorage.getItem(draftKey)), key)).toEqual(draft);
   await page.unroute(productApi, abortProduct);
-  await page.getByRole('button', { name: 'Try again' }).click();
+  await page.reload();
   await expect(cartPage.getByText('Saved ₹40', { exact: true })).toBeVisible();
 
   small.stock = 1;

@@ -1,3 +1,4 @@
+import { useSavedViewState } from '../../../offline/useSavedViewState';
 import { usePagination } from '../../../hooks/usePagination';
 import Pagination from '../../../components/ui/Pagination';
 import { useState } from 'react';
@@ -30,9 +31,9 @@ const ACTION_META = {
 const TABS = ['Activity Log', 'Missing Report', 'High-Value Alerts'];
 
 function ActivityLog() {
-  const [filters, setFilters] = useState({ highValueOnly: false });
+  const [filters, setFilters] = useSavedViewState('StaffActivityPage:ActivityLog:filters', { highValueOnly: false });
   const [showFilters, setShowFilters] = useState(false);
-  const paging = usePagination(JSON.stringify({ ...filters, page: undefined, limit: undefined }));
+  const paging = usePagination(JSON.stringify({ ...filters, page: undefined, limit: undefined }), 'rows', 'activity-pagination');
   const { data, isLoading, isFetching } = useGetStaffActivityLogsQuery({ ...filters, page: paging.page, limit: paging.limit });
 
   const logs = data?.data ?? [];
@@ -62,7 +63,7 @@ function ActivityLog() {
           />
           <span className="text-xs text-amber-400 font-medium">High-value only</span>
         </label>
-        {(isFetching) && <RefreshCw size={13} className="text-slate-500 animate-spin ml-auto" />}
+        {isLoading && <RefreshCw size={13} className="text-slate-500 animate-spin ml-auto" />}
       </div>
 
       {showFilters && (
@@ -162,7 +163,7 @@ function ActivityLog() {
 }
 
 function MissingReport() {
-  const paging = usePagination();
+  const paging = usePagination('', 'rows', 'missing-pagination');
   const { data, isLoading, isFetching } = useGetMissingItemsReportQuery({ page: paging.page, limit: paging.limit });
   const items = data?.data?.report ?? [];
 
@@ -216,7 +217,7 @@ function MissingReport() {
 }
 
 function HighValueAlerts() {
-  const paging = usePagination();
+  const paging = usePagination('', 'rows', 'alerts-pagination');
   const { data, isLoading, isFetching } = useGetHighValueAlertsQuery({ page: paging.page, limit: paging.limit });
   const alerts = data?.data?.alerts ?? [];
 
@@ -276,7 +277,7 @@ function HighValueAlerts() {
 }
 
 export default function StaffActivityPage() {
-  const [activeTab, setActiveTab] = useState(0);
+  const [activeTab, setActiveTab] = useSavedViewState('StaffActivityPage:StaffActivityPage:activeTab', 0);
 
   return (
     <div className="space-y-4">

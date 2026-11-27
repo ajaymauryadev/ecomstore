@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useSavedViewState } from '../offline/useSavedViewState';
 
 export function useCursorPages(scope) {
-  const [state, setState] = useState({ scope, cursors: [undefined], index: 0 });
+  const [state, setState] = useSavedViewState('cursor-pages', { scope, cursors: [undefined], index: 0 });
   const current = state.scope === scope ? state : { scope, cursors: [undefined], index: 0 };
   const reset = () => setState({ scope, cursors: [undefined], index: 0 });
   const next = (cursor) => {

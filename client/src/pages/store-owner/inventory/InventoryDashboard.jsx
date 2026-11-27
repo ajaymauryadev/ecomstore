@@ -1,3 +1,4 @@
+import { useSavedViewState } from '../../../offline/useSavedViewState';
 import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
 import Pagination from '../../../components/ui/Pagination';
 import { usePagination } from '../../../hooks/usePagination';
@@ -53,9 +54,9 @@ function StockDot({ stock, lowStockLimit }) {
 export default function InventoryDashboard() {
   const { user } = useAuth();
   const canAdjust = hasPermission(user, PERMISSIONS.INVENTORY_ADJUST);
-  const [search, setSearch] = useState('');
-  const [categoryId, setCategoryId] = useState('');
-  const [stockStatus, setStockStatus] = useState('');
+  const [search, setSearch] = useSavedViewState('InventoryDashboard:InventoryDashboard:search', '');
+  const [categoryId, setCategoryId] = useSavedViewState('InventoryDashboard:InventoryDashboard:categoryId', '');
+  const [stockStatus, setStockStatus] = useSavedViewState('stock-status', '');
   const settledSearch = useDebouncedValue(search.trim(), 250);
   const { page, setPage, limit } = usePagination(JSON.stringify([settledSearch, categoryId, stockStatus]), 'compact');
   const [adjustTarget, setAdjustTarget] = useState(null); // { product, variant }
@@ -72,7 +73,7 @@ export default function InventoryDashboard() {
   const categories = catData?.data?.categories || [];
 
   return (
-    <div className="space-y-5 animate-fade-in">
+    <div className="space-y-5">
       {/* Header */}
       <div className="page-header">
         <div>

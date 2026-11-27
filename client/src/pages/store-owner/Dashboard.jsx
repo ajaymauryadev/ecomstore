@@ -5,7 +5,7 @@ import EmptyState from '../../components/ui/EmptyState';
 import { SkeletonCard } from '../../components/ui/Skeleton';
 import { useAuth } from '../../hooks/useAuth';
 import { formatCurrency, formatTimeAgo } from '../../utils/formatters';
-import { resolveStoreTimeZone } from '../../utils/accounting';
+import { accountingDate, resolveStoreTimeZone } from '../../utils/accounting';
 import { ROUTES } from '../../constants/routes';
 import { PERMISSIONS, hasPermission } from '../../constants/permissions';
 import { useGetDashboardQuery } from '../../features/dashboard/dashboardApi';
@@ -49,6 +49,8 @@ export default function StoreOwnerDashboard() {
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
   const date = now.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', timeZone });
   const trend = kpis.revenueChange;
+  const savedDate = data?.data?.businessDate;
+  const historical = savedDate && savedDate !== accountingDate(undefined, timeZone);
 
   return (
     <div className="space-y-6">
@@ -91,7 +93,7 @@ export default function StoreOwnerDashboard() {
               </>
             ) : (
               <>
-                <OverviewMetric title="Today's sales" value={formatCurrency(kpis.revenueToday ?? 0)} icon={TrendingUp}
+                <OverviewMetric title={historical ? `Sales on ${savedDate}` : "Today's sales"} value={formatCurrency(kpis.revenueToday ?? 0)} icon={TrendingUp}
                   to={hasPermission(user, PERMISSIONS.REPORTS_SENSITIVE) ? ROUTES.STORE.SALES : undefined}
                   detail={trend != null ? `${trend > 0 ? '+' : ''}${trend}% vs yesterday · View breakdown` : 'View POS & online breakdown'} tone="bg-blue-500/10 text-blue-400" />
                 <OverviewMetric title="Pending orders" value={kpis.pendingOrderCount ?? pendingOrders.length} icon={ClipboardList}

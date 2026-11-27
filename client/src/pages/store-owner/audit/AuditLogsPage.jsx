@@ -1,6 +1,6 @@
+import { useSavedViewState } from '../../../offline/useSavedViewState';
 import Pagination from '../../../components/ui/Pagination';
 import { usePageSize, usePageState } from '../../../hooks/usePagination';
-import { useState } from 'react';
 import { ScrollText } from 'lucide-react';
 import { useGetAuditLogsQuery } from '../../../features/auditLog/auditLogApi';
 import { formatDateTime } from '../../../utils/formatters';
@@ -31,9 +31,9 @@ const ACTIONS = [
 ];
 
 export default function AuditLogsPage() {
-  const [action, setAction] = useState('');
-  const [from, setFrom] = useState('');
-  const [to, setTo] = useState('');
+  const [action, setAction] = useSavedViewState('AuditLogsPage:AuditLogsPage:action', '');
+  const [from, setFrom] = useSavedViewState('AuditLogsPage:AuditLogsPage:from', '');
+  const [to, setTo] = useSavedViewState('AuditLogsPage:AuditLogsPage:to', '');
   const { limit } = usePageSize('compact');
   const [page, setPage] = usePageState(limit);
 

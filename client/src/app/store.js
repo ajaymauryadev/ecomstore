@@ -4,11 +4,14 @@ import { baseApi } from '../api/baseApi';
 import authReducer, { selectSessionEpoch } from '../features/auth/authSlice';
 import cartReducer from '../features/cart/cartSlice';
 import { cartDraftMiddleware } from '../features/cart/cartDraftMiddleware';
+import savedDataReducer from '../offline/savedDataSlice';
+import { savedDataMiddleware } from '../offline/savedData';
 
 const reducers = combineReducers({
   [baseApi.reducerPath]: baseApi.reducer,
   auth: authReducer,
   cart: cartReducer,
+  savedData: savedDataReducer,
 });
 
 export function sessionReducer(state, action) {
@@ -31,7 +34,7 @@ export const store = configureStore({
       serializableCheck: {
         ignoredActions: [baseApi.util.resetApiState.type],
       },
-    }).concat(sessionCacheMiddleware, cartDraftMiddleware, baseApi.middleware),
+    }).concat(sessionCacheMiddleware, savedDataMiddleware, cartDraftMiddleware, baseApi.middleware),
   devTools: import.meta.env.DEV,
 });
 

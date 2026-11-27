@@ -1,5 +1,7 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { setCredentials, clearCredentials, selectSessionEpoch } from '../features/auth/authSlice';
+import { savedDataStatus, HYDRATE_SAVED_DATA } from '../offline/savedDataSlice';
+import { useQueryReadState } from '../offline/ReadStateContext';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api/v1';
 
@@ -80,6 +82,15 @@ const baseQueryWithReauth = async (args, api, extraOptions) => {
     sessions.set(api.getState, session);
   }
   const sessionEndpoint = isSessionEndpoint(args);
+  if (/\/auth\/(login|register)$/.test(requestUrl(args) || '') && api.getState().savedData?.logoutPending) {
+    return { error: { status: 409, data: { message: 'Finishing the previous sign-out. Connect online and try again shortly.' } } };
+  }
+  if ((typeof navigator !== 'undefined' && navigator.onLine === false) ||
+      (!sessionEndpoint && api.getState().auth.offlineSession && !accessToken)) {
+    return { error: { status: 'FETCH_ERROR', data: { message: api.type === 'mutation'
+      ? 'An online connection and server confirmation are required. Your draft has not been submitted.'
+      : 'Connect to the internet to download this data.' } } };
+  }
   const { trafficCooldown, refreshCooldown } = session;
   if (!sessionEndpoint && trafficCooldown?.error.data.retryAt > Date.now()) {
     return rateLimitError(trafficCooldown, trafficCooldown.error.data.retryAt);
@@ -130,6 +141,12 @@ const baseQueryWithReauth = async (args, api, extraOptions) => {
 
   if (!isCurrent()) return staleSession();
   const normalized = normalizeApiError(result);
+  api.dispatch(savedDataStatus({ serverUnavailable: ['FETCH_ERROR', 'TIMEOUT_ERROR', 502, 503, 504].includes(normalized.error?.status) }));
+  // Never keep an authorized snapshot after an explicit access rejection.
+  if ([401, 403].includes(normalized.error?.status) && !sessionEndpoint) {
+    api.dispatch(clearCredentials());
+    return normalized;
+  }
   const { rateLimitScope, retryAt } = normalized.error?.data ?? {};
   if (normalized.error?.status === 429 && retryAt && ['public', 'business'].includes(rateLimitScope)) {
     session.trafficCooldown = normalized;
@@ -140,10 +157,11 @@ const baseQueryWithReauth = async (args, api, extraOptions) => {
 export const baseApi = createApi({
   reducerPath: 'api',
   baseQuery: baseQueryWithReauth,
-  keepUnusedDataFor: 300,
-  refetchOnMountOrArgChange: 30,
+  keepUnusedDataFor: Infinity,
+  refetchOnMountOrArgChange: false,
   refetchOnFocus: false,
-  refetchOnReconnect: true,
+  refetchOnReconnect: false,
+  extractRehydrationInfo: (action) => action.type === HYDRATE_SAVED_DATA ? action.payload : undefined,
   tagTypes: [
     'CurrentUser',
     'Store',
@@ -175,5 +193,45 @@ export const baseApi = createApi({
     'Dashboard',
     'Delivery',
   ],
-  endpoints: () => ({}),
+  endpoints: (builder) => ({
+    getSyncRevision: builder.query({
+      query: (slug) => slug ? `/storefront/${slug}/sync-revision` : '/sync/revision',
+    }),
+  }),
 });
+
+// Normalize every injected query hook, including lazy-loaded role modules. A hook's
+// `data` may otherwise belong to its previous arguments (a different report date,
+// product or page). `currentData` is the result for this exact cache key.
+const injectEndpoints = baseApi.injectEndpoints.bind(baseApi);
+const wrappedHooks = new Set();
+export const savedEndpointDefinitions = new Map();
+baseApi.injectEndpoints = (options) => {
+  const api = injectEndpoints({ ...options, endpoints: (builder) => {
+    const definitions = options.endpoints(builder);
+    for (const [name, definition] of Object.entries(definitions)) savedEndpointDefinitions.set(name, definition);
+    return definitions;
+  } });
+  for (const [name, endpoint] of Object.entries(api.endpoints)) {
+    if (!endpoint.useQuery || wrappedHooks.has(name)) continue;
+    wrappedHooks.add(name);
+    const useQuery = endpoint.useQuery;
+    const useSavedQuery = (...args) => {
+      const result = useQuery(...args);
+      useQueryReadState(result);
+      if (args[1]?.selectFromResult) return result;
+      const status = result.error?.status;
+      const rejected = typeof status === 'number' && status >= 400 && status < 500 && ![408, 429].includes(status);
+      const saved = rejected ? undefined : result.currentData;
+      return {
+        ...result, data: saved, currentData: saved,
+        isError: result.isError && saved === undefined,
+        // Error details stay available to the persistent status notice/retry UI.
+        isLoading: saved === undefined && (result.isLoading || result.isFetching),
+      };
+    };
+    endpoint.useQuery = useSavedQuery;
+    api[`use${name[0].toUpperCase()}${name.slice(1)}Query`] = useSavedQuery;
+  }
+  return api;
+};

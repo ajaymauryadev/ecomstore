@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useSavedViewState } from '../../../offline/useSavedViewState';
 import {
   TrendingUp, TrendingDown, DollarSign, ShoppingCart, Package,
   Users, Truck, AlertTriangle, RefreshCw, ArrowUpRight, ArrowDownRight,
@@ -65,10 +65,10 @@ export default function ProfitLossPage() {
   const today = accountingDate(undefined, resolveStoreTimeZone(store?.settings?.timezone));
   const firstOfMonth = today.slice(0, 8) + '01';
 
-  const [startDate, setStartDate] = useState(firstOfMonth);
-  const [endDate, setEndDate] = useState(today);
+  const [startDate, setStartDate] = useSavedViewState('ProfitLossPage:ProfitLossPage:startDate', firstOfMonth);
+  const [endDate, setEndDate] = useSavedViewState('ProfitLossPage:ProfitLossPage:endDate', today);
 
-  const { currentData, isFetching, isError, error, refetch } = useGetProfitLossQuery({ startDate, endDate }, { refetchOnMountOrArgChange: true });
+  const { currentData, isFetching, isError, error, refetch } = useGetProfitLossQuery({ startDate, endDate });
   const pl = currentData?.data ?? {};
 
   const hasNetProfit = pl.netProfit != null;
@@ -106,7 +106,7 @@ export default function ProfitLossPage() {
             <input type="date" aria-label="End date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="bg-transparent text-sm text-slate-200 outline-none" />
           </div>
           <button onClick={refetch} aria-label="Refresh profit and loss" className="workspace-row-action bg-navy-800 border border-navy-700/40 text-slate-400 hover:text-gold-400">
-            <RefreshCw size={18} className={isFetching ? 'animate-spin' : ''} />
+            <RefreshCw size={18} className={isFetching && !currentData ? 'animate-spin' : ''} />
           </button>
         </div>
       </div>
@@ -205,7 +205,7 @@ export default function ProfitLossPage() {
                 labelStyle={{ color: '#94a3b8' }}
                 itemStyle={{ color: '#f1f5f9' }}
               />
-              <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+              <Bar isAnimationActive={false} dataKey="value" radius={[4, 4, 0, 0]}>
                 {barData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
               </Bar>
             </BarChart>
@@ -218,7 +218,7 @@ export default function ProfitLossPage() {
             <p className="text-sm font-semibold text-slate-300 mb-4">Expense Breakdown</p>
             <ResponsiveContainer width="100%" height={240}>
               <PieChart>
-                <Pie data={deductionData} cx="50%" cy="50%" innerRadius={60} outerRadius={90} paddingAngle={4} dataKey="value" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`} labelLine={false}>
+                <Pie isAnimationActive={false} data={deductionData} cx="50%" cy="50%" innerRadius={60} outerRadius={90} paddingAngle={4} dataKey="value" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`} labelLine={false}>
                   {deductionData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
                 </Pie>
                 <Tooltip formatter={(v) => fmtFull(v)} contentStyle={{ background: '#0f2740', border: '1px solid #1e3a5f', borderRadius: 8 }} labelStyle={{ color: '#94a3b8' }} itemStyle={{ color: '#f1f5f9' }} />

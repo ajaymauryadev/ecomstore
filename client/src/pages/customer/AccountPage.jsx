@@ -103,7 +103,7 @@ export default function AccountPage() {
 
   if (!user || user.role !== 'customer') {
     return (
-      <div className="text-center py-16 text-slate-500 animate-fade-in">
+      <div className="text-center py-16 text-slate-500">
         <User size={48} strokeWidth={1} className="mx-auto mb-3" />
         <p className="font-medium text-slate-400">Not logged in</p>
         <Link to={`/s/${storeSlug}/auth`} className="btn btn-primary btn-sm mt-4 inline-block">Login / Register</Link>
@@ -112,7 +112,7 @@ export default function AccountPage() {
   }
 
   return (
-    <div className="customer-account max-w-4xl mx-auto animate-fade-in space-y-5 pb-8">
+    <div className="customer-account max-w-4xl mx-auto space-y-5 pb-8">
       <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-100">My Account</h1>
       {/* Profile card */}
       <div className="card account-profile">
@@ -213,7 +213,7 @@ export default function AccountPage() {
         )}
       </div>
 
-      <Pagination meta={addressPaging.meta} page={addressPaging.page} onPageChange={addressPaging.setPage} label="saved addresses" />
+      <Pagination meta={addressPaging.meta} page={addressPaging.page} onPageChange={addressPaging.setPage} label="saved addresses" hideOnSinglePage />
 
       {/* Favourites */}
       {favorites.length > 0 && (
@@ -252,7 +252,7 @@ export default function AccountPage() {
         </div>
       )}
 
-      <Pagination meta={favoritesPaging.meta} page={favoritesPaging.page} onPageChange={favoritesPaging.setPage} label="favorites" />
+      <Pagination meta={favoritesPaging.meta} page={favoritesPaging.page} onPageChange={favoritesPaging.setPage} label="favorites" hideOnSinglePage />
 
       {/* Logout */}
       <button

@@ -114,6 +114,8 @@ async function withStorefrontFixture(use, { realtime = false } = {}) {
       await vite?.close();
     } finally {
       if (api?.listening) await new Promise((resolve) => api.close(resolve));
+      const { settleRevisionWrites } = await import('../../server/src/middleware/savedDataSync.js');
+      await settleRevisionWrites();
       await mongoose.disconnect();
       try {
         await mongo?.stop();

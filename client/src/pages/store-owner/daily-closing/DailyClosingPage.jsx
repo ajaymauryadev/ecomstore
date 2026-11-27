@@ -1,3 +1,4 @@
+import { useSavedViewState } from '../../../offline/useSavedViewState';
 import { usePagination } from '../../../hooks/usePagination';
 import Pagination from '../../../components/ui/Pagination';
 import { useState } from 'react';
@@ -106,15 +107,15 @@ export default function DailyClosingPage() {
   const canManage = isStoreOwner || hasPermission(user, PERMISSIONS.ACCOUNTING_MANAGE);
   const timeZone = resolveStoreTimeZone(store?.settings?.timezone);
   const today = accountingDate(undefined, timeZone);
-  const [selectedDate, setSelectedDate] = useState(today);
-  const [activeTab, setActiveTab] = useState('close'); // 'close' | 'history'
-  const [localDraft, setLocalDraft] = useState(null);
+  const [selectedDate, setSelectedDate] = useSavedViewState('DailyClosingPage:DailyClosingPage:selectedDate', today);
+  const [activeTab, setActiveTab] = useSavedViewState('DailyClosingPage:DailyClosingPage:activeTab', 'close'); // 'close' | 'history'
+  const [localDraft, setLocalDraft] = useSavedViewState('DailyClosingPage:DailyClosingPage:localDraft', null);
   const [finalizePrompt, setFinalizePrompt] = useState(null);
   const [correctionForm, setCorrectionForm] = useState(null);
 
   const { currentData: summaryData, isFetching: summaryLoading, isError: summaryFailed, refetch: refetchSummary } = useGetDailySummaryQuery(
     { date: selectedDate },
-    { refetchOnMountOrArgChange: true }
+    { refetchOnMountOrArgChange: false }
   );
   const paging = usePagination('history');
   const { data: historyData, isLoading: historyLoading } = useGetDailyClosingsQuery({ page: paging.page, limit: paging.limit });
@@ -275,7 +276,7 @@ export default function DailyClosingPage() {
           )}
 
           {/* Auto-computed sales (read-only) */}
-          {summaryLoading && !isClosed ? (
+          {summaryLoading && !liveSummary ? (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {[1, 2, 3, 4].map((i) => <div key={i} className="h-20 bg-navy-800 rounded-xl animate-pulse" />)}
             </div>

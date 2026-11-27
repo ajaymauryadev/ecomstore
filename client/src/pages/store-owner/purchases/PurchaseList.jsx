@@ -1,7 +1,7 @@
+import { useSavedViewState } from '../../../offline/useSavedViewState';
 import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
 import Pagination from '../../../components/ui/Pagination';
 import { usePagination } from '../../../hooks/usePagination';
-import { useState } from 'react';
 import { Plus, Search, TrendingDown, CreditCard, Clock, CheckCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useGetPurchasesQuery, useGetPurchaseStatsQuery } from '../../../features/purchases/purchaseApi';
@@ -22,8 +22,8 @@ function formatDate(str) {
 }
 
 export default function PurchaseList() {
-  const [search, setSearch] = useState('');
-  const [paymentStatus, setPaymentStatus] = useState('');
+  const [search, setSearch] = useSavedViewState('PurchaseList:PurchaseList:search', '');
+  const [paymentStatus, setPaymentStatus] = useSavedViewState('PurchaseList:PurchaseList:paymentStatus', '');
   const settledSearch = useDebouncedValue(search.trim(), 250);
   const { page, setPage, limit } = usePagination(JSON.stringify([settledSearch, paymentStatus]), 'compact');
 
@@ -35,7 +35,7 @@ export default function PurchaseList() {
   const stats = statsData?.data?.stats || {};
 
   return (
-    <div className="space-y-5 animate-fade-in">
+    <div className="space-y-5">
       {/* Header */}
       <div className="page-header">
         <div>
@@ -100,7 +100,7 @@ export default function PurchaseList() {
           </Link>
         </div>
       ) : (
-        <div className={cn('card p-0 overflow-hidden', isFetching && 'opacity-75')}>
+        <div className="card p-0 overflow-hidden" aria-busy={isFetching}>
           <div className="overflow-x-auto">
             <table className="table w-full">
               <thead>

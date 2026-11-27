@@ -90,12 +90,13 @@ export const productApi = baseApi.injectEndpoints({
       providesTags: (result, error, { productId }) => [{ type: 'Product', id: productId }, { type: 'Product', id: 'PUBLIC' }],
     }),
 
-    getCartProducts: builder.mutation({
+    getCartProducts: builder.query({
       query: ({ slug, productIds }) => ({
         url: `/storefront/${slug}/cart/products`,
         method: 'POST',
         body: { productIds },
       }),
+      providesTags: [{ type: 'Product', id: 'PUBLIC' }],
     }),
 
     uploadImage: builder.mutation({

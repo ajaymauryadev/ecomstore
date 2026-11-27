@@ -3,6 +3,7 @@ import { useSelector } from 'react-redux';
 import { useLocation } from 'react-router-dom';
 import { selectSessionEpoch } from '../../features/auth/authSlice';
 import Skeleton, { SkeletonTable } from '../ui/Skeleton';
+import SavedReadBoundary from '../../offline/SavedReadBoundary';
 
 export function RouteSkeleton({ label = 'Loading page' }) {
   return (
@@ -19,5 +20,5 @@ export function RouteSkeleton({ label = 'Loading page' }) {
 export default function RouteContent({ children }) {
   const epoch = useSelector(selectSessionEpoch);
   const { pathname } = useLocation();
-  return <Suspense key={`${epoch}:${pathname}`} fallback={<RouteSkeleton />}>{children}</Suspense>;
+  return <Suspense key={`${epoch}:${pathname}`} fallback={<RouteSkeleton />}><SavedReadBoundary>{children}</SavedReadBoundary></Suspense>;
 }

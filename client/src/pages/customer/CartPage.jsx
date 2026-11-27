@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useSavedViewState } from '../../offline/useSavedViewState';
+import { useEffect } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   ShoppingCart, Plus, Minus, Trash2, Tag, Truck, MapPin,
@@ -19,12 +20,12 @@ export default function CartPage() {
   const { storeSlug } = useParams();
   const navigate = useNavigate();
   const {
-    items, count, subtotal, total, isEmpty,
+    items, count, subtotal, total, isEmpty, provisional,
     deliveryType, deliveryCharge, coupon, couponDiscount,
     updateQuantity, setDeliveryType, setDeliveryCharge, applyCoupon, removeCoupon,
   } = useCart();
 
-  const [couponInput, setCouponInput] = useState('');
+  const [couponInput, setCouponInput] = useSavedViewState('CartPage:CartPage:couponInput', '');
   const [validateCoupon, { isLoading: validatingCoupon }] = useValidateCouponMutation();
   const { data: storeData } = useGetStorefrontInfoQuery(storeSlug);
   const deliverySettings = storeData?.data?.store?.deliverySettings;
@@ -70,7 +71,7 @@ export default function CartPage() {
 
   if (isEmpty) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 text-slate-500 animate-fade-in">
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 text-slate-500">
         <ShoppingCart size={56} strokeWidth={1} />
         <p className="font-medium text-slate-400 text-lg">Your cart is empty</p>
         <Link to={`/s/${storeSlug}`} className="btn btn-primary btn-md gap-2">
@@ -81,7 +82,8 @@ export default function CartPage() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto animate-fade-in">
+    <div className="max-w-6xl mx-auto">
+      {provisional && <p role="status" className="workspace-feedback mb-4">Saved cart — prices, stock and coupons need online confirmation. These items are not reserved.</p>}
       {/* Header */}
       <div className="flex items-center gap-3 mb-5">
         <Link to={`/s/${storeSlug}`} aria-label="Back to store" className="workspace-row-action rounded-xl hover:bg-navy-800 text-slate-400 transition-colors">

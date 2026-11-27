@@ -1,3 +1,4 @@
+import { useSavedViewState } from '../../../offline/useSavedViewState';
 import Pagination from '../../../components/ui/Pagination';
 import { usePageSize, usePageState } from '../../../hooks/usePagination';
 import { useMemo, useState } from 'react';
@@ -161,8 +162,8 @@ function PermissionEditor({ role, selected, onChange }) {
 }
 
 export default function StaffManagementPage() {
-  const [search, setSearch] = useState('');
-  const [role, setRole] = useState('');
+  const [search, setSearch] = useSavedViewState('StaffManagementPage:StaffManagementPage:search', '');
+  const [role, setRole] = useSavedViewState('StaffManagementPage:StaffManagementPage:role', '');
   const { limit } = usePageSize('cards');
   const [page, setPage] = usePageState(limit);
   const [form, setForm] = useState(EMPTY_FORM);
@@ -243,7 +244,7 @@ export default function StaffManagementPage() {
   }));
 
   return (
-    <div className="space-y-5 animate-fade-in">
+    <div className="space-y-5">
       <div className="page-header gap-3">
         <div>
           <h1 className="page-title">Staff and Fulfillment</h1>

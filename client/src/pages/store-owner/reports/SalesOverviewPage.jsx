@@ -1,5 +1,6 @@
 import { usePageSize } from '../../../hooks/usePagination';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link } from 'react-router-dom';
+import { useSavedSearchParams } from '../../../offline/useSavedSearchParams';
 import { ShoppingCart, Truck, Wallet, TrendingUp, BookOpen, RefreshCw, Receipt } from 'lucide-react';
 import { useGetSalesOverviewQuery } from '../../../features/reports/reportsApi';
 import { useAuth } from '../../../hooks/useAuth';
@@ -24,7 +25,7 @@ const METHODS = { counter: 'Cash', cod: 'Cash on delivery', cash_on_pickup: 'Cas
 export default function SalesOverviewPage() {
   const { store } = useAuth();
   const timeZone = resolveStoreTimeZone(store?.settings?.timezone);
-  const [params, setParams] = useSearchParams();
+  const [params, setParams] = useSavedSearchParams();
   const today = accountingDate(undefined, timeZone);
   const startDate = params.get('startDate') || today;
   const endDate = params.get('endDate') || startDate;

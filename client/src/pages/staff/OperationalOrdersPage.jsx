@@ -1,7 +1,7 @@
+import { useSavedViewState } from '../../offline/useSavedViewState';
 import Pagination from '../../components/ui/Pagination';
 import { usePageSize, usePageState } from '../../hooks/usePagination';
 import OrderResponsibility from '../../components/orders/OrderResponsibility';
-import { useState } from 'react';
 import { ClipboardList, RefreshCw, Search } from 'lucide-react';
 import { useGetAdminOrdersQuery } from '../../features/orders/orderApi';
 import { useAuth } from '../../hooks/useAuth';
@@ -16,9 +16,9 @@ const STATUS_OPTIONS = ['', 'pending', 'accepted', 'payment_verified', 'packing'
 
 export default function OperationalOrdersPage() {
   const { store } = useAuth();
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useSavedViewState('OperationalOrdersPage:OperationalOrdersPage:search', '');
   const settledSearch = useDebouncedValue(search.trim());
-  const [status, setStatus] = useState('');
+  const [status, setStatus] = useSavedViewState('OperationalOrdersPage:OperationalOrdersPage:status', '');
   const { limit } = usePageSize('cards');
   const [page, setPage] = usePageState(limit);
   const { data, isLoading, isError, isFetching, refetch } = useGetAdminOrdersQuery(
@@ -37,7 +37,7 @@ export default function OperationalOrdersPage() {
           <p className="text-sm text-slate-400">Live operational view. Administrative changes require an owner.</p>
         </div>
         <button type="button" onClick={refetch} className="min-w-11 min-h-11 inline-flex items-center justify-center rounded-xl hover:bg-navy-800 text-slate-400" aria-label="Refresh orders" title="Refresh orders">
-          <RefreshCw size={18} className={isFetching ? 'animate-spin' : ''} />
+          <RefreshCw size={18} className={isFetching && !data ? 'animate-spin' : ''} />
         </button>
       </div>
 

@@ -23,7 +23,7 @@ export default function DeliveryOrdersPage() {
   const [page, setPage] = usePageState(limit);
   const [confirmation, setConfirmation] = useState(null);
   const { data, isLoading, isError, isFetching, refetch } = useGetDeliveryOrdersQuery({ page, limit }, {
-    pollingInterval: 30000, skipPollingIfUnfocused: true, refetchOnFocus: true, refetchOnReconnect: true,
+    pollingInterval: 0, skipPollingIfUnfocused: true, refetchOnFocus: true, refetchOnReconnect: true,
   });
   const [updateStatus, { isLoading: updating }] = useUpdateDeliveryStatusMutation();
   const orders = data?.data || [];
@@ -41,7 +41,7 @@ export default function DeliveryOrdersPage() {
 
   return (
     <div className="space-y-5" aria-busy={isFetching}>
-      <div className="page-header"><div><h1 className="page-title">{managesAll ? 'Deliveries' : 'My deliveries'}</h1><p className="text-sm text-slate-400 mt-1">{meta.total ?? orders.length} order{(meta.total ?? orders.length) === 1 ? '' : 's'} · {managesAll ? 'All store deliveries' : 'Your assigned deliveries'}</p></div><button type="button" onClick={refetch} className="workspace-row-action text-slate-400" aria-label="Refresh deliveries" title="Refresh deliveries"><RefreshCw size={18} className={isFetching ? 'animate-spin' : ''} /></button></div>
+      <div className="page-header"><div><h1 className="page-title">{managesAll ? 'Deliveries' : 'My deliveries'}</h1><p className="text-sm text-slate-400 mt-1">{meta.total ?? orders.length} order{(meta.total ?? orders.length) === 1 ? '' : 's'} · {managesAll ? 'All store deliveries' : 'Your assigned deliveries'}</p></div><button type="button" onClick={refetch} className="workspace-row-action text-slate-400" aria-label="Refresh deliveries" title="Refresh deliveries"><RefreshCw size={18} className={isFetching && !data ? 'animate-spin' : ''} /></button></div>
 
       {isLoading ? <div className="grid gap-3">{[1, 2, 3].map((item) => <div key={item} className="h-48 card animate-pulse" />)}</div> : isError ? (
         <EmptyState icon={Truck} title="Deliveries could not be loaded" description="Check the connection and try again." action={<Button size="sm" variant="secondary" onClick={refetch}>Retry</Button>} />

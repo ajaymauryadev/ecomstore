@@ -6,6 +6,7 @@ import MobileNavigation from './MobileNavigation';
 import { ROUTES } from '../../constants/routes';
 import { WorkspaceTheme } from './WorkspaceTheme';
 import './workspace.css';
+import './customer-storefront.css';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import {
   ShoppingCart, Plus, Minus, Trash2, Home, LayoutGrid,
@@ -22,6 +23,7 @@ import { PageLoader } from '../ui/Spinner';
 import Button from '../ui/Button';
 import Modal from '../ui/Modal';
 import StoreSearch from '../products/StoreSearch';
+import { CustomerConnectionStatus } from '../../offline/SavedDataStatus';
 
 const API_BASE = import.meta.env.VITE_API_URL?.replace('/api/v1', '') || '';
 function imgSrc(url) {
@@ -147,6 +149,7 @@ export default function CustomerLayout() {
   const location = useLocation();
   const dispatch = useDispatch();
   const user = useSelector(selectCurrentUser);
+  const sessionInitialized = useSelector((state) => state.auth.isInitialized);
   const { scopeKey, status, restoredWithChanges } = useSelector((state) => state.cart);
   const [restoreAttempt, setRestoreAttempt] = useState(0);
 
@@ -155,6 +158,7 @@ export default function CustomerLayout() {
   const isAuth = useMatch('/s/:storeSlug/auth');
   const isCheckout = useMatch('/s/:storeSlug/checkout');
   const isCart = useMatch('/s/:storeSlug/cart');
+  const isAccount = useMatch('/s/:storeSlug/account');
   const isCustomer = user?.role === 'customer' && (user.tenantId?._id ?? user.tenantId) === store?._id;
   const sessionUserId = user?._id ?? null;
   const userId = isCustomer ? sessionUserId : null;
@@ -195,6 +199,9 @@ export default function CustomerLayout() {
   if (isAuth) return <RouteContent><Outlet context={{ store }} /></RouteContent>;
 
   if (isCheckout && !isCustomer) {
+    // The public store may load before the cookie-based session check finishes.
+    // Wait for that check before deciding that checkout needs a sign-in.
+    if (!sessionInitialized) return <PageLoader className="workspace-theme" />;
     return <Navigate to={`/s/${storeSlug}/auth`} state={{ checkout: true, buyNow: location.state?.buyNow }} replace />;
   }
 
@@ -236,21 +243,21 @@ export default function CustomerLayout() {
         {/* Sticky Header */}
         <header className="shrink-0 z-40 bg-navy-900 border-b border-navy-700/60">
           <div className="page-width">
-            <div className="customer-header-row flex items-center gap-2 sm:gap-4 min-h-16 py-2">
+            <div className={`customer-header-row flex items-center gap-2 sm:gap-4 min-h-16 py-2${isAccount ? ' is-account' : ''}`}>
               {/* Logo / Store name */}
-              <Link to={`/s/${storeSlug}`} aria-label={`${store.name} home`} className="min-w-0 flex items-center gap-2">
+              <Link to={`/s/${storeSlug}`} aria-label={`${store.name} home`} className="customer-store-identity min-w-0 flex items-center gap-2">
                 <div className="w-7 h-7 shrink-0 workspace-mark rounded-lg flex items-center justify-center">
                   <Store size={14} aria-hidden="true" />
                 </div>
-                <span className="font-black text-slate-100 text-base leading-tight truncate max-w-40 hidden sm:block">
-                  {store?.name || 'Kirana'}
-                </span>
+                <div className="min-w-0"><strong className="customer-store-name">{store?.name || 'Kirana'}</strong>
+                  <CustomerConnectionStatus tagline={store.branding?.tagline} />
+                </div>
               </Link>
 
               {/* Search */}
-              <StoreSearch value={search} storeSlug={storeSlug} onSubmit={handleSearch}
+              {!isAccount && <StoreSearch value={search} storeSlug={storeSlug} onSubmit={handleSearch}
                 onChange={(value) => { setSearch(value); setSearchEdited(true); }}
-                onClear={() => { setSearch(''); setSearchEdited(false); navigate(searchDestination(storeSlug, location, '')); }} />
+                onClear={() => { setSearch(''); setSearchEdited(false); navigate(searchDestination(storeSlug, location, '')); }} />}
 
               {/* Account */}
               {isCustomer ? (
@@ -258,14 +265,15 @@ export default function CustomerLayout() {
                   to={`/s/${storeSlug}/account`}
                   aria-label="Customer account"
                   title="Account"
-                  className="relative hidden min-w-11 min-h-11 md:inline-flex items-center justify-center rounded-xl bg-navy-800 border border-navy-600 hover:border-gold-500/50 text-slate-300 hover:text-gold-400 transition-all shrink-0"
+                  className="customer-account-link relative min-w-11 min-h-11 inline-flex items-center justify-center rounded-xl bg-navy-800 border border-navy-600 hover:border-gold-500/50 text-slate-300 hover:text-gold-400 transition-colors shrink-0"
                 >
                   <User size={18} />
                 </Link>
               ) : (
                 <Link
                   to={`/s/${storeSlug}/auth`}
-                  className="btn btn-secondary btn-sm min-w-11 min-h-11 shrink-0 px-2 sm:px-3"
+                  aria-label="Login"
+                  className="customer-account-link btn btn-secondary btn-sm min-w-11 min-h-11 shrink-0 px-2 sm:px-3"
                 >
                   <User size={18} aria-hidden="true" /><span className="sr-only sm:not-sr-only">Login</span>
                 </Link>
@@ -279,7 +287,7 @@ export default function CustomerLayout() {
                   aria-label={cartLabel}
                   aria-expanded={isOpen}
                   title="Cart"
-                  className="relative hidden min-w-11 min-h-11 md:inline-flex items-center justify-center rounded-xl bg-navy-800 border border-navy-600 hover:border-gold-500/50 text-slate-300 hover:text-gold-400 transition-all shrink-0"
+                  className="customer-header-cart relative min-w-11 min-h-11 hidden md:inline-flex items-center justify-center rounded-xl bg-navy-800 border border-navy-600 hover:border-gold-500/50 text-slate-300 hover:text-gold-400 transition-colors shrink-0"
                 >
                   <ShoppingCart size={20} />
                   {count > 0 && (
@@ -294,7 +302,7 @@ export default function CustomerLayout() {
         </header>
 
         {/* Delivery strip */}
-        {!isOrderPage && (
+        {!isOrderPage && (!store.orderSettings?.isAcceptingOrders || store.deliverySettings?.minOrderAmount > 0 || store.deliverySettings?.freeDeliveryAbove > 0) && (
           <div className="shrink-0 bg-[var(--brand-tint)] border-b border-navy-700/30">
             <div className="page-width py-2 flex flex-wrap items-center gap-x-5 gap-y-1 text-xs text-slate-400">
               {!store.orderSettings?.isAcceptingOrders ? <span className="text-amber-300">Online ordering is currently paused.</span> : <>
@@ -308,11 +316,9 @@ export default function CustomerLayout() {
         {/* Page content */}
         <div key={location.pathname} className="customer-scroll min-h-0 flex-1 overflow-y-auto overscroll-y-contain">
           <main id="shop-content" tabIndex={-1} className="page-width customer-main py-5 sm:py-8">
-            {!cartReady && <div role="status" className="mb-4 text-sm text-slate-400">
-              {status === 'error' ? <>
+            {!cartReady && status === 'error' && <div role="status" className="mb-4 text-sm text-slate-400">
                 Cart could not be checked. Your saved draft is retained.
                 <button type="button" className="ml-2 underline" onClick={() => setRestoreAttempt((attempt) => attempt + 1)}>Retry cart</button>
-              </> : 'Checking saved cart… You can continue browsing.'}
             </div>}
             {restoredWithChanges && (
               <p role="status" className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-300">

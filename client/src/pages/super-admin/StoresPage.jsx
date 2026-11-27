@@ -1,3 +1,4 @@
+import { useSavedViewState } from '../../offline/useSavedViewState';
 import Pagination from '../../components/ui/Pagination';
 import { usePageSize, usePageState } from '../../hooks/usePagination';
 import { useState } from 'react';
@@ -19,8 +20,8 @@ const PLAN_VARIANTS = { trial: 'default', basic: 'info', premium: 'gold', enterp
 const EMPTY_NEW = { ownerName: '', ownerPhone: '', ownerEmail: '', ownerPassword: '', storeName: '', storeSlug: '', plan: 'trial' };
 
 export default function StoresPage() {
-  const [search, setSearch] = useState('');
-  const [planFilter, setPlanFilter] = useState('');
+  const [search, setSearch] = useSavedViewState('StoresPage:StoresPage:search', '');
+  const [planFilter, setPlanFilter] = useSavedViewState('StoresPage:StoresPage:planFilter', '');
   const { limit } = usePageSize('compact');
   const [page, setPage] = usePageState(limit);
   const [showCreate, setShowCreate] = useState(false);

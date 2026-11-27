@@ -1,3 +1,4 @@
+import { useSavedViewState } from '../../../offline/useSavedViewState';
 import { useState } from 'react';
 import { Download, Package, ShoppingBag, Users, Warehouse, BookOpen, Database, AlertTriangle } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -37,8 +38,8 @@ const EXPORTS = [
 export default function BackupPage() {
   const token = useSelector(selectAccessToken);
   const [loading, setLoading] = useState({});
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
+  const [dateFrom, setDateFrom] = useSavedViewState('BackupPage:BackupPage:dateFrom', '');
+  const [dateTo, setDateTo] = useSavedViewState('BackupPage:BackupPage:dateTo', '');
 
   const downloadExport = async (exportItem) => {
     setLoading((l) => ({ ...l, [exportItem.id]: true }));

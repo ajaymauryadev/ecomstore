@@ -1,3 +1,4 @@
+import { useSavedViewState } from '../../offline/useSavedViewState';
 import OrderResponsibility from '../../components/orders/OrderResponsibility';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -142,13 +143,13 @@ export default function StaffOrdersPage({ packingPath = ROUTES.STAFF.PACKING }) 
   const managesAll = hasPermission(user, PERMISSIONS.PACKING_MANAGE);
   const canPerform = hasPermission(user, PERMISSIONS.PACKING_PERFORM);
   const { data, isLoading, isError, refetch } = useGetMyPackingOrdersQuery(undefined, {
-    pollingInterval: 30000, skipPollingIfUnfocused: true, refetchOnFocus: true, refetchOnReconnect: true,
+    pollingInterval: 0, skipPollingIfUnfocused: true, refetchOnFocus: true, refetchOnReconnect: true,
   });
   const [startSession, { isLoading: starting }] = useStartPackingSessionMutation();
   const [acceptOrder, { isLoading: accepting }] = useAcceptPackingOrderMutation();
   const [acceptTarget, setAcceptTarget] = useState(null);
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [search, setSearch] = useSavedViewState('StaffOrdersPage:StaffOrdersPage:search', '');
+  const [statusFilter, setStatusFilter] = useSavedViewState('StaffOrdersPage:StaffOrdersPage:statusFilter', 'all');
   const [startingId, setStartingId] = useState(null);
   const navigate = useNavigate();
 

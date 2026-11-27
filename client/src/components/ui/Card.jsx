@@ -40,7 +40,7 @@ export function KPICard({ title, value, icon, change, changeLabel, trend, color 
   const c = colors[color] || colors.gold;
 
   return (
-    <div className="kpi-card animate-fade-in">
+    <div className="kpi-card">
       <div className="flex items-start justify-between">
         <div className={cn('p-2.5 rounded-xl', c.icon)}>
           {icon}

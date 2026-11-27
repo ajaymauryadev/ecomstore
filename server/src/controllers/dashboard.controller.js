@@ -205,5 +205,5 @@ export const getDashboard = asyncHandler(async (req, res) => {
   if (req.user.role === 'store_owner') dashboard = await ownerDashboard(req.tenantId, req.storeTimeZone);
   else if (req.user.role === 'delivery') dashboard = await deliveryDashboard(req.tenantId, req.user, req.storeTimeZone);
   else dashboard = await staffDashboard(req.tenantId, req.user, req.storeTimeZone);
-  sendSuccess(res, dashboard);
+  sendSuccess(res, { ...dashboard, businessDate: accountingDay(undefined, req.storeTimeZone).businessDate });
 });

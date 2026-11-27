@@ -21,12 +21,14 @@ export const useCart = () => {
   const coupon = useSelector(selectCoupon);
   const couponDiscount = useSelector(selectCouponDiscount);
   const scopeKey = useSelector(selectCartScope);
+  const provisional = useSelector((state) => state.cart.provisional);
   const updateDeliveryCharge = useCallback((charge) => dispatch(setDeliveryCharge(charge)), [dispatch]);
 
   const getItemQuantity = (id) => items.find((i) => i._id === id)?.quantity ?? 0;
 
   return {
     items,
+    provisional,
     count,
     subtotal,
     total,

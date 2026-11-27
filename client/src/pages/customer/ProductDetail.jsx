@@ -176,7 +176,7 @@ export default function ProductDetail() {
   };
 
   return (
-    <div className="space-y-5 animate-fade-in">
+    <div className="space-y-5">
       {/* Breadcrumb */}
       <div className="flex items-center gap-1.5 text-xs text-slate-500">
         <Link to={`/s/${storeSlug}`} className="hover:text-slate-300 transition-colors">Home</Link>

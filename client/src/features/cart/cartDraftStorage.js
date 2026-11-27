@@ -35,7 +35,7 @@ function makeDraft(items, deliveryType, couponCode) {
 
 export function readCartDraft(key) {
   try {
-    const draft = JSON.parse(window.sessionStorage.getItem(key));
+    const draft = JSON.parse(window.localStorage.getItem(key) || window.sessionStorage.getItem(key));
     if (draft) return makeDraft(draft.items, draft.deliveryType, draft.couponCode);
   } catch { /* Storage may be unavailable or contain an invalid draft. */ }
   return null;
@@ -44,25 +44,43 @@ export function readCartDraft(key) {
 export function removeCartDraft(key) {
   if (!key) return;
   try { window.sessionStorage.removeItem(key); } catch { /* Cart still works in memory. */ }
+  try { window.localStorage.removeItem(key); window.localStorage.removeItem(key + ':snapshot'); } catch { /* Storage notice is handled by shared persistence. */ }
+}
+
+export function readCartSnapshot(key, draft) {
+  try {
+    const saved = JSON.parse(window.localStorage.getItem(key + ':snapshot'));
+    if (!Array.isArray(saved)) return null;
+    const items = draft.items.map((line) => {
+      const item = saved.find((row) => row.productId === line.productId && row.variantId === line.variantId);
+      return item && Number.isFinite(item.price) && item.price > 0 ? { ...item, quantity: line.quantity } : null;
+    });
+    return items.every(Boolean) ? items : null;
+  } catch { return null; }
 }
 
 export function writeCartDraft(cart) {
-  const draft = makeDraft(cart.items, cart.deliveryType, cart.coupon?.code);
+  const draft = makeDraft(cart.items, cart.deliveryType, cart.coupon?.code || cart.pendingCouponCode);
   if (!draft.items.length) {
     removeCartDraft(cart.scopeKey);
     return;
   }
   try {
     window.sessionStorage.setItem(cart.scopeKey, JSON.stringify(draft));
-  } catch { /* Cart still works in memory. */ }
+    window.localStorage.setItem(cart.scopeKey, JSON.stringify(draft));
+    window.localStorage.setItem(cart.scopeKey + ':snapshot', JSON.stringify(cart.items));
+  } catch {
+    window.dispatchEvent(new Event('saved-cart-storage-error'));
+  }
 }
 
 export function clearGuestCartDrafts() {
   try {
-    const storage = window.sessionStorage;
-    for (let index = storage.length - 1; index >= 0; index--) {
-      const key = storage.key(index);
-      if (key?.startsWith(prefix) && key.endsWith(':guest')) storage.removeItem(key);
+    for (const storage of [window.sessionStorage, window.localStorage]) {
+      for (let index = storage.length - 1; index >= 0; index--) {
+        const key = storage.key(index);
+        if (key?.startsWith(prefix) && /:guest(:snapshot)?$/.test(key)) storage.removeItem(key);
+      }
     }
   } catch { /* Cart still works in memory. */ }
 }
