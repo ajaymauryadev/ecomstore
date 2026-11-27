@@ -212,11 +212,11 @@ for (const [role, paths] of Object.entries(routes)) {
     await expect(page.locator('main')).toBeVisible();
     await expect(page.locator(role === 'customer' ? '.customer-store-note' : '.saved-data-status')).toContainText('Offline');
     if (role !== 'customer') await expect(page.locator('.saved-data-status')).toContainText('Last synced');
-    await expect(page.getByText('Saved data is unavailable for this view')).toHaveCount(0);
+    await expect(page.getByText('This view is waiting for its first download')).toHaveCount(0);
     for (const path of actual) {
       await navigate(page, path);
       await expect(page.locator('main')).toBeVisible();
-      await expect(page.getByText('Saved data is unavailable for this view')).toHaveCount(0);
+      await expect(page.getByText('This view is waiting for its first download')).toHaveCount(0);
     }
     expect(errors).toEqual([]);
     await page.context().setOffline(false);
@@ -228,6 +228,8 @@ test('saved product appears before delayed online refresh and a missing offline 
   test.skip(process.env.STOREFRONT_PRODUCTION !== 'true');
   const credentials = { email: 'saved-slow@example.com', password: 'SavedSlow123!' };
   await storefront.seedStore('saved-slow', credentials);
+  // Keep this particular view undownloaded even when workspace warmup runs.
+  await page.route('**/api/v1/audit-logs?*', (route) => route.abort());
   await page.request.post(`${storefront.apiOrigin}/api/v1/auth/login`, { data: credentials });
   await page.goto(storefront.origin + '/store/products');
   await expect(page.getByText('Pickup Test Rice', { exact: true }).first()).toBeVisible();
@@ -243,7 +245,7 @@ test('saved product appears before delayed online refresh and a missing offline 
   await expect(page.locator('.saved-data-status')).not.toContainText('checking your session');
   await page.context().setOffline(true);
   await navigate(page, '/store/audit-logs');
-  await expect(page.getByText('Saved data is unavailable for this view')).toBeVisible();
-  await expect(page.locator('main')).toContainText('Connect to the internet to download this data');
+  await expect(page.getByText('This view is waiting for its first download')).toBeVisible();
+  await expect(page.locator('main')).toContainText('Connect once to save this data');
   await page.context().setOffline(false);
 });

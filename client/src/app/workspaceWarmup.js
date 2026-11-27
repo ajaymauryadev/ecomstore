@@ -1,11 +1,10 @@
 import { useEffect } from 'react';
 import { useSelector, useStore } from 'react-redux';
-import { hasPermission, PERMISSIONS } from '../constants/permissions';
 import { selectSessionEpoch, selectCurrentUser } from '../features/auth/authSlice';
-import { POS_CATALOG_PARAMS } from '../features/pos/catalog';
 import { scheduleBackgroundTasks } from './backgroundTasks';
 import { prefetchQuery, queriesSettled } from './queryWarmup';
-import { PAGE_SIZE } from '../constants/pagination';
+import { prefetchRoute } from './routePrefetch';
+import { workspaceReadPlan } from './workspaceReadPlan';
 
 export const loadPOS = () => import('../pages/store-owner/pos/POSPage');
 export const loadProducts = () => import('../pages/store-owner/products/ProductList');
@@ -17,37 +16,20 @@ export function useWorkspaceWarmup() {
   const epoch = useSelector(selectSessionEpoch);
   const user = useSelector(selectCurrentUser);
   const authenticated = useSelector((state) => Boolean(state.auth.accessToken));
+  const restoring = useSelector((state) => state.savedData.restoring);
+  const workspace = useSelector((state) => state.auth.store);
 
   useEffect(() => {
-    if (!authenticated || !['store_owner', 'staff', 'packer'].includes(user?.role)) return;
+    if (!authenticated || restoring || !['store_owner', 'staff', 'packer', 'delivery'].includes(user?.role)) return;
     let disposed = false;
     const active = () => !disposed && selectSessionEpoch(store.getState()) === epoch;
-    const owner = user.role === 'store_owner';
-    const slug = store.getState().auth.store?.slug;
-    const tasks = [];
-    if (hasPermission(user, PERMISSIONS.POS_ACCESS)) {
-      tasks.push(loadPOS, async () => {
-        await import('../features/products/productApi');
-        if (active()) return prefetchQuery(store, 'getProducts', POS_CATALOG_PARAMS);
-      });
-    }
-    if (hasPermission(user, PERMISSIONS.PRODUCTS_VIEW)) {
-      tasks.push(loadProducts, async () => {
-        await import('../features/products/productApi');
-        if (active()) return prefetchQuery(store, 'getProducts', { page: 1, limit: PAGE_SIZE });
-      });
-    }
-    if (slug && hasPermission(user, PERMISSIONS.ORDERS_VIEW)) {
-      tasks.push(owner ? loadOwnerOrders : loadStaffOrders, async () => {
-        await import('../features/orders/orderApi');
-        if (active()) return prefetchQuery(store, 'getAdminOrders', {
-          slug, ...(owner && { status: '' }), page: 1, limit: PAGE_SIZE,
-        });
-      });
-    }
+    const tasks = workspaceReadPlan(user, workspace).flatMap(({ path, queries }) => [
+      ...queries.map(([endpoint, args]) => () => active() && prefetchQuery(store, endpoint, args)),
+      () => active() && prefetchRoute(path),
+    ]);
     const cancel = scheduleBackgroundTasks(tasks, {
-      isCurrent: active, isReady: () => queriesSettled(store),
+      isCurrent: active, isReady: () => queriesSettled(store), delay: 100,
     });
     return () => { disposed = true; cancel(); };
-  }, [epoch, store, user, authenticated]);
+  }, [epoch, store, user, authenticated, restoring, workspace]);
 }

@@ -1,6 +1,5 @@
 import { Suspense } from 'react';
 import { useSelector } from 'react-redux';
-import { useLocation } from 'react-router-dom';
 import { selectSessionEpoch } from '../../features/auth/authSlice';
 import Skeleton, { SkeletonTable } from '../ui/Skeleton';
 import SavedReadBoundary from '../../offline/SavedReadBoundary';
@@ -19,6 +18,7 @@ export function RouteSkeleton({ label = 'Loading page' }) {
 
 export default function RouteContent({ children }) {
   const epoch = useSelector(selectSessionEpoch);
-  const { pathname } = useLocation();
-  return <Suspense key={`${epoch}:${pathname}`} fallback={<RouteSkeleton />}><SavedReadBoundary>{children}</SavedReadBoundary></Suspense>;
+  // Keep the resolved boundary during route transitions. A pathname key forces
+  // a fresh fallback even when the previous page and saved data are available.
+  return <Suspense key={epoch} fallback={<RouteSkeleton />}><SavedReadBoundary>{children}</SavedReadBoundary></Suspense>;
 }

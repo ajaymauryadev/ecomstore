@@ -1,8 +1,12 @@
 import { useInfiniteProducts } from '../../hooks/useInfiniteProducts';
-import { memo, useState, useMemo } from 'react';
+import { memo, useState, useMemo, useCallback, useRef } from 'react';
+import { useSelector } from 'react-redux';
+import toast from 'react-hot-toast';
 import { useOutletContext, useParams, useNavigate, Link } from 'react-router-dom';
 import { useSavedSearchParams } from '../../offline/useSavedSearchParams';
-import { ShoppingCart, Plus, Minus, Star, AlertTriangle, LayoutGrid, Tag, Sparkles, X } from 'lucide-react';
+import { ShoppingCart, Plus, Minus, Heart, Star, AlertTriangle, LayoutGrid, Tag, Sparkles, X } from 'lucide-react';
+import { useGetCustomerProfileQuery, useToggleFavoriteMutation } from '../../features/customer/customerApi';
+import { selectCurrentUser } from '../../features/auth/authSlice';
 import { useGetPublicCategoriesQuery } from '../../features/categories/categoryApi';
 import { useCart } from '../../hooks/useCart';
 import { formatCurrency } from '../../utils/formatters';
@@ -88,7 +92,7 @@ function CartControl({ product, variant }) {
         onClick={(e) => { e.stopPropagation(); addItem(cartItem); }}
         className="storefront-add"
       >
-        ADD <Plus size={15} aria-hidden="true" />
+        <ShoppingCart size={14} aria-hidden="true" /> Add to cart
       </button>
     );
   }
@@ -122,7 +126,7 @@ function CartControl({ product, variant }) {
 }
 
 /* ─── Product Card ──────────────────────────────────────── */
-const ProductCard = memo(function ProductCard({ product }) {
+const ProductCard = memo(function ProductCard({ product, priority = false, isFavorited = false, favoriteDisabled = false, onFavorite }) {
   const { storeSlug } = useParams();
   const activeVariants = useMemo(() => product.variants?.filter((v) => v.isActive) || [], [product.variants]);
   const defaultVariant = activeVariants.find((v) => v.stock > 0) ?? activeVariants[0];
@@ -135,7 +139,8 @@ const ProductCard = memo(function ProductCard({ product }) {
   const retail = selectedVariant.retailPrice;
   const offer = selectedVariant.offerPrice;
   const price = offer ?? retail;
-  const discount = offer && retail > offer ? Math.round(((retail - offer) / retail) * 100) : null;
+  const discount = retail > price ? Math.round(((retail - price) / retail) * 100) : null;
+  const saving = Math.max(0, retail - price);
   const isLowStock = selectedVariant.stock > 0 && selectedVariant.stock <= selectedVariant.lowStockLimit;
 
   return (
@@ -143,7 +148,9 @@ const ProductCard = memo(function ProductCard({ product }) {
       {/* Image — clicking goes to product detail */}
       <Link to={`/s/${storeSlug}/p/${product._id}`} aria-label={`View ${product.name}`} className="relative aspect-square bg-navy-750 overflow-hidden block">
         {mainImg ? (
-          <img src={mainImg} alt={product.name} className="w-full h-full object-cover" loading="lazy" decoding="async" width="240" height="240" />
+          // React 18 requires the lowercase HTML attribute; newer React uses fetchPriority.
+          // eslint-disable-next-line react/no-unknown-property
+          <img src={mainImg} alt={product.name} className="w-full h-full object-contain" loading={priority ? 'eager' : 'lazy'} fetchpriority={priority ? 'high' : 'auto'} decoding="async" width="240" height="240" />
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-navy-700/50">
             <ShoppingCart size={28} strokeWidth={1} className="text-navy-500" />
@@ -152,7 +159,7 @@ const ProductCard = memo(function ProductCard({ product }) {
 
         {/* Badges */}
         <div className="absolute top-2 left-2 flex flex-col gap-1">
-          {discount && (
+          {discount > 0 && (
             <span className="bg-gold-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-md leading-none">
               {discount}% OFF
             </span>
@@ -164,13 +171,7 @@ const ProductCard = memo(function ProductCard({ product }) {
           )}
         </div>
 
-        <div className="absolute top-2 right-2 flex flex-col gap-1 items-end">
-          {product.isFeatured && (
-            <span className="bg-navy-900/80 backdrop-blur-sm text-gold-400 text-[10px] font-bold px-1.5 py-0.5 rounded-md flex items-center gap-0.5 border border-gold-500/20 leading-none">
-              <Star size={8} fill="currentColor" /> Top
-            </span>
-          )}
-        </div>
+        {product.isFeatured && <span className="storefront-featured"><Star size={8} fill="currentColor" /> Top</span>}
 
         {selectedVariant.stock <= 0 && (
           <div className="absolute inset-0 bg-navy-900/70 flex items-center justify-center">
@@ -180,14 +181,18 @@ const ProductCard = memo(function ProductCard({ product }) {
           </div>
         )}
       </Link>
+      <button type="button" className="storefront-favorite" aria-label={`${isFavorited ? 'Remove' : 'Save'} ${product.name} ${isFavorited ? 'from' : 'to'} favourites`}
+        aria-pressed={isFavorited} disabled={favoriteDisabled} onClick={() => onFavorite(product._id)}>
+        <Heart size={16} fill={isFavorited ? 'currentColor' : 'none'} aria-hidden="true" />
+      </button>
 
       {/* Info */}
-      <div className="p-3 flex flex-col gap-2 flex-1">
-        <div className="flex-1 min-h-0">
+      <div className="storefront-product-body p-3 flex flex-col gap-2 flex-1">
+        <div className="storefront-product-info flex-1 min-h-0">
           <p className="storefront-product-brand">
             {product.categoryId?.emoji} {product.brand || product.categoryId?.name || ''}
           </p>
-          <Link to={`/s/${storeSlug}/p/${product._id}`} className="text-base font-semibold text-slate-200 leading-snug mt-1 line-clamp-2 break-words hover:text-gold-400 transition-colors block">
+          <Link to={`/s/${storeSlug}/p/${product._id}`} className="storefront-product-name text-base font-semibold text-slate-200 leading-snug mt-1 line-clamp-2 break-words hover:text-gold-400 transition-colors block">
             {product.name}
           </Link>
 
@@ -202,11 +207,14 @@ const ProductCard = memo(function ProductCard({ product }) {
 
         {/* Price + Add */}
         <div className="storefront-product-footer mt-auto">
-          <div className="storefront-product-price">
-            <p className="font-bold text-slate-100 leading-tight">{formatCurrency(price)}</p>
-            {discount && (
-              <p className="text-[11px] text-slate-500 line-through leading-tight">{formatCurrency(retail)}</p>
-            )}
+          <div className="storefront-product-price-row">
+            <div className="storefront-product-price">
+              <p className="font-bold text-slate-100 leading-tight">{formatCurrency(price)}</p>
+              {saving > 0 && (
+                <p className="text-[11px] text-slate-500 line-through leading-tight">{formatCurrency(retail)}</p>
+              )}
+            </div>
+            {saving > 0 && <span className="storefront-product-saving">Save {formatCurrency(saving)}</span>}
           </div>
           <CartControl product={product} variant={selectedVariant} />
         </div>
@@ -218,7 +226,7 @@ const ProductCard = memo(function ProductCard({ product }) {
 /* ─── Skeleton card ─────────────────────────────────────── */
 function SkeletonCard() {
   return (
-    <div className="bg-navy-800 rounded-2xl border border-navy-700/40 overflow-hidden animate-pulse">
+    <div className="storefront-product-skeleton bg-navy-800 rounded-2xl border border-navy-700/40 overflow-hidden animate-pulse">
       <div className="aspect-square bg-navy-700" />
       <div className="p-3 space-y-2">
         <div className="h-3 bg-navy-700 rounded w-1/3" />
@@ -236,6 +244,25 @@ function SkeletonCard() {
 /* ─── Main StoreFront ───────────────────────────────────── */
 function ProductResults({ storeSlug, filters, title, onReset, hasFilters }) {
   const { products, meta, sentinel, hasMore, fetching, initialLoading, error, retry, loadMore, offline } = useInfiniteProducts(storeSlug, filters);
+  const navigate = useNavigate();
+  const user = useSelector(selectCurrentUser);
+  const { store } = useOutletContext() || {};
+  const canFavorite = user?.role === 'customer' && (user.tenantId?._id ?? user.tenantId) === store?._id;
+  // Optional favourite metadata must never replace the catalog with a read error.
+  const { data: profile } = useGetCustomerProfileQuery(storeSlug, {
+    skip: !canFavorite, selectFromResult: ({ currentData }) => ({ data: currentData }),
+  });
+  const [toggleFavorite] = useToggleFavoriteMutation();
+  const pendingFavorites = useRef(new Set());
+  const favoriteIds = useMemo(() => new Set(profile?.data?.user?.favoriteProductIds ?? []), [profile]);
+  const onFavorite = useCallback((productId) => {
+    if (!canFavorite) { navigate(`/s/${storeSlug}/auth`); return; }
+    if (pendingFavorites.current.has(productId)) return;
+    pendingFavorites.current.add(productId);
+    void toggleFavorite({ slug: storeSlug, productId }).unwrap()
+      .catch((failure) => toast.error(failure?.data?.message || 'Could not update favourites. Try again.'))
+      .finally(() => pendingFavorites.current.delete(productId));
+  }, [canFavorite, navigate, storeSlug, toggleFavorite]);
 
   return (
     <section aria-label="Product results" aria-busy={fetching} className="storefront-results space-y-3">
@@ -256,7 +283,8 @@ function ProductResults({ storeSlug, filters, title, onReset, hasFilters }) {
           <button type="button" onClick={onReset} className="btn btn-secondary min-h-11 mt-4">Clear all filters</button></>}
       </div> : <>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-          {products.map((product) => <ProductCard key={product._id} product={product} />)}
+          {products.map((product, index) => <ProductCard key={product._id} product={product} priority={index < 4}
+            isFavorited={favoriteIds.has(product._id)} favoriteDisabled={canFavorite && !profile} onFavorite={onFavorite} />)}
         </div>
       </>}
       <div ref={sentinel} className="storefront-scroll-end" aria-label="Continue exploring products">

@@ -25,16 +25,20 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url);
   const remotePublicImage = request.destination === 'image' && url.hostname === 'ik.imagekit.io' && url.pathname.includes('/public/') && !/token|signature|authorization/i.test(url.search);
   if (request.method !== 'GET' || (url.origin !== self.location.origin && !remotePublicImage) || request.headers.has('authorization') ||
-      url.pathname.startsWith('/api/') || url.pathname.startsWith('/socket.io') ||
-      /payment|proof|backup/i.test(url.pathname)) return;
-  if (request.mode === 'navigate') {
-    event.respondWith(fetch(request).catch(async () => (await caches.open(SHELL)).match('/index.html')));
+      url.pathname.startsWith('/api/') || url.pathname.startsWith('/socket.io')) return;
+  if (request.mode === 'navigate' && new RegExp('^/(?:s|store|staff|super-admin)(?:/|$)|^/(?:login|register)?$').test(url.pathname)) {
+    // All app routes share the versioned shell, including supplier-payments.
+    // Opening a saved view must never wait on a stalled navigation request.
+    event.respondWith(caches.open(SHELL).then(async (cache) => (await cache.match('/index.html')) || fetch(request)));
     return;
   }
   if (PRECACHE.includes(url.pathname)) {
     event.respondWith(caches.open(SHELL).then(async (cache) => (await cache.match(request)) || fetch(request)));
     return;
   }
+  // Public build chunks may be named SupplierPaymentsPage or BackupPage.
+  // Exclude private uploads only after checking the explicit shell allowlist.
+  if (/payment|proof|backup/i.test(url.pathname)) return;
   // Cache only public product uploads actually viewed, never authenticated responses.
   if (request.destination === 'image' && (url.pathname.startsWith('/uploads/public/') || remotePublicImage)) {
     event.respondWith((async () => {

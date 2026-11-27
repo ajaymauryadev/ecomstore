@@ -226,6 +226,7 @@ export default function AccountPage() {
               const variant = product.variants?.filter((v) => v.isActive)?.[0];
               if (!variant) return null;
               const price = variant.offerPrice ?? variant.retailPrice;
+              const image = product.mainImage || product.images?.find((entry) => entry.isMain)?.url || product.images?.[0]?.url;
               return (
                 <Link
                   key={product._id}
@@ -233,8 +234,8 @@ export default function AccountPage() {
                   className="bg-navy-800 rounded-xl border border-navy-700/60 overflow-hidden hover:border-navy-600 transition-all"
                 >
                   <div className="aspect-square bg-navy-750">
-                    {product.mainImage ? (
-                      <img src={imgSrc(product.mainImage)} alt="" className="w-full h-full object-cover" />
+                    {image ? (
+                      <img src={imgSrc(image)} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center bg-navy-700">
                         <Heart size={20} className="text-navy-500" />

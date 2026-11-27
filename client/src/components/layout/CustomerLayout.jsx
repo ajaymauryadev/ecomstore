@@ -1,5 +1,5 @@
 import { useNavigationPrefetch } from '../../hooks/useNavigationPrefetch';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { Outlet, useParams, Link, useNavigate, useLocation, useMatch, Navigate } from 'react-router-dom';
 import RouteContent from './RouteContent';
 import MobileNavigation from './MobileNavigation';
@@ -24,6 +24,7 @@ import Button from '../ui/Button';
 import Modal from '../ui/Modal';
 import StoreSearch from '../products/StoreSearch';
 import { CustomerConnectionStatus } from '../../offline/SavedDataStatus';
+import { useStorefrontWarmup } from '../../app/storefrontWarmup';
 
 const API_BASE = import.meta.env.VITE_API_URL?.replace('/api/v1', '') || '';
 function imgSrc(url) {
@@ -147,6 +148,11 @@ export default function CustomerLayout() {
   const { storeSlug } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const scrollRoot = useRef(null);
+  useLayoutEffect(() => {
+    // Catalog views restore their own saved position before paint.
+    if (!/^\/s\/[^/]+(?:\/(?:search|categories))?$/.test(location.pathname)) scrollRoot.current?.scrollTo({ top: 0, behavior: 'instant' });
+  }, [location.pathname]);
   const dispatch = useDispatch();
   const user = useSelector(selectCurrentUser);
   const sessionInitialized = useSelector((state) => state.auth.isInitialized);
@@ -155,6 +161,7 @@ export default function CustomerLayout() {
 
   const { currentData: storeData, isFetching: isStoreFetching, isError: isStoreError, error: storeError, refetch: refetchStore } = useGetStorefrontInfoQuery(storeSlug, { skip: !storeSlug });
   const store = storeData?.data?.store;
+  useStorefrontWarmup(storeSlug, Boolean(store));
   const isAuth = useMatch('/s/:storeSlug/auth');
   const isCheckout = useMatch('/s/:storeSlug/checkout');
   const isCart = useMatch('/s/:storeSlug/cart');
@@ -314,7 +321,7 @@ export default function CustomerLayout() {
         )}
 
         {/* Page content */}
-        <div key={location.pathname} className="customer-scroll min-h-0 flex-1 overflow-y-auto overscroll-y-contain">
+        <div ref={scrollRoot} className="customer-scroll min-h-0 flex-1 overflow-y-auto overscroll-y-contain">
           <main id="shop-content" tabIndex={-1} className="page-width customer-main py-5 sm:py-8">
             {!cartReady && status === 'error' && <div role="status" className="mb-4 text-sm text-slate-400">
                 Cart could not be checked. Your saved draft is retained.
