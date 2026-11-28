@@ -14,10 +14,30 @@ const movementSchema = new mongoose.Schema({
   supplierPayments: Number,
   refunds: Number,
   expenses: Number,
+  salaries: Number,
+  otherReceived: Number,
+  otherPaid: Number,
   inflow: Number,
   outflow: Number,
   net: Number,
 }, { _id: false });
+
+export const MANUAL_MOVEMENT_TYPES = {
+  owner_addition: 'in', owner_withdrawal: 'out', external_sale: 'in',
+  external_upi: 'in', bank_deposit: 'out', bank_withdrawal: 'in',
+  other_receipt: 'in', other_payment: 'out',
+};
+
+const manualMovementSchema = new mongoose.Schema({
+  operationId: String,
+  type: { type: String, enum: Object.keys(MANUAL_MOVEMENT_TYPES), required: true },
+  method: { type: String, enum: ['cash', 'upi', 'bank_transfer'], required: true },
+  amount: { type: Number, required: true },
+  party: String,
+  description: String,
+  recordedByName: String,
+  recordedAt: Date,
+});
 
 const snapshotFields = {
   cashSales: { type: Number, default: 0 },
@@ -37,13 +57,13 @@ const snapshotFields = {
   },
 
   // Physical cash counts and legacy notes on manually entered expenses
-  openingCash: { type: Number, default: 0 },
-  closingCash: { type: Number, default: 0 },
+  openingCash: Number,
+  closingCash: Number,
   expenses: [expenseSchema],
   totalExpenses: { type: Number, default: 0 },
 
-  expectedClosingCash: { type: Number, default: 0 },
-  cashDifference: { type: Number, default: 0 },
+  expectedClosingCash: Number,
+  cashDifference: Number,
   notes: { type: String, trim: true },
 };
 
@@ -68,6 +88,7 @@ const dailyClosingSchema = new mongoose.Schema({
   version: { type: Number, default: 0 },
   finalizedFromVersion: Number,
   corrections: [correctionSchema],
+  manualMovements: [manualMovementSchema],
   ...snapshotFields,
 }, { timestamps: true });
 

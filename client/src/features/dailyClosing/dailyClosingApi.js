@@ -3,6 +3,7 @@ import { baseApi } from '../../api/baseApi';
 const closingTags = (_result, error, { date, id }) => error ? [] : [
   { type: 'DailyClosing', id: 'LIST' },
   { type: 'DailyClosing', id: `summary-${date}` },
+  { type: 'DailyClosing', id: `transactions-${date}` },
   ...(id ? [{ type: 'DailyClosing', id }] : []),
 ];
 
@@ -12,6 +13,10 @@ export const dailyClosingApi = baseApi.injectEndpoints({
       query: (params) => ({ url: '/daily-closing/summary', params }),
       providesTags: (r, e, { date }) => [{ type: 'DailyClosing', id: `summary-${date}` }],
     }),
+    getDailyTransactions: builder.query({
+      query: (params) => ({ url: '/daily-closing/transactions', params }),
+      providesTags: (r, e, { date }) => [{ type: 'DailyClosing', id: `transactions-${date}` }],
+    }),
 
     saveDailyClosing: builder.mutation({
       query: (body) => ({ url: '/daily-closing', method: 'POST', body }),
@@ -19,7 +24,7 @@ export const dailyClosingApi = baseApi.injectEndpoints({
     }),
 
     finalizeDailyClosing: builder.mutation({
-      query: ({ id, version }) => ({ url: `/daily-closing/${id}/finalize`, method: 'POST', body: { version } }),
+      query: ({ id, version, reviewKey }) => ({ url: `/daily-closing/${id}/finalize`, method: 'POST', body: { version, reviewKey } }),
       invalidatesTags: closingTags,
     }),
 
@@ -42,6 +47,7 @@ export const dailyClosingApi = baseApi.injectEndpoints({
 
 export const {
   useGetDailySummaryQuery,
+  useGetDailyTransactionsQuery,
   useSaveDailyClosingMutation,
   useFinalizeDailyClosingMutation,
   useCorrectDailyClosingMutation,

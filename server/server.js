@@ -5,6 +5,7 @@ import { app } from './src/app.js';
 import Order from './src/models/Order.js';
 import Notification from './src/models/Notification.js';
 import SyncRevision from './src/models/SyncRevision.js';
+import Expense from './src/models/Expense.js';
 import { connectDB } from './src/config/db.js';
 import { initSocket } from './src/config/socket.js';
 import { logger } from './src/config/logger.js';
@@ -20,7 +21,7 @@ const io = initSocket(server);
 const start = async () => {
   await connectDB();
   await assertRestoreReady(mongoose.connection.db, UPLOADS_ROOT);
-  await Promise.all([Order.init(), Notification.init(), SyncRevision.init()]);
+  await Promise.all([Order.init(), Notification.init(), SyncRevision.init(), Expense.init()]);
   startUploadCleanupScheduler();
   server.listen(env.PORT, () => {
     logger.info(`Server running on port ${env.PORT} in ${env.NODE_ENV} mode`);

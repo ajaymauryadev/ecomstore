@@ -23,12 +23,14 @@ const expenseRules = [
   body('amount').optional().isFloat({ gt: 0 }),
   body('method').optional().isIn(ACCOUNT_PAYMENT_METHODS),
   body('description').optional().isString().isLength({ max: 500 }),
+  body('name').optional().isString().isLength({ max: 120 }),
+  body('paidTo').optional().isString().isLength({ max: 120 }),
   body('date').optional().isISO8601(),
   body('receiptUrl').optional({ nullable: true }).isString().isLength({ max: 500 }),
   validate,
 ];
 router.post('/', requirePermission(PERMISSIONS.ACCOUNTING_MANAGE), [
-  body('category').exists(), body('amount').exists(), ...expenseRules,
+  body('category').exists(), body('amount').exists(), body('operationId').optional().isUUID(), ...expenseRules,
 ], createExpense);
 router.put('/:id', requirePermission(PERMISSIONS.ACCOUNTING_MANAGE), expenseRules, updateExpense);
 router.delete('/:id', requirePermission(PERMISSIONS.ACCOUNTING_MANAGE), deleteExpense);

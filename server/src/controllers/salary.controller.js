@@ -80,19 +80,28 @@ export const upsertSalaryRecord = asyncHandler(async (req, res, next) => {
 });
 
 export const recordPayment = asyncHandler(async (req, res, next) => {
-  const { amount, type = 'salary', method = 'cash', note } = req.body;
+  const { amount, type = 'salary', method = 'cash', note, operationId } = req.body;
   if (!['advance', 'salary', 'bonus'].includes(type) || !['cash', 'upi', 'bank_transfer'].includes(method)) {
     return next(new AppError('Invalid salary payment type or method.', 400));
   }
   const payment = fromMinorUnits(toMinorUnits(amount, 'payment amount', { allowZero: false }));
-  const record = await runInTransaction(async (session) => {
+  const memo = String(note || '').trim().slice(0, 300);
+  const { record, replayed } = await runInTransaction(async (session) => {
     const current = await StaffSalary.findOne({ _id: req.params.id, tenantId: req.tenantId }).session(session);
     if (!current) throw new AppError('Salary record not found.', 404);
+    const existing = operationId && current.payments.find((entry) => entry.operationId === operationId);
+    if (existing) {
+      if (existing.amount !== payment || existing.type !== type || existing.method !== method || existing.note !== memo) {
+        throw new AppError('This request ID already belongs to another salary payment.', 409);
+      }
+      return { record: current, replayed: true };
+    }
     current.payments.push({
       amount: payment,
       type,
       method,
-      note: String(note || '').trim().slice(0, 300),
+      note: memo,
+      operationId,
       paidAt: new Date(),
       paidBy: req.user._id,
       paidByName: req.user.name,
@@ -107,8 +116,12 @@ export const recordPayment = asyncHandler(async (req, res, next) => {
     );
     current.status = computeStatus(current);
     await current.save({ session });
-    return current;
+    return { record: current };
   });
+  if (replayed) {
+    req.skipSavedDataChange = true;
+    return sendSuccess(res, { record });
+  }
   await logAudit({
     tenantId: req.tenantId,
     action: 'salary_paid',

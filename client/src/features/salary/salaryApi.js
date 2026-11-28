@@ -24,10 +24,11 @@ export const salaryApi = baseApi.injectEndpoints({
     }),
     recordSalaryPayment: builder.mutation({
       query: ({ id, ...body }) => ({ url: `/salary/${id}/payment`, method: 'POST', body }),
-      invalidatesTags: (r, e, { id }) => [
+      invalidatesTags: (r, e, { id }) => e ? [] : [
         { type: 'Salary', id: 'LIST' },
         { type: 'Salary', id: 'STATS' },
         { type: 'Salary', id },
+        'DailyClosing',
       ],
     }),
   }),

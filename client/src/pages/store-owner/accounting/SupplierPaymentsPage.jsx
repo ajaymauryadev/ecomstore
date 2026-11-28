@@ -1,7 +1,7 @@
 import { usePagination, useClientPagination } from '../../../hooks/usePagination';
 import Pagination from '../../../components/ui/Pagination';
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import RecordSupplierPaymentDialog from '../../../components/purchases/RecordSupplierPaymentDialog';
 import SupplierReconciliationDialog from '../../../components/purchases/SupplierReconciliationDialog';
 import Button from '../../../components/ui/Button';
@@ -9,6 +9,7 @@ import { ROUTES } from '../../../constants/routes';
 import { Truck, X, DollarSign, CheckCircle2, AlertCircle } from 'lucide-react';
 import {
   useGetSuppliersQuery,
+  useGetSupplierQuery,
   useRecordSupplierPaymentMutation,
 } from '../../../features/suppliers/supplierApi';
 import { cn } from '../../../utils/cn';
@@ -23,7 +24,9 @@ function fmtDate(d) {
 }
 
 export default function SupplierPaymentsPage() {
-  const [selectedSupplierId, setSelectedSupplierId] = useState(null);
+  const [params] = useSearchParams();
+  const linkedSupplier = /^[a-f\d]{24}$/i.test(params.get('supplierId') ?? '') ? params.get('supplierId') : null;
+  const [selectedSupplierId, setSelectedSupplierId] = useState(linkedSupplier);
   const [showPayModal, setShowPayModal] = useState(false);
   const [showReconciliation, setShowReconciliation] = useState(false);
 
@@ -32,7 +35,9 @@ export default function SupplierPaymentsPage() {
   const [recordPayment, { isLoading: paying }] = useRecordSupplierPaymentMutation();
 
   const suppliers = listData?.data?.suppliers ?? [];
-  const selectedSupplier = suppliers.find((supplier) => supplier._id === selectedSupplierId);
+  const listedSupplier = suppliers.find((supplier) => supplier._id === selectedSupplierId);
+  const { data: supplierData } = useGetSupplierQuery(selectedSupplierId, { skip: !selectedSupplierId || Boolean(listedSupplier) });
+  const selectedSupplier = listedSupplier ?? supplierData?.data?.supplier;
   const totalDue = listData?.data?.summary?.totalDue ?? 0;
   const historyPaging = useClientPagination([...(selectedSupplier?.paymentHistory || [])].reverse(), selectedSupplierId);
   const suppliersWithDue = suppliers.filter((s) => (s.pendingAmount ?? 0) > 0);

@@ -8,6 +8,7 @@ const paymentSchema = new mongoose.Schema({
   paidAt: { type: Date, default: Date.now },
   paidBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   paidByName: { type: String },
+  operationId: String,
 }, { _id: true });
 
 const staffSalarySchema = new mongoose.Schema({
@@ -33,6 +34,7 @@ staffSalarySchema.virtual('dueAmount').get(function () {
 });
 
 staffSalarySchema.index({ tenantId: 1, monthYear: -1 });
+staffSalarySchema.index({ tenantId: 1, 'payments.paidAt': 1 });
 staffSalarySchema.index({ tenantId: 1, staffId: 1, monthYear: -1 });
 staffSalarySchema.index({ tenantId: 1, staffId: 1, monthYear: 1 }, { unique: true });
 

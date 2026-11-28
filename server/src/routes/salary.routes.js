@@ -25,6 +25,7 @@ router.post('/', requirePermission(PERMISSIONS.SALARY_MANAGE), [
   validate,
 ], upsertSalaryRecord);
 router.post('/:id/payment', requirePermission(PERMISSIONS.SALARY_MANAGE), [
+  body('operationId').optional().isUUID(),
   body('amount').isFloat({ gt: 0 }),
   body('type').optional().isIn(['advance', 'salary', 'bonus']),
   body('method').optional().isIn(['cash', 'upi', 'bank_transfer']),

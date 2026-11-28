@@ -5,7 +5,7 @@ export const AUDIT_ACTIONS = [
   'stock_adjusted', 'purchase_added',
   'order_created', 'order_packed', 'order_delivered', 'order_cancelled',
   'payment_verified', 'payment_rejected',
-  'salary_paid', 'expense_added',
+  'salary_paid', 'expense_added', 'expense_updated', 'expense_archived',
   'daily_closing_corrected',
   'return_created', 'return_processed',
   'pos_bill_created',

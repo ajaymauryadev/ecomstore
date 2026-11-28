@@ -2,13 +2,13 @@ import { useSavedViewState } from '../../../offline/useSavedViewState';
 import { usePagination } from '../../../hooks/usePagination';
 import Pagination from '../../../components/ui/Pagination';
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { useDebouncedValue } from '../../../hooks/useDebouncedValue';
+import { hasPermission, PERMISSIONS } from '../../../constants/permissions';
 import {
-  Receipt, Plus, Trash2, Pencil, TrendingDown,
+  Receipt, Plus, Trash2, Pencil,
   Home, Zap, Truck, Package, Users, AlertTriangle, Wrench, Megaphone, MoreHorizontal,
 } from 'lucide-react';
-import {
-  PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
-} from 'recharts';
 import {
   useGetExpensesQuery,
   useGetExpenseStatsQuery,
@@ -36,34 +36,45 @@ const CATEGORIES = [
 const catMap = Object.fromEntries(CATEGORIES.map((c) => [c.value, c]));
 
 function fmt(n) {
-  return `₹${(n ?? 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
+  return `₹${(n ?? 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
 }
 
 function fmtDate(d, timeZone) {
-  return new Date(d).toLocaleDateString('en-IN', { timeZone, day: 'numeric', month: 'short' });
+  return new Date(d).toLocaleString('en-IN', { timeZone, day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
 }
 
 const emptyForm = (timeZone) => ({
-  category: 'rent', amount: '', method: 'cash', description: '', date: accountingDate(undefined, timeZone), receiptUrl: '',
+  category: 'rent', name: '', paidTo: '', amount: '', method: 'cash', description: '', date: accountingDate(undefined, timeZone), receiptUrl: '',
 });
 
 export default function ExpensesPage() {
-  const { store } = useAuth();
+  const { store, user } = useAuth();
+  const canManage = hasPermission(user, PERMISSIONS.ACCOUNTING_MANAGE);
+  const [route, setRoute] = useSearchParams();
+  const routeDate = route.get('date');
   const timeZone = resolveStoreTimeZone(store?.settings?.timezone);
   const today = accountingDate(undefined, timeZone);
   const firstOfMonth = today.slice(0, 8) + '01';
 
-  const [startDate, setStartDate] = useSavedViewState('ExpensesPage:ExpensesPage:startDate', firstOfMonth);
-  const [endDate, setEndDate] = useSavedViewState('ExpensesPage:ExpensesPage:endDate', today);
+  const [customStart, setStartDate] = useSavedViewState('expenses-start-custom', '');
+  const startDate = routeDate || customStart || firstOfMonth;
+  const [customEnd, setEndDate] = useSavedViewState('expenses-end-custom', '');
+  const endDate = routeDate || customEnd || today;
   const [filterCat, setFilterCat] = useSavedViewState('ExpensesPage:ExpensesPage:filterCat', '');
-  const [showModal, setShowModal] = useState(false);
+  const [search, setSearch] = useState('');
+  const [method, setMethod] = useState('');
+  const settledSearch = useDebouncedValue(search.trim(), 300);
+  const [showModal, setShowModal] = useState(() => canManage && route.get('new') === '1');
   const [editingExpense, setEditingExpense] = useState(null);
-  const [form, setForm] = useState(() => emptyForm(timeZone));
+  const [form, setForm] = useState(() => ({ ...emptyForm(timeZone), date: routeDate || today, operationId: crypto.randomUUID() }));
 
-  const paging = usePagination(`${startDate}:${endDate}:${filterCat}`, 'compact');
-  const params = { page: paging.page, limit: paging.limit, startDate, endDate, category: filterCat || undefined };
-  const { data: listData, isLoading, isFetching } = useGetExpensesQuery(params);
-  const { data: statsData } = useGetExpenseStatsQuery({ startDate, endDate });
+  const expenseId = route.get('expense') || undefined;
+  const paging = usePagination(`${startDate}:${endDate}:${filterCat}:${method}:${settledSearch}:${expenseId ?? ''}`, 'compact');
+  const filters = { startDate, endDate, category: expenseId ? undefined : filterCat || undefined,
+    method: expenseId ? undefined : method || undefined, search: expenseId ? undefined : settledSearch || undefined, expense: expenseId };
+  const params = { ...filters, page: paging.page, limit: paging.limit };
+  const { data: listData, isLoading, isFetching, isError, refetch } = useGetExpensesQuery(params);
+  const { data: statsData } = useGetExpenseStatsQuery(filters);
 
   const [createExpense, { isLoading: creating }] = useCreateExpenseMutation();
   const [updateExpense, { isLoading: updating }] = useUpdateExpenseMutation();
@@ -71,17 +82,9 @@ export default function ExpensesPage() {
 
   const expenses = listData?.data ?? [];
   const stats = statsData?.data ?? {};
-  const byCategory = stats.byCategory ?? [];
-
-  const pieData = byCategory.map((b) => ({
-    name: catMap[b._id]?.label ?? b._id,
-    value: b.total,
-    color: catMap[b._id]?.color ?? '#94a3b8',
-  }));
-
   const openCreate = () => {
     setEditingExpense(null);
-    setForm(emptyForm(timeZone));
+    setForm({ ...emptyForm(timeZone), date: routeDate || today, operationId: crypto.randomUUID() });
     setShowModal(true);
   };
 
@@ -89,6 +92,8 @@ export default function ExpensesPage() {
     setEditingExpense(exp);
     setForm({
       category: exp.category,
+      name: exp.name ?? '',
+      paidTo: exp.paidTo ?? '',
       amount: exp.amount.toString(),
       method: exp.method ?? '',
       description: exp.description || '',
@@ -103,6 +108,7 @@ export default function ExpensesPage() {
     try {
       const payload = { ...form, amount: Number(form.amount), method: form.method || undefined };
       if (editingExpense) {
+        if (payload.date === accountingDate(editingExpense.date, timeZone)) delete payload.date;
         await updateExpense({ id: editingExpense._id, ...payload }).unwrap();
         toast.success('Expense updated');
       } else {
@@ -116,10 +122,10 @@ export default function ExpensesPage() {
   };
 
   const handleDelete = async (id) => {
-    if (!confirm('Delete this expense?')) return;
+    if (!confirm('Archive this expense?')) return;
     try {
       await deleteExpense(id).unwrap();
-      toast.success('Deleted');
+      toast.success('Expense archived');
     } catch {
       toast.error('Failed to delete');
     }
@@ -133,22 +139,23 @@ export default function ExpensesPage() {
           <h1 className="text-2xl font-bold text-slate-100">Expenses</h1>
           <p className="text-sm text-slate-500 mt-1">Track all business expenses</p>
         </div>
-        <button onClick={openCreate} className="btn-primary flex items-center gap-2">
+        {canManage && <button onClick={openCreate} className="btn-primary flex items-center gap-2">
           <Plus size={18} /> Add Expense
-        </button>
+        </button>}
       </div>
 
       {/* Date filters */}
       <div className="flex flex-wrap gap-3 items-center">
         <div className="flex items-center gap-2 bg-navy-800 border border-navy-700/40 rounded-xl px-3 py-2">
           <span className="text-xs text-slate-500">From</span>
-          <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="bg-transparent text-sm text-slate-200 outline-none" />
+          <input aria-label="From date" type="date" value={startDate} onChange={(e) => { setRoute({}); setStartDate(e.target.value); }} className="bg-transparent text-sm text-slate-200 outline-none" />
         </div>
         <div className="flex items-center gap-2 bg-navy-800 border border-navy-700/40 rounded-xl px-3 py-2">
           <span className="text-xs text-slate-500">To</span>
-          <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="bg-transparent text-sm text-slate-200 outline-none" />
+          <input aria-label="To date" type="date" value={endDate} onChange={(e) => { setRoute({}); setEndDate(e.target.value); }} className="bg-transparent text-sm text-slate-200 outline-none" />
         </div>
         <select
+          aria-label="Expense category"
           value={filterCat}
           onChange={(e) => setFilterCat(e.target.value)}
           className="input py-2"
@@ -158,56 +165,35 @@ export default function ExpensesPage() {
         </select>
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-6">
-        {/* Left: stats + pie */}
-        <div className="space-y-4">
-          <div className="bg-navy-800 border border-navy-700/60 rounded-xl p-5">
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-xs text-slate-500 uppercase tracking-wide">Total Expenses</p>
-              <TrendingDown size={16} className="text-red-400" />
-            </div>
-            <p className="text-3xl font-bold text-red-400">{fmt(stats.total)}</p>
-            <p className="text-xs text-slate-500 mt-1">{stats.count ?? 0} transactions</p>
-          </div>
-
-          {pieData.length > 0 && (
-            <div className="bg-navy-800 border border-navy-700/60 rounded-xl p-4">
-              <p className="text-xs text-slate-500 uppercase tracking-wide mb-3">By Category</p>
-              <ResponsiveContainer width="100%" height={200}>
-                <PieChart>
-                  <Pie isAnimationActive={false} data={pieData} cx="50%" cy="50%" innerRadius={55} outerRadius={80} paddingAngle={3} dataKey="value">
-                    {pieData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
-                  </Pie>
-                  <Tooltip formatter={(v) => fmt(v)} contentStyle={{ background: '#0f2740', border: '1px solid #1e3a5f', borderRadius: 8 }} labelStyle={{ color: '#94a3b8' }} itemStyle={{ color: '#f1f5f9' }} />
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="space-y-2 mt-2">
-                {byCategory.map((b) => {
-                  const cat = catMap[b._id];
-                  return (
-                    <div key={b._id} className="flex items-center justify-between text-sm">
-                      <div className="flex items-center gap-2">
-                        <div className="w-2.5 h-2.5 rounded-full" style={{ background: cat?.color ?? '#94a3b8' }} />
-                        <span className="text-slate-400">{cat?.label ?? b._id}</span>
-                      </div>
-                      <span className="font-medium text-slate-200">{fmt(b.total)}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Right: expense list */}
-        <div className="lg:col-span-2">
+      <div className="flex flex-wrap gap-2">
+        <input className="input min-w-0" type="search" aria-label="Search expenses" placeholder="Search expenses" value={search} onChange={(e) => setSearch(e.target.value)} />
+        <select className="input" aria-label="Filter payment method" value={method} onChange={(e) => setMethod(e.target.value)}>
+          <option value="">All payment methods</option>
+          {Object.entries(PAYMENT_METHOD_LABELS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+          <option value="unrecorded">Method unrecorded</option>
+        </select>
+        <button type="button" className="btn-secondary" onClick={() => { setRoute({}); setStartDate(''); setEndDate(''); setFilterCat(''); setMethod(''); setSearch(''); }}>This month</button>
+      </div>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {[['Total Expenses', stats.total], ['Cash Expenses', stats.cash], ['Online / Bank', stats.online], ['Transactions', stats.count]].map(([label, value]) => (
+          <div key={label} className="card p-4"><p className="text-sm text-slate-500">{label}</p>
+            <strong className="text-lg">{value == null ? '—' : label === 'Transactions' ? value : fmt(value)}</strong></div>
+        ))}
+      </div>
+      <section aria-label="Expense Records">
           <div className="bg-navy-800 border border-navy-700/60 rounded-xl overflow-hidden">
             <div className="px-4 py-3 border-b border-navy-700/40">
-              <p className="text-sm font-semibold text-slate-300">Expense List</p>
+              <p className="text-sm font-semibold text-slate-300">Expense Records</p>
             </div>
+            {isError && <div className="p-4" role="status">
+              {listData && <p className="mb-2 text-sm text-slate-500">Showing saved expenses.</p>}
+              <button className="btn-secondary" onClick={refetch}>Retry expense download</button>
+            </div>}
             {isLoading ? (
-              <div className="p-8 text-center text-slate-500 text-sm">Loading...</div>
-            ) : expenses.length === 0 ? (
+              <div className="space-y-4 p-4" role="status" aria-label="Loading expenses">
+                {[0, 1, 2].map((row) => <div key={row} className="h-12 rounded-lg bg-navy-700/40" />)}
+              </div>
+            ) : isError && !listData ? null : expenses.length === 0 ? (
               <div className="p-12 text-center">
                 <Receipt size={40} className="mx-auto text-slate-600 mb-2" />
                 <p className="text-slate-500 text-sm">No expenses in this period</p>
@@ -224,33 +210,37 @@ export default function ExpensesPage() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-slate-200 truncate">
-                          {exp.description || cat?.label || exp.category}
+                          {exp.name || exp.description || cat?.label || exp.category}
                         </p>
                         <p className="text-xs text-slate-500">
                           {cat?.label} · {fmtDate(exp.date, timeZone)} · {PAYMENT_METHOD_LABELS[exp.method] ?? 'Method unrecorded'}
                         </p>
+                        {exp.paidTo && <p className="text-sm">Paid to {exp.paidTo}</p>}
+                        {exp.name && exp.description && <p className="text-sm">{exp.description}</p>}
+                        {exp.recordedByName && <p className="text-xs text-slate-500">Recorded by {exp.recordedByName}</p>}
                       </div>
                       <p className="text-sm font-bold text-red-400 shrink-0">{fmt(exp.amount)}</p>
-                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                        <button onClick={() => openEdit(exp)} className="p-1.5 hover:bg-navy-600 rounded-lg text-slate-400 hover:text-gold-400 transition-colors">
+                      {canManage && <div className="flex gap-1 shrink-0">
+                        <button aria-label="Edit expense" onClick={() => openEdit(exp)} className="p-1.5 hover:bg-navy-600 rounded-lg text-slate-400 hover:text-gold-400 transition-colors">
                           <Pencil size={14} />
                         </button>
-                        <button onClick={() => handleDelete(exp._id)} className="p-1.5 hover:bg-red-500/10 rounded-lg text-slate-400 hover:text-red-400 transition-colors">
+                        <button aria-label="Archive expense" onClick={() => handleDelete(exp._id)} className="p-1.5 hover:bg-red-500/10 rounded-lg text-slate-400 hover:text-red-400 transition-colors">
                           <Trash2 size={14} />
                         </button>
-                      </div>
+                      </div>}
                     </div>
                   );
                 })}
               </div>
             )}
           </div>
-        </div>
-      </div>
+      </section>
 
       <Pagination meta={listData?.meta} page={paging.page} onPageChange={paging.setPage} isFetching={isFetching} label="expenses" />
       <Modal isOpen={showModal} onClose={() => setShowModal(false)} title={editingExpense ? 'Edit Expense' : 'Add Expense'} size="md">
             <div className="space-y-4">
+              <label className="block text-sm">Expense name<input className="input block w-full" maxLength={120} value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} /></label>
+              <label className="block text-sm">Paid to<input className="input block w-full" maxLength={120} value={form.paidTo} onChange={(e) => setForm((p) => ({ ...p, paidTo: e.target.value }))} /></label>
               <div>
                 <label htmlFor="expense-category" className="label">Category *</label>
                 <select id="expense-category" name="category" className="input w-full" value={form.category} onChange={(e) => setForm((p) => ({ ...p, category: e.target.value }))}>

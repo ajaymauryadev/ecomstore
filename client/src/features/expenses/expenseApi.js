@@ -1,5 +1,7 @@
 import { baseApi } from '../../api/baseApi';
 
+const expenseChanges = (_result, error) => error ? [] : ['Expense', 'DailyClosing'];
+
 export const expenseApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
     getExpenses: builder.query({
@@ -12,15 +14,15 @@ export const expenseApi = baseApi.injectEndpoints({
     }),
     createExpense: builder.mutation({
       query: (body) => ({ url: '/expenses', method: 'POST', body }),
-      invalidatesTags: [{ type: 'Expense', id: 'LIST' }, { type: 'Expense', id: 'STATS' }],
+      invalidatesTags: expenseChanges,
     }),
     updateExpense: builder.mutation({
       query: ({ id, ...body }) => ({ url: `/expenses/${id}`, method: 'PUT', body }),
-      invalidatesTags: [{ type: 'Expense', id: 'LIST' }, { type: 'Expense', id: 'STATS' }],
+      invalidatesTags: expenseChanges,
     }),
     deleteExpense: builder.mutation({
       query: (id) => ({ url: `/expenses/${id}`, method: 'DELETE' }),
-      invalidatesTags: [{ type: 'Expense', id: 'LIST' }, { type: 'Expense', id: 'STATS' }],
+      invalidatesTags: expenseChanges,
     }),
   }),
 });

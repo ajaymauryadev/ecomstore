@@ -2867,6 +2867,62 @@ describe('daily closing cash movements', () => {
 });
 
 describe('daily closing finalization and corrections', () => {
+  test('suggests opening cash from the last finalized count and intervening cash only', async () => {
+    const headers = auth(tokens.ownerA);
+    const endpoint = '/api/v1/daily-closing';
+    const requestClosing = (body) => request(app).post(endpoint).set(headers).send(body);
+    await requestClosing({ date: '2025-01-01', openingCash: 100, closingCash: 100 }).expect(200);
+    await requestClosing({ date: '2025-01-02', status: 'draft', movement: {
+      operationId: randomUUID(), type: 'owner_addition', amount: 50, method: 'cash', description: 'Owner float',
+    } }).expect(200);
+    await request(app).post('/api/v1/expenses').set(headers).send({ category: 'rent', date: '2025-01-02', amount: 40, method: 'upi' }).expect(201);
+    const next = await request(app).get(endpoint + '/summary').set(headers).query({ date: '2025-01-03' }).expect(200);
+    expect(next.body.data).toMatchObject({ suggestedOpeningCash: 150, closing: null });
+  });
+
+  test('counts only recorded salary payments and cash transfer legs, preserves incomplete drafts, and rejects stale reviews', async () => {
+    const date = accountingDay().businessDate;
+    const api = '/api/v1';
+    const headers = auth(tokens.ownerA);
+    const save = (body) => request(app).post(api + '/daily-closing').set(headers).send({ date, status: 'draft', ...body });
+    const summary = () => request(app).get(api + '/daily-closing/summary').set(headers).query({ date });
+    const salary = await mongoose.model('StaffSalary').create({ tenantId: ids.storeA, staffId: ids.staff, staffName: 'Counter Staff', monthYear: date.slice(0, 7), monthlySalary: 1000 });
+    const salaryPayment = { amount: 25.25, method: 'cash', operationId: randomUUID() };
+    const pay = () => request(app).post(api + '/salary/' + salary._id + '/payment').set(headers).send(salaryPayment);
+    await pay().expect(200);
+    await pay().expect(200);
+    const draft = (await save({ openingCash: null, closingCash: null }).expect(200)).body.data.closing;
+    expect(draft).toMatchObject({ openingCash: null, closingCash: null, cashDifference: null });
+    const finish = (version, reviewKey) => request(app).post(api + '/daily-closing/' + draft._id + '/finalize').set(headers).send({ version, reviewKey });
+    await finish(draft.version).expect(400);
+    const negative = (await save({ openingCash: 0, closingCash: 0, version: draft.version }).expect(200)).body.data.closing;
+    expect(negative).toMatchObject({ expectedClosingCash: -25.25, cashDifference: null });
+    await finish(negative.version).expect(400);
+    const move = { operationId: randomUUID(), type: 'bank_withdrawal', method: 'cash', amount: 50.25, description: 'Cash from bank' };
+    const next = (await save({ version: negative.version, closingCash: 25, movement: move }).expect(200)).body.data.closing;
+    await save({ version: negative.version, closingCash: 25, movement: move }).expect(200);
+    const before = (await summary().expect(200)).body.data;
+    expect(before).toMatchObject({ totalSales: 0, movements: { cash: { salaries: 25.25, otherReceived: 50.25, net: 25 }, bank: { otherPaid: 50.25 } } });
+    const expense = { category: 'transport', name: 'Delivery trip', paidTo: 'Driver', date, amount: 5, method: 'cash', operationId: randomUUID() };
+    await mongoose.model('Expense').init();
+    const recordExpense = () => request(app).post(api + '/expenses').set(headers).send(expense);
+    await recordExpense().expect(201);
+    await recordExpense().expect(200);
+    const stats = await request(app).get(api + '/expenses/stats').set(headers).query({ startDate: date, endDate: date, search: 'Driver', method: 'cash' }).expect(200);
+    expect(stats.body.data).toMatchObject({ total: 5, cash: 5, count: 1 });
+    const details = await request(app).get(api + '/daily-closing/transactions').set(headers).query({ date, kind: 'paid', channel: 'cash' }).expect(200);
+    expect(details.body.data).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: 'salaries', amount: 25.25, party: 'Counter Staff' }),
+      expect.objectContaining({ type: 'expenses', amount: 5, party: 'Driver' }),
+    ]));
+    await finish(next.version, before.reviewKey).expect(409);
+    const after = (await summary().expect(200)).body.data;
+    await finish(next.version, after.reviewKey).expect(400);
+    const counted = (await save({ version: next.version, notes: '₹5 extra verified after recount' }).expect(200)).body.data.closing;
+    const finalized = (await finish(counted.version, after.reviewKey).expect(200)).body.data.closing;
+    expect(finalized).toMatchObject({ expectedClosingCash: 20, cashDifference: 5, status: 'closed' });
+  });
+
   const date = '2025-04-02';
   const owner = (method, suffix = '', token = tokens.ownerA) =>
     request(app)[method](`/api/v1/daily-closing${suffix}`).set(auth(token));
@@ -3055,7 +3111,7 @@ describe('store business dates', () => {
     expect(day.hours[23].sales).toBe(30);
     const outflow = await owner('post', '/expenses').send({ category: 'rent', amount: 5, method: 'cash', date });
     expect(outflow.body.data.expense.date).toBe('2025-03-09T05:00:00.000Z');
-    const created = await owner('post', '/daily-closing').send({ date, status: 'draft', closingCash: 45 });
+    const created = await owner('post', '/daily-closing').send({ date, status: 'draft', openingCash: 0, closingCash: 45 });
     const draft = created.body.data.closing;
     expect(draft).toMatchObject({ date: '2025-03-09T00:00:00.000Z', businessDate: date, cashSales: 50 });
     const finalized = await owner('post', `/daily-closing/${draft._id}/finalize`).send({ version: draft.version });

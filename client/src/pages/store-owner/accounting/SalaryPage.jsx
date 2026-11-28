@@ -2,6 +2,7 @@ import { useSavedViewState } from '../../../offline/useSavedViewState';
 import { usePagination } from '../../../hooks/usePagination';
 import Pagination from '../../../components/ui/Pagination';
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Users, Plus, X, CheckCircle2, Clock, AlertTriangle,
   ChevronDown, CreditCard, Banknote, Smartphone,
@@ -49,14 +50,18 @@ const MONTHS = getMonthYears();
 const currentMonth = MONTHS[0].value;
 
 export default function SalaryPage() {
-  const [selectedMonth, setSelectedMonth] = useSavedViewState('SalaryPage:SalaryPage:selectedMonth', currentMonth);
+  const [params, setParams] = useSearchParams();
+  const [savedMonth, setSavedMonth] = useSavedViewState('SalaryPage:SalaryPage:selectedMonth', currentMonth);
+  const selectedMonth = /^\d{4}-(0[1-9]|1[0-2])$/.test(params.get('month') ?? '') ? params.get('month') : savedMonth;
+  const staffId = /^[a-f\d]{24}$/i.test(params.get('staffId') ?? '') ? params.get('staffId') : undefined;
+  const setSelectedMonth = (month) => { setParams({}); setSavedMonth(month); };
   const [showAddModal, setShowAddModal] = useState(false);
   const [showPayModal, setShowPayModal] = useState(null);
   const [addForm, setAddForm] = useState({ staffId: '', monthlySalary: '', notes: '' });
   const [payForm, setPayForm] = useState({ amount: '', type: 'salary', method: 'cash', note: '' });
 
-  const paging = usePagination(selectedMonth, 'cards');
-  const { data: listData, isLoading, isFetching } = useGetSalaryRecordsQuery({ monthYear: selectedMonth, page: paging.page, limit: paging.limit });
+  const paging = usePagination(`${selectedMonth}:${staffId ?? ''}`, 'cards');
+  const { data: listData, isLoading, isFetching } = useGetSalaryRecordsQuery({ monthYear: selectedMonth, staffId, page: paging.page, limit: paging.limit });
   const { data: statsData } = useGetSalaryStatsQuery({ monthYear: selectedMonth });
   const { data: staffData } = useGetStaffListQuery();
 
@@ -184,7 +189,7 @@ export default function SalaryPage() {
                   </span>
                   {rec.status !== 'paid' && (
                     <button
-                      onClick={() => { setShowPayModal(rec); setPayForm({ amount: String(dueAmount), type: 'salary', method: 'cash', note: '' }); }}
+                      onClick={() => { setShowPayModal(rec); setPayForm({ amount: String(dueAmount), type: 'salary', method: 'cash', note: '', operationId: crypto.randomUUID() }); }}
                       className="btn-primary text-xs px-3 py-1.5 shrink-0"
                     >
                       Pay

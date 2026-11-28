@@ -4,12 +4,12 @@ import Pagination from '../../../components/ui/Pagination';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  CalendarDays, TrendingUp, TrendingDown, DollarSign,
-  Save, ChevronLeft, ChevronRight, AlertTriangle, Clock,
+  CalendarDays, Save, ChevronLeft, ChevronRight,
   RefreshCw,
 } from 'lucide-react';
 import {
   useGetDailySummaryQuery,
+  useGetDailyTransactionsQuery,
   useSaveDailyClosingMutation,
   useFinalizeDailyClosingMutation,
   useCorrectDailyClosingMutation,
@@ -17,7 +17,7 @@ import {
 } from '../../../features/dailyClosing/dailyClosingApi';
 import toast from 'react-hot-toast';
 import { cn } from '../../../utils/cn';
-import { accountingDate, resolveStoreTimeZone } from '../../../utils/accounting';
+import { accountingDate, resolveStoreTimeZone, PAYMENT_METHOD_LABELS } from '../../../utils/accounting';
 import { ROUTES } from '../../../constants/routes';
 import { useAuth } from '../../../hooks/useAuth';
 import Modal from '../../../components/ui/Modal';
@@ -29,6 +29,7 @@ const MOVEMENT_CHANNELS = [
 ];
 
 const toPaise = (value) => Math.round((Number(value) || 0) * 100);
+const hasCashAmount = (value) => value !== '' && Number.isFinite(Number(value)) && Number(value) >= 0;
 const shiftDate = (date, offset) => {
   const day = new Date(date + 'T00:00:00Z');
   day.setUTCDate(day.getUTCDate() + offset);
@@ -45,22 +46,66 @@ const formValues = (closing) => ({
   notes: closing?.notes ?? '',
 });
 const cashPayload = (form) => ({
-  openingCash: Number(form.openingCash),
-  closingCash: Number(form.closingCash),
+  openingCash: form.openingCash === '' ? null : Number(form.openingCash),
+  closingCash: form.closingCash === '' ? null : Number(form.closingCash),
   notes: form.notes,
 });
 
-function SummaryCard({ label, value, sub, color = 'text-slate-200', icon: Icon }) {
-  return (
-    <div className="bg-navy-800 border border-navy-700/60 rounded-xl p-4">
-      <div className="flex items-center justify-between mb-1">
-        <p className="text-xs text-slate-500 uppercase tracking-wide">{label}</p>
-        {Icon && <Icon size={14} className="text-slate-600" />}
-      </div>
-      <p className={cn('text-xl font-bold', color)}>{fmt(value)}</p>
-      {sub && <p className="text-xs text-slate-500 mt-0.5">{sub}</p>}
-    </div>
-  );
+const received = [['sales', 'Sales payments'], ['udharCollections', 'Udhar collections'], ['otherReceived', 'Other receipts and transfers']];
+const paid = [['supplierPayments', 'Supplier payments'], ['expenses', 'Shop expenses'], ['salaries', 'Salary paid'], ['refunds', 'Customer refunds'], ['otherPaid', 'Other payments and transfers']];
+const manualTypes = {
+  in: [['owner_addition', 'Owner added cash'], ['external_sale', 'Sale outside the app'], ['external_upi', 'External UPI receipt'], ['bank_withdrawal', 'Bank withdrawal into drawer'], ['other_receipt', 'Other receipt']],
+  out: [['owner_withdrawal', 'Owner took cash out'], ['bank_deposit', 'Cash deposited in bank'], ['other_payment', 'Other payment']],
+};
+const labels = Object.fromEntries([...received, ...paid, ...manualTypes.in, ...manualTypes.out, ['creditSales', 'Udhar sale']]);
+
+function TransactionDetails({ date, detail, timeZone, closed }) {
+  const [page, setPage] = useState(1);
+  const { user } = useAuth();
+  const { data, isLoading, isFetching, isError, refetch } = useGetDailyTransactionsQuery({
+    date, kind: detail.kind, channel: detail.channel, page,
+  });
+  const sources = {
+    sales: ROUTES.STORE.SALES, creditSales: ROUTES.STORE.ORDERS, udharCollections: ROUTES.STORE.UDHAR,
+    supplierPayments: ROUTES.STORE.SUPPLIER_PAYMENTS, expenses: ROUTES.STORE.EXPENSES,
+    salaries: ROUTES.STORE.SALARY, refunds: ROUTES.STORE.RETURNS,
+  };
+  const sourceLink = (row) => {
+    if (row.type === 'salaries' && !hasPermission(user, PERMISSIONS.SALARY_VIEW)) return undefined;
+    if (row.type === 'expenses') return `${sources.expenses}?date=${date}&expense=${row.id}`;
+    if (row.type === 'supplierPayments' && row.id) return ROUTES.STORE.PURCHASE_DETAIL(row.id);
+    if (row.type === 'supplierPayments' && row.supplierId) return `${sources.supplierPayments}?supplierId=${row.supplierId}`;
+    if (['sales', 'creditSales', 'refunds'].includes(row.type) && row.id) return `${ROUTES.STORE.ORDERS}?orderId=${row.id}`;
+    if (row.type === 'udharCollections' && row.id) return `${sources.udharCollections}?customerId=${row.id}`;
+    if (row.type === 'salaries' && row.id && row.month) return `${sources.salaries}?month=${row.month}&staffId=${row.id}`;
+    return sources[row.type];
+  };
+  return <div className="space-y-3">
+    {closed && <p className="text-sm text-slate-500">These are current source records. Later changes may differ from the finalized totals.</p>}
+    {isLoading && <p role="status">Loading transactions…</p>}
+    {isError && <button className="btn-secondary" onClick={refetch}>Retry download</button>}
+    {data?.data?.length === 0 && <p>No recorded transactions in this group.</p>}
+    <ul className="divide-y divide-navy-700">
+      {data?.data?.map((row, index) => <li key={`${row.reference}-${index}`} className="py-3">
+        <div className="flex justify-between gap-3"><strong>{labels[row.name] ?? row.name ?? labels[row.type]}</strong><strong>{fmt(row.amount)}</strong></div>
+        <p className="text-sm text-slate-500">{[row.party, PAYMENT_METHOD_LABELS[row.method] ?? row.method ?? 'Method unrecorded',
+          row.date && new Date(row.date).toLocaleString('en-IN', { timeZone })].filter(Boolean).join(' · ')}</p>
+        {row.description && <p className="text-sm">{row.description}</p>}
+        {row.actor && <p className="text-sm text-slate-500">Recorded by {row.actor}</p>}
+        <div className="flex flex-wrap justify-between gap-2 text-sm">
+          {row.reference && <span className="break-all text-slate-500">Ref {row.reference}</span>}
+          {sourceLink(row) && <Link className="underline" to={sourceLink(row)}>Open source</Link>}
+        </div>
+      </li>)}
+    </ul>
+    <Pagination meta={data?.meta} page={page} onPageChange={setPage} isFetching={isFetching} label="transactions" />
+  </div>;
+}
+
+function AmountButton({ label, value, onClick }) {
+  return <button type="button" onClick={onClick} className="card p-3 text-left hover:border-blue-400">
+    <span className="block text-sm text-slate-500">{label}</span><strong className="text-lg">{fmt(value)}</strong>
+  </button>;
 }
 
 function HistoryRow({ record, onClick }) {
@@ -81,7 +126,7 @@ function HistoryRow({ record, onClick }) {
           })}
         </p>
         <p className="text-xs text-slate-500 mt-0.5">
-          Drawer count {fmt(snapshot.closingCash)}{correction && ` · Original ${fmt(record.closingCash)}`}
+          {snapshot.closingCash == null ? 'Drawer count pending' : `Drawer count ${fmt(snapshot.closingCash)}`}{correction && ` · Original ${fmt(record.closingCash)}`}
           {!record.businessDate && ' · Legacy date needs review'}
         </p>
       </div>
@@ -112,13 +157,15 @@ export default function DailyClosingPage() {
   const [localDraft, setLocalDraft] = useSavedViewState('DailyClosingPage:DailyClosingPage:localDraft', null);
   const [finalizePrompt, setFinalizePrompt] = useState(null);
   const [correctionForm, setCorrectionForm] = useState(null);
+  const [detail, setDetail] = useState(null);
+  const [movement, setMovement] = useState(null);
 
   const { currentData: summaryData, isFetching: summaryLoading, isError: summaryFailed, refetch: refetchSummary } = useGetDailySummaryQuery(
     { date: selectedDate },
-    { refetchOnMountOrArgChange: false }
+    { skip: activeTab !== 'close' }
   );
   const paging = usePagination('history');
-  const { data: historyData, isLoading: historyLoading } = useGetDailyClosingsQuery({ page: paging.page, limit: paging.limit });
+  const { data: historyData, isLoading: historyLoading } = useGetDailyClosingsQuery({ page: paging.page, limit: paging.limit }, { skip: activeTab !== 'history' });
   const [saveClosing, { isLoading: saving }] = useSaveDailyClosingMutation();
   const [finalizeClosing, { isLoading: finalizing }] = useFinalizeDailyClosingMutation();
   const [correctClosing, { isLoading: correcting }] = useCorrectDailyClosingMutation();
@@ -137,9 +184,14 @@ export default function DailyClosingPage() {
   const actionsDisabled = locked || summaryLoading;
 
   const cash = summary.movements?.cash ?? {};
-  const expectedPaise = toPaise(openingCash) + toPaise(cash.net);
-  const expectedClosing = isClosed ? summary.expectedClosingCash : expectedPaise / 100;
-  const cashDiff = isClosed ? summary.cashDifference : (toPaise(closingCash) - expectedPaise) / 100;
+  const expectedPaise = !liveSummary || !hasCashAmount(openingCash) ? null : toPaise(openingCash) + toPaise(cash.net);
+  const expectedClosing = isClosed ? summary.expectedClosingCash : expectedPaise == null ? null : expectedPaise / 100;
+  const cashDiff = expectedClosing == null || expectedClosing < 0 || !hasCashAmount(closingCash) ? null
+    : isClosed ? summary.cashDifference : (toPaise(closingCash) - expectedPaise) / 100;
+  const openDetails = (title, kind, channel) => setDetail({ title, kind, channel });
+  const sum = (key) => Object.values(summary.movements ?? {}).reduce((total, row) => total + toPaise(row[key]), 0) / 100;
+  const openMovement = (direction) => setMovement({ direction, operationId: crypto.randomUUID(),
+    type: direction === 'in' ? 'owner_addition' : 'owner_withdrawal', method: 'cash', amount: '', party: '', description: '' });
 
   const selectDate = (date) => {
     setLocalDraft(null);
@@ -166,6 +218,17 @@ export default function DailyClosingPage() {
     } catch (err) {
       reportError(err, 'Failed to save draft');
     }
+  };
+
+  const handleMovement = async (event) => {
+    event.preventDefault();
+    const { direction: _direction, ...entry } = movement;
+    try {
+      await saveClosing({ date: selectedDate, ...cashPayload(form), version, status: 'draft', movement: entry }).unwrap();
+      setLocalDraft(null);
+      setMovement(null);
+      toast.success('Money movement recorded');
+    } catch (error) { reportError(error, 'Could not record money movement'); }
   };
 
   const handleFinalize = async () => {
@@ -198,7 +261,7 @@ export default function DailyClosingPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-slate-100">Daily Closing</h1>
-          <p className="text-xs text-slate-500 mt-0.5">Cash reconciliation & day summary</p>
+          <p className="text-xs text-slate-500 mt-0.5">Review the day’s money and count your drawer</p>
         </div>
         <div className="flex gap-2">
           {['close', 'history'].map((tab) => (
@@ -275,150 +338,69 @@ export default function DailyClosingPage() {
             </div>
           )}
 
-          {/* Auto-computed sales (read-only) */}
-          {summaryLoading && !liveSummary ? (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {[1, 2, 3, 4].map((i) => <div key={i} className="h-20 bg-navy-800 rounded-xl animate-pulse" />)}
+          {summaryFailed && <p role="alert">Could not load this day’s money movements. Try refreshing.</p>}
+          {!liveSummary && !summaryFailed && <div role="status" className="card p-4">Loading day summary…</div>}
+          {liveSummary && <>
+            {!isClosed && <p className="text-sm text-slate-500">{closing ? 'Draft saved' : 'Day open'}</p>}
+            <section className="space-y-2">
+              <h2 className="font-semibold">Sales on this day</h2>
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                {[
+                  [`Total Sales · ${summary.ordersCount ?? 0} orders placed`, summary.totalSales, 'totalSales'],
+                  ['Cash Sales', summary.cashSales, 'sales', 'cash'],
+                  ['Online Sales', Number(summary.upiSales ?? 0) + Number(summary.onlineSales ?? 0), 'sales', 'digital'],
+                  ['Udhar Sales', summary.creditSales, 'creditSales'],
+                ].map(([label, value, kind, channel]) => <AmountButton key={label} label={label} value={value} onClick={() => openDetails(label, kind, channel)} />)}
+              </div>
+            </section>
+            <section className="card p-4 space-y-2">
+              <h2 className="font-semibold">Opening Cash</h2>
+              <label className="block text-sm" htmlFor="closing-opening-cash">Cash in the drawer when you opened (₹)</label>
+              <input id="closing-opening-cash" className="input w-full sm:w-56" type="number" min="0" step="0.01" value={openingCash}
+                placeholder="Enter amount" readOnly={locked || Boolean(staleDraft)} onChange={(e) => updateDraft('openingCash', e.target.value)} />
+              {!locked && !staleDraft && openingCash === '' && liveSummary.suggestedOpeningCash != null &&
+                (liveSummary.suggestedOpeningCash >= 0
+                  ? <button className="btn-secondary block" type="button" onClick={() => updateDraft('openingCash', String(liveSummary.suggestedOpeningCash))}>Use suggested {fmt(liveSummary.suggestedOpeningCash)}</button>
+                  : <p className="text-sm text-red-600">Recorded movements leave the suggested opening cash below zero. Check earlier cash entries.</p>)}
+            </section>
+            <div className="grid lg:grid-cols-2 gap-3">
+              {[[received, 'Money Received', 'received', 'in', 'inflow'], [paid, 'Money Paid', 'paid', 'out', 'outflow']].map(([rows, title, kind, direction, total]) => (
+                <section key={kind} className="card p-4 space-y-2">
+                  <div className="flex flex-wrap justify-between gap-2">
+                    <h2 className="font-semibold">{title}</h2>
+                    {!locked && <button className="btn-secondary" type="button" disabled={actionsDisabled || Boolean(staleDraft)} onClick={() => openMovement(direction)}>Record {direction === 'in' ? 'money received' : 'money paid'}</button>}
+                  </div>
+                  <button type="button" className="text-xl font-bold underline" onClick={() => openDetails(title, kind)}>{fmt(sum(total))}</button>
+                  {rows.map(([key, label]) => <button key={key} type="button" className="flex w-full justify-between gap-3 border-t border-navy-700 py-2 text-left text-sm hover:underline"
+                    onClick={() => openDetails(label, key)}><span>{label}</span><strong>{fmt(sum(key))}</strong></button>)}
+                </section>
+              ))}
             </div>
-          ) : summaryFailed ? (
-            <p role="alert" className="text-sm text-red-400">Could not load this day’s movements. Refresh to try again.</p>
-          ) : (
-            <>
-              <div>
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 px-1">Sales and returns</p>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  <SummaryCard label="Cash Sales" value={summary?.cashSales} color="text-emerald-400" icon={DollarSign} />
-                  <SummaryCard label="UPI Sales" value={summary?.upiSales} color="text-blue-400" icon={TrendingUp} />
-                  <SummaryCard label="Udhar Added" value={summary?.creditSales} color="text-orange-400" icon={Clock}
-                    sub="Credit sales today" />
-                  <SummaryCard label="Returns" value={summary?.returnsTotal} color="text-red-400" icon={TrendingDown}
-                    sub="Processed refunds and store credit" />
-                </div>
-              </div>
-              <div className="overflow-x-auto rounded-xl border border-navy-700/60 bg-navy-800 p-4">
-                <table className="w-full text-sm text-slate-300">
-                  <caption className="mb-2 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">
-                    Movements by payment method
-                  </caption>
-                  <thead className="text-xs text-slate-500">
-                    <tr>
-                      <th scope="col" className="py-1 text-left">Method</th>
-                      <th scope="col" className="px-2 py-1 text-right">Inflow</th>
-                      <th scope="col" className="px-2 py-1 text-right">Outflow</th>
-                      <th scope="col" className="py-1 text-right">Net</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {MOVEMENT_CHANNELS.map(([id, label], index) => {
-                      const movement = summary.movements?.[id];
-                      if (index >= 3 && !movement?.inflow && !movement?.outflow) return null;
-                      return (
-                        <tr key={id} className="border-t border-navy-700/40">
-                          <th scope="row" className="py-2 text-left font-medium">{label}</th>
-                          <td className="px-2 text-right">{fmt(movement?.inflow)}</td>
-                          <td className="px-2 text-right">{fmt(movement?.outflow)}</td>
-                          <td className="text-right font-semibold">{fmt(movement?.net)}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-              <div className="bg-navy-800 border border-navy-700/60 rounded-xl px-4 py-3 flex items-center gap-6">
-                <div>
-                  <p className="text-xs text-slate-500">Total Sales</p>
-                  <p className="text-lg font-bold text-slate-100">{fmt(summary?.totalSales)}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-slate-500">Orders</p>
-                  <p className="text-lg font-bold text-slate-200">{summary?.ordersCount ?? 0}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-slate-500">Supplier Payments</p>
-                  <p className="text-lg font-bold text-slate-200">{fmt(summary?.supplierPayments)}</p>
-                </div>
-              </div>
-            </>
-          )}
-
-          {/* Manual entries */}
-          <div className="bg-navy-800 border border-navy-700/60 rounded-xl p-4 space-y-3">
-            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Manual Cash Count</p>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label htmlFor="closing-opening-cash" className="text-xs text-slate-500 block mb-1">Opening Cash (₹)</label>
-                <input
-                  id="closing-opening-cash"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={openingCash}
-                  readOnly={locked || Boolean(staleDraft)}
-                  onChange={(e) => updateDraft('openingCash', e.target.value)}
-                  placeholder="0.00"
-                  className="w-full bg-navy-900 border border-navy-600 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-gold-500/60"
-                />
-              </div>
-              <div>
-                <label htmlFor="closing-counted-cash" className="text-xs text-slate-500 block mb-1">Closing Cash — Physical Count (₹)</label>
-                <input
-                  id="closing-counted-cash"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={closingCash}
-                  readOnly={locked || Boolean(staleDraft)}
-                  onChange={(e) => updateDraft('closingCash', e.target.value)}
-                  placeholder="0.00"
-                  className="w-full bg-navy-900 border border-navy-600 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-gold-500/60"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Cash difference summary */}
-          <div className={cn(
-            'rounded-xl border p-4 space-y-2',
-            cashDiff > 0 ? 'bg-emerald-500/5 border-emerald-500/30' :
-              cashDiff < 0 ? 'bg-red-500/5 border-red-500/30' :
-                'bg-navy-800 border-navy-700/60'
-          )}>
-            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Cash Reconciliation</p>
-            <div className="space-y-1 text-sm">
-              <div className="flex justify-between text-slate-400">
-                <span>Opening Cash</span><span>{fmt(Number(openingCash) || 0)}</span>
-              </div>
-              <div className="flex justify-between text-emerald-400">
-                <span>+ Cash Sales</span><span>{fmt(cash.sales ?? (isClosed ? summary.cashSales : undefined))}</span>
-              </div>
-              <div className="flex justify-between text-emerald-400">
-                <span>+ Cash Udhar Collections</span><span>{fmt(cash.udharCollections)}</span>
-              </div>
-              <div className="flex justify-between text-red-400">
-                <span>− Cash Supplier Payments</span><span>{fmt(cash.supplierPayments)}</span>
-              </div>
-              <div className="flex justify-between text-red-400">
-                <span>− Cash Refunds</span><span>{fmt(cash.refunds)}</span>
-              </div>
-              <div className="flex justify-between text-red-400">
-                <Link to={ROUTES.STORE.EXPENSES} className="underline underline-offset-2">− Cash Expenses</Link>
-                <span>{fmt(cash.expenses)}</span>
-              </div>
-              <div className="flex justify-between text-slate-300 border-t border-navy-700/40 pt-1 font-medium">
-                <span>Expected Closing</span><span>{fmt(expectedClosing)}</span>
-              </div>
-              <div className="flex justify-between text-slate-300 font-medium">
-                <span>Actual Closing</span><span>{fmt(Number(closingCash) || 0)}</span>
-              </div>
-              <div className={cn('flex justify-between font-bold text-base border-t border-navy-700/40 pt-1', cashDiff > 0 ? 'text-emerald-400' : cashDiff < 0 ? 'text-red-400' : 'text-slate-300')}>
-                <div className="flex items-center gap-1.5">
-                  {cashDiff !== 0 && (cashDiff > 0 ? <TrendingUp size={14} /> : <AlertTriangle size={14} />)}
-                  <span>{cashDiff > 0 ? 'Cash Excess' : cashDiff < 0 ? 'Cash Short' : 'Balanced'}</span>
-                </div>
-                <span>{cashDiff >= 0 ? '+' : ''}{fmt(cashDiff)}</span>
-              </div>
-            </div>
-          </div>
+            <section className="card p-4">
+              <h2 className="mb-2 font-semibold">Payment Method Summary</h2>
+              {sum('otherPaid') + sum('otherReceived') > 0 && <p className="mb-2 text-sm text-slate-500">Cash moved between your drawer and bank appears on both sides of the transfer.</p>}
+              <table className="w-full text-sm">
+                <thead><tr><th className="text-left">Method</th><th className="text-right">Received</th><th className="text-right">Paid</th></tr></thead>
+                <tbody>{MOVEMENT_CHANNELS.filter(([id], index) => index < 3 || summary.movements?.[id]?.inflow || summary.movements?.[id]?.outflow)
+                  .map(([id, label]) => <tr key={id} className="border-t border-navy-700">
+                    <th className="py-2 text-left">{label}</th>
+                    {[[ 'received', 'inflow'], ['paid', 'outflow']].map(([kind, field]) =>
+                      <td key={kind} className="text-right"><button type="button" className="underline" onClick={() => openDetails(`${label} ${kind}`, kind, id)}>{fmt(summary.movements?.[id]?.[field])}</button></td>)}
+                  </tr>)}</tbody>
+              </table>
+            </section>
+            <section className="card p-4 space-y-3">
+              <h2 className="font-semibold">Cash Verification</h2>
+              <div className="flex justify-between gap-3 text-sm"><span>Expected Cash in Drawer</span><strong>{expectedClosing == null ? 'Confirm opening cash' : fmt(expectedClosing)}</strong></div>
+              {expectedClosing < 0 && <p role="alert" className="text-red-600">Expected cash is below zero. Check your opening cash, missing cash receipts or incorrect payment methods.</p>}
+              <label htmlFor="closing-counted-cash" className="block text-sm">Actual Cash in Drawer (physical count)</label>
+              <input id="closing-counted-cash" className="input w-full sm:w-56" type="number" min="0" step="0.01" value={closingCash}
+                placeholder="Enter counted cash" readOnly={locked || Boolean(staleDraft)} onChange={(e) => updateDraft('closingCash', e.target.value)} />
+              <p className="font-semibold">{cashDiff == null ? 'Cash Difference Pending' : cashDiff === 0 ? 'Cash Matched' :
+                `${cashDiff < 0 ? 'Cash Short' : 'Extra Cash'} · ${fmt(Math.abs(cashDiff))}`}</p>
+              {cashDiff == null && closingCash === '' && <p className="text-sm text-slate-500">Awaiting Cash Count</p>}
+            </section>
+          </>}
 
           {/* Notes */}
           <textarea
@@ -427,7 +409,7 @@ export default function DailyClosingPage() {
             maxLength={1000}
             aria-label="Closing notes"
             onChange={(e) => updateDraft('notes', e.target.value)}
-            placeholder="Notes (optional)..."
+            placeholder={cashDiff ? "Explain the cash difference before finalizing" : "Notes (optional)"}
             rows={2}
             className="w-full bg-navy-800 border border-navy-700/60 rounded-xl px-4 py-3 text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-gold-500/60 resize-none"
           />
@@ -466,8 +448,8 @@ export default function DailyClosingPage() {
                 {saving ? <RefreshCw size={15} className="animate-spin" /> : <Save size={15} />}
                 Save Draft
               </button>
-              <button type="button" disabled={actionsDisabled || !closing || Boolean(localDraft)}
-                onClick={() => setFinalizePrompt({ id: closing._id, date: selectedDate, version, closingCash: closing.closingCash })}
+              <button type="button" disabled={actionsDisabled || !closing || Boolean(localDraft) || cashDiff == null || (Boolean(cashDiff) && !notes.trim())}
+                onClick={() => setFinalizePrompt({ id: closing._id, date: selectedDate, version, reviewKey: liveSummary.reviewKey, closingCash: closing.closingCash })}
                 className="btn-primary">
                 Finalize Closing
               </button>
@@ -502,6 +484,29 @@ export default function DailyClosingPage() {
           )}
         </div>
       )}
+      <Modal isOpen={Boolean(detail)} title={detail?.title ?? 'Transactions'} size="lg" onClose={() => setDetail(null)}>
+        {detail && <TransactionDetails key={`${selectedDate}:${detail.kind}:${detail.channel}`} date={selectedDate} detail={detail} timeZone={timeZone} closed={isClosed} />}
+      </Modal>
+      <Modal isOpen={Boolean(movement)} title={movement?.direction === 'in' ? 'Money Received' : 'Money Paid'} onClose={() => { if (!saving) setMovement(null); }}>
+        {movement && <form className="space-y-3" onSubmit={handleMovement}>
+          <p className="text-sm text-slate-500">Record money that is missing from the app. Sales, collections and payments already recorded are included automatically.</p>
+          {movement.direction === 'out' && <div className="flex flex-wrap gap-2">
+            <Link className="btn-secondary" to={`${ROUTES.STORE.EXPENSES}?date=${selectedDate}&new=1`}>Add shop expense</Link>
+            <Link className="btn-secondary" to={ROUTES.STORE.SALARY}>Pay salary</Link>
+            <Link className="btn-secondary" to={ROUTES.STORE.SUPPLIER_PAYMENTS}>Pay supplier</Link>
+          </div>}
+          <label className="block text-sm">Transaction type<select className="input block w-full" value={movement.type} onChange={(e) => setMovement({ ...movement, type: e.target.value, method: 'cash' })}>
+            {manualTypes[movement.direction].map(([type, label]) => <option key={type} value={type}>{label}</option>)}
+          </select></label>
+          <label className="block text-sm">Amount (₹)<input className="input block w-full" required type="number" min="0.01" step="0.01" value={movement.amount} onChange={(e) => setMovement({ ...movement, amount: e.target.value })} /></label>
+          {['external_sale', 'other_receipt', 'other_payment'].includes(movement.type) && <label className="block text-sm">Payment method<select className="input block w-full" value={movement.method} onChange={(e) => setMovement({ ...movement, method: e.target.value })}>
+            <option value="cash">Cash</option><option value="upi">UPI</option><option value="bank_transfer">Bank</option>
+          </select></label>}
+          <label className="block text-sm">{movement.direction === 'in' ? 'Received from' : 'Paid to'}<input className="input block w-full" maxLength={120} value={movement.party} onChange={(e) => setMovement({ ...movement, party: e.target.value })} /></label>
+          <label className="block text-sm">Reason or description<input className="input block w-full" required maxLength={500} value={movement.description} onChange={(e) => setMovement({ ...movement, description: e.target.value })} /></label>
+          <button className="btn-primary" type="submit" disabled={actionsDisabled || Boolean(staleDraft)}>{saving ? 'Saving…' : 'Save money movement'}</button>
+        </form>}
+      </Modal>
       <Modal isOpen={Boolean(finalizePrompt)} title="Finalize Daily Closing"
         onClose={() => { if (!finalizing) setFinalizePrompt(null); }}>
         <div className="space-y-4 p-4">

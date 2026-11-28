@@ -42,6 +42,7 @@ export const supplierApi = baseApi.injectEndpoints({
         url: `/suppliers/${id}/payment`, method: 'POST', headers: { 'Idempotency-Key': idempotencyKey }, body, timeout: 30000,
       }),
       invalidatesTags: (result, error, { id }) => result ? [
+        'DailyClosing',
         { type: 'Supplier', id }, { type: 'Supplier', id: 'LIST' }, { type: 'Supplier', id: 'RECONCILIATION' },
         { type: 'Purchase', id: 'LIST' }, { type: 'Purchase', id: 'STATS' },
         ...result.data.payment.allocations.map(({ purchaseId }) => ({ type: 'Purchase', id: purchaseId })),
