@@ -23,6 +23,10 @@ try {
   });
   await mongoose.connect(mongo.getUri(), { monitorCommands: true, maxPoolSize: 10 });
   const { app } = await import('../src/app.js');
+  if (process.env.PERF_DIAGNOSTICS === '1') {
+    const { installMongoCommandTiming } = await import('../src/middleware/performanceDiagnostics.js');
+    installMongoCommandTiming(mongoose.connection.getClient());
+  }
   const { default: Product } = await import('../src/models/Product.js');
   const { default: Store } = await import('../src/models/Store.js');
   const { default: User } = await import('../src/models/User.js');
@@ -108,6 +112,7 @@ try {
       samples.sort((a, b) => a - b);
       const percentile = (p) => Number(samples[Math.ceil(samples.length * p) - 1].toFixed(2));
       results.push({ route, concurrency, samples: samples.length,
+        latencySamplesMs: samples.map((value) => Number(value.toFixed(2))),
         p50Ms: percentile(0.5), p95Ms: percentile(0.95), p99Ms: percentile(0.99),
         requestsPerSecond: Number((samples.length * 1000 / elapsed).toFixed(2)),
         cpuMsPerRequest: Number(((cpu.user + cpu.system) / 1000 / samples.length).toFixed(2)),
@@ -117,6 +122,7 @@ try {
     }
   }
   const report = { generatedAt: new Date().toISOString(), node: process.version,
+    diagnosticsEnabled: process.env.PERF_DIAGNOSTICS === '1',
     scope: 'Disposable local MongoDB, real HTTP/auth API; 10,000 synthetic products, two tenants. Warm reads, max four concurrent users, no production traffic; not a Northflank capacity estimate. Small samples make p99 exploratory.',
     rssMiB: Number((process.memoryUsage().rss / 1024 / 1024).toFixed(2)), results };
   if (process.argv[2]) await writeFile(process.argv[2], `${JSON.stringify(report, null, 2)}\n`);

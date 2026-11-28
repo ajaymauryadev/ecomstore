@@ -14,9 +14,17 @@ export default function ProtectedRoute({ children, allowedRoles, requiredPermiss
   const isAuthenticated = useSelector(selectIsAuthenticated);
   const isInitialized = useSelector(selectIsInitialized);
   const offlineSession = useSelector((state) => state.auth.offlineSession);
+  const logoutPending = useSelector((state) => state.savedData?.logoutPending);
   const location = useLocation();
 
-  if (!isInitialized) return <StartupShell />;
+  if (logoutPending && !user) return <Navigate to={ROUTES.LOGIN} state={{ from: location.pathname }} replace />;
+  if (!isInitialized || logoutPending) return <StartupShell />;
+
+  // A time-limited local identity unlocks saved work when offline. While online,
+  // wait for cookie refresh before showing sensitive data from that identity.
+  if (offlineSession && navigator.onLine !== false) return <StartupShell>
+    <p role="status">Confirming access to this workspace. Saved data will open when your session is verified.</p>
+  </StartupShell>;
 
   if (!isAuthenticated) {
     return <Navigate to={ROUTES.LOGIN} state={{ from: location.pathname }} replace />;

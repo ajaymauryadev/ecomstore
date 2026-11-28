@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import { logger } from './logger.js';
 import { env } from './env.js';
+import { installMongoCommandTiming } from '../middleware/performanceDiagnostics.js';
 
 const MAX_RETRIES = 5;
 const RETRY_DELAY_MS = 5000;
@@ -11,7 +12,10 @@ export const connectDB = async (retries = 0) => {
       maxPoolSize: 10,
       serverSelectionTimeoutMS: 5000,
       socketTimeoutMS: 45000,
+      monitorCommands: process.env.PERF_DIAGNOSTICS === '1',
     });
+
+    installMongoCommandTiming(conn.connection.getClient());
 
     logger.info(`MongoDB connected: ${conn.connection.host}`);
 

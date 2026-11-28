@@ -93,7 +93,7 @@ export default function StoreOwnerDashboard() {
               </>
             ) : (
               <>
-                <OverviewMetric title={historical ? `Sales on ${savedDate}` : "Today's sales"} value={formatCurrency(kpis.revenueToday ?? 0)} icon={TrendingUp}
+                <OverviewMetric title={historical ? `Sales on ${savedDate}` : "Today's sales"} value={kpis.revenueToday == null ? '—' : formatCurrency(kpis.revenueToday)} icon={TrendingUp}
                   to={hasPermission(user, PERMISSIONS.REPORTS_SENSITIVE) ? ROUTES.STORE.SALES : undefined}
                   detail={trend != null ? `${trend > 0 ? '+' : ''}${trend}% vs yesterday · View breakdown` : 'View POS & online breakdown'} tone="bg-blue-500/10 text-blue-400" />
                 <OverviewMetric title="Pending orders" value={kpis.pendingOrderCount ?? pendingOrders.length} icon={ClipboardList}

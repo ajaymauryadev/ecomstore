@@ -34,7 +34,7 @@ function fmt(n) {
   return `₹${abs.toLocaleString('en-IN')}`;
 }
 function fmtFull(n) {
-  return `₹${(n ?? 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return n == null ? '—' : `₹${n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 const REPORT_TABS = [
@@ -76,7 +76,7 @@ function DailySalesReport({ timeZone }) {
   const { data, isLoading, isError, error, refetch } = useGetDailySalesQuery({ date });
   if (isError) return <LoadError title="Could not load report" error={error} retry={refetch} />;
   const hours = data?.data?.hours ?? [];
-  const total = data?.data?.total ?? 0;
+  const total = data?.data?.total;
 
   return (
     <div className="space-y-4">
@@ -128,7 +128,7 @@ function MonthlySalesReport({ timeZone }) {
   const { data, isLoading, isError, error, refetch } = useGetMonthlySalesQuery({ year, month });
   if (isError) return <LoadError title="Could not load report" error={error} retry={refetch} />;
   const days = data?.data?.days ?? [];
-  const total = data?.data?.total ?? 0;
+  const total = data?.data?.total;
 
   const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -174,7 +174,7 @@ function YearlySalesReport({ timeZone }) {
   const { data, isLoading, isError, error, refetch } = useGetYearlySalesQuery({ year });
   if (isError) return <LoadError title="Could not load report" error={error} retry={refetch} />;
   const months = data?.data?.months ?? [];
-  const total = data?.data?.total ?? 0;
+  const total = data?.data?.total;
 
   return (
     <div className="space-y-4">
@@ -364,7 +364,7 @@ function SupplierDuesReport() {
   const { data, isLoading, isFetching, isError, error, refetch } = useGetSupplierDuesReportQuery({ page: paging.page, limit: paging.limit });
   if (isError) return <LoadError title="Could not load report" error={error} retry={refetch} />;
   const suppliers = data?.data?.suppliers ?? [];
-  const total = data?.data?.total ?? 0;
+  const total = data?.data?.total;
 
   return (
     <div className="space-y-4">
@@ -402,7 +402,7 @@ function CustomerDuesReport() {
   const { data, isLoading, isFetching, isError, error, refetch } = useGetCustomerDuesReportQuery({ page: paging.page, limit: paging.limit });
   if (isError) return <LoadError title="Could not load report" error={error} retry={refetch} />;
   const customers = data?.data?.customers ?? [];
-  const total = data?.data?.total ?? 0;
+  const total = data?.data?.total;
 
   return (
     <div className="space-y-4">
@@ -442,7 +442,7 @@ function ExpenseReport({ timeZone }) {
   const { data, isLoading, isError, error, refetch } = useGetExpenseReportQuery({ startDate, endDate });
   if (isError) return <LoadError title="Could not load report" error={error} retry={refetch} />;
   const byCategory = data?.data?.byCategory ?? [];
-  const total = data?.data?.total ?? 0;
+  const total = data?.data?.total;
 
   return (
     <div className="space-y-4">
@@ -539,8 +539,8 @@ function PurchaseReport({ timeZone }) {
   const bySupplier = data?.data?.bySupplier ?? [];
   const paging = useClientPagination(bySupplier, `${startDate}:${endDate}`, 'compact', 'PurchaseReport:pagination');
   if (isError) return <LoadError title="Could not load report" error={error} retry={refetch} />;
-  const total = data?.data?.total ?? 0;
-  const paid = data?.data?.paid ?? 0;
+  const total = data?.data?.total;
+  const paid = data?.data?.paid;
 
   return (
     <div className="space-y-4">
@@ -556,7 +556,7 @@ function PurchaseReport({ timeZone }) {
         <div className="ml-auto flex gap-4 text-right">
           <div><p className="text-xs text-slate-500">Total</p><p className="font-bold text-slate-200">{fmtFull(total)}</p></div>
           <div><p className="text-xs text-slate-500">Paid</p><p className="font-bold text-emerald-400">{fmtFull(paid)}</p></div>
-          <div><p className="text-xs text-slate-500">Pending</p><p className="font-bold text-red-400">{fmtFull(total - paid)}</p></div>
+          <div><p className="text-xs text-slate-500">Pending</p><p className="font-bold text-red-400">{fmtFull(total == null || paid == null ? null : total - paid)}</p></div>
         </div>
       </div>
       <SectionCard title="By Supplier">

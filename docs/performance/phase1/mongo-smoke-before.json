@@ -1,0 +1,54 @@
+{
+  "generatedAt": "2026-11-28T09:14:29.036Z",
+  "products": 10000,
+  "productsPerTenant": 5000,
+  "samplesPerQuery": 30,
+  "pageSize": 24,
+  "scope": "Local disposable MongoDB; warm sequential find queries, not API or hosting latency. Counts, search, price sorting and deep pagination are not benchmarked.",
+  "before": [
+    {
+      "name": "admin_recent",
+      "returned": 24,
+      "documentsExamined": 5000,
+      "blockingSort": true,
+      "queryP95Ms": 11.64
+    },
+    {
+      "name": "counter_catalog",
+      "returned": 24,
+      "documentsExamined": 4500,
+      "blockingSort": true,
+      "queryP95Ms": 10.83
+    },
+    {
+      "name": "storefront_default",
+      "returned": 24,
+      "documentsExamined": 3857,
+      "blockingSort": true,
+      "queryP95Ms": 15.08
+    }
+  ],
+  "after": [
+    {
+      "name": "admin_recent",
+      "returned": 24,
+      "documentsExamined": 24,
+      "blockingSort": false,
+      "queryP95Ms": 0.97
+    },
+    {
+      "name": "counter_catalog",
+      "returned": 24,
+      "documentsExamined": 24,
+      "blockingSort": false,
+      "queryP95Ms": 1.01
+    },
+    {
+      "name": "storefront_default",
+      "returned": 24,
+      "documentsExamined": 24,
+      "blockingSort": false,
+      "queryP95Ms": 1.14
+    }
+  ]
+}

@@ -223,7 +223,7 @@ for (const [role, paths] of Object.entries(routes)) {
   });
 }
 
-test('saved product appears before delayed online refresh and a missing offline screen gives a download message', async ({ page, storefront }) => {
+test('private saved product waits for online scope confirmation and a missing offline screen gives a download message', async ({ page, storefront }) => {
   test.setTimeout(90000);
   test.skip(process.env.STOREFRONT_PRODUCTION !== 'true');
   const credentials = { email: 'saved-slow@example.com', password: 'SavedSlow123!' };
@@ -239,10 +239,10 @@ test('saved product appears before delayed online refresh and a missing offline 
   const delayed = new Promise((resolve) => { release = resolve; });
   await page.route('**/api/v1/auth/refresh', async (route) => { await delayed; await route.continue(); });
   await page.reload();
-  await expect(page.getByText('Pickup Test Rice', { exact: true }).first()).toBeVisible();
-  await expect(page.locator('.saved-data-status')).toContainText('checking your session');
+  await expect(page.locator('#root .startup-shell')).toBeVisible();
+  await expect(page.getByText('Pickup Test Rice', { exact: true })).toHaveCount(0);
   release();
-  await expect(page.locator('.saved-data-status')).not.toContainText('checking your session');
+  await expect(page.getByText('Pickup Test Rice', { exact: true }).first()).toBeVisible();
   await page.context().setOffline(true);
   await navigate(page, '/store/audit-logs');
   await expect(page.getByText('This view is waiting for its first download')).toBeVisible();

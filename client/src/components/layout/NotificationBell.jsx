@@ -25,12 +25,12 @@ export default function NotificationBell() {
   const user = useSelector(selectCurrentUser);
   const navigate = useNavigate();
   const { on, connected } = useSocket();
-  const { data: countData } = useGetUnreadCountQuery(undefined, refreshOptions);
+  const { currentData: countData } = useGetUnreadCountQuery(undefined, refreshOptions);
   // Keep a small inbox current even while closed, so polling can recover missed events.
-  const { data: notifData, isLoading, isError, refetch } = useGetNotificationsQuery({ limit: 20 }, refreshOptions);
+  const { currentData: notifData, isLoading, isError, refetch } = useGetNotificationsQuery({ limit: 20 }, refreshOptions);
   const [markRead] = useMarkReadMutation();
   const [markAllRead] = useMarkAllReadMutation();
-  const count = countData?.data?.count ?? 0;
+  const count = countData?.data?.count;
   const notifications = notifData?.data ?? [];
 
   const viewNotification = useCallback((notification) => {
@@ -106,7 +106,7 @@ export default function NotificationBell() {
       {open && (
         <section aria-label="Notification inbox" className="notification-inbox fixed right-4 top-16 mt-2 w-[min(26rem,calc(100vw-2rem))] bg-navy-800 border border-navy-700 rounded-2xl shadow-xl z-50 overflow-hidden sm:absolute sm:right-0 sm:top-full">
           <div className="flex shrink-0 items-center justify-between gap-2 px-4 py-3 border-b border-navy-700/60">
-            <h2 className="font-semibold text-slate-100 text-base min-w-0 flex-1">Notifications <span className="block text-xs text-slate-500 font-normal">{count} unread</span></h2>
+            <h2 className="font-semibold text-slate-100 text-base min-w-0 flex-1">Notifications <span className="block text-xs text-slate-500 font-normal">{count == null ? 'Unread count unavailable' : `${count} unread`}</span></h2>
             {count > 0 && <button type="button" onClick={() => markAllRead()} className="min-h-11 flex items-center gap-1 text-xs text-gold-400"><CheckCheck size={14} /> Mark all read</button>}
           </div>
           <div className="min-h-0 max-h-96 overflow-y-auto">

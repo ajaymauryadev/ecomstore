@@ -50,7 +50,7 @@ export default function AuditLogsPage() {
     <div className="space-y-5">
       <div>
         <h1 className="page-title">Audit Logs</h1>
-        <p className="text-slate-500 text-sm mt-0.5">{meta.total ?? 0} entries — all staff and owner actions are tracked</p>
+        <p className="text-slate-500 text-sm mt-0.5">{meta.total == null ? 'Entry count unavailable' : `${meta.total} entries`} — all staff and owner actions are tracked</p>
       </div>
 
       <div className="flex flex-wrap gap-3">

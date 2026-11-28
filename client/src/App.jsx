@@ -3,6 +3,7 @@ import { Route, Navigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { Toaster } from 'react-hot-toast';
 import { selectCurrentUser } from './features/auth/authSlice';
+import StartupShell from './components/layout/StartupShell';
 import AuthInit from './components/shared/AuthInit';
 import ProtectedRoute from './components/shared/ProtectedRoute';
 import UnauthorizedPage from './components/shared/UnauthorizedPage';
@@ -80,6 +81,9 @@ function Access({ children, permission, roles }) {
 
 function RoleRedirect() {
   const user = useSelector(selectCurrentUser);
+  const ready = useSelector((state) => (state.savedData?.identityReady ?? true) &&
+    (state.auth.isInitialized || (state.auth.offlineSession && state.savedData?.offline)));
+  if (!ready) return <StartupShell />;
   if (!user) return <Navigate to={ROUTES.LOGIN} replace />;
   return <Navigate to={dashboardRouteForRole(user.role)} replace />;
 }

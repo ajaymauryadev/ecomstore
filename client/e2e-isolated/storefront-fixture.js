@@ -22,7 +22,7 @@ async function withStorefrontFixture(use, { realtime = false } = {}) {
     );
     process.env.MONGOMS_DOWNLOAD_IGNORE_MISSING_HEADER ||= 'true';
     mongo = await MongoMemoryReplSet.create({ replSet: { count: 1, storageEngine: 'wiredTiger' } });
-    await mongoose.connect(mongo.getUri());
+    await mongoose.connect(mongo.getUri(), { monitorCommands: process.env.PERF_DIAGNOSTICS === '1' });
 
     api = createHttpServer().listen(0, '127.0.0.1');
     await once(api, 'listening');
@@ -39,7 +39,7 @@ async function withStorefrontFixture(use, { realtime = false } = {}) {
     });
     const apiOrigin = 'http://127.0.0.1:' + api.address().port;
     if (process.env.STOREFRONT_PRODUCTION === 'true') {
-      const built = await preview({ preview: { host: '127.0.0.1', port: 0,
+      const built = await preview({ ...(process.env.PHASE2_PREVIEW_DIST && { build: { outDir: process.env.PHASE2_PREVIEW_DIST } }), preview: { host: '127.0.0.1', port: 0,
         proxy: { '/api': { target: apiOrigin, changeOrigin: true }, '/uploads': { target: apiOrigin, changeOrigin: true }, '/socket.io': { target: apiOrigin, changeOrigin: true, ws: true } },
       } });
       const connections = new Set();
@@ -66,6 +66,10 @@ async function withStorefrontFixture(use, { realtime = false } = {}) {
     const origin = 'http://127.0.0.1:' + vite.httpServer.address().port;
     process.env.CORS_ORIGINS = origin;
     const { app } = await import('../../server/src/app.js');
+    if (process.env.PERF_DIAGNOSTICS === '1') {
+      const { installMongoCommandTiming } = await import('../../server/src/middleware/performanceDiagnostics.js');
+      installMongoCommandTiming(mongoose.connection.getClient());
+    }
     api.on('request', app);
     if (realtime || process.env.STOREFRONT_PRODUCTION === 'true') {
       const { initSocket } = await import('../../server/src/config/socket.js');

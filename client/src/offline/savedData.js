@@ -1,10 +1,11 @@
 import { baseApi, savedEndpointDefinitions } from '../api/baseApi';
 import { clearCredentials, restoreOfflineIdentity, selectSessionEpoch } from '../features/auth/authSlice';
-import { accountScope, businessSnapshot, savedStorage, SNAPSHOT_SCHEMA, MAX_SAVED_QUERIES, OFFLINE_ACCESS_MS } from './storage';
+import { accountScope, businessSnapshot, readPendingLogoutMarker, writePendingLogoutMarker, savedStorage, SNAPSHOT_SCHEMA, MAX_SAVED_QUERIES, OFFLINE_ACCESS_MS } from './storage';
 import { HYDRATE_SAVED_DATA, INVALIDATE_SAVED_QUERIES, savedDataStatus } from './savedDataSlice';
 import { loadOutbox } from './outbox';
 import { packingIntents, syncPackingOutbox } from './packingOutbox';
 import { changedQueryKeys, retryableRead } from './revisionChanges';
+import { markPerformance } from '../diagnostics/performance';
 
 export const viewMemory = new Map();
 let sessionChannel;
@@ -19,33 +20,57 @@ export async function restoreScope(store) {
     const [snapshot, drafts] = await Promise.all([
       savedStorage.get('snapshots', scope), savedStorage.get('drafts', scope),
     ]);
-    if (selectSessionEpoch(store.getState()) !== epoch) return;
+    if (selectSessionEpoch(store.getState()) !== epoch || accountScope(store.getState().auth) !== scope) return;
     if (drafts) viewMemory.set(scope, drafts);
     if (snapshot?.schema === SNAPSHOT_SCHEMA && snapshot.queries && snapshot.provided) {
-      store.dispatch({ type: HYDRATE_SAVED_DATA, payload: snapshot });
+      // A public read may have completed while IndexedDB opened. Never replace it
+      // with an older snapshot, or hydrate a snapshot after a scope change.
+      const existing = store.getState().api.queries;
+      const queries = Object.fromEntries(Object.entries(snapshot.queries)
+        .filter(([key]) => existing[key]?.data === undefined));
+      if (Object.keys(queries).length) store.dispatch({ type: HYDRATE_SAVED_DATA,
+        payload: { ...snapshot, queries } });
     }
   } catch { storageFailure(store.dispatch); }
   finally {
-    if (selectSessionEpoch(store.getState()) === epoch) store.dispatch(savedDataStatus({ restoring: false }));
+    if (selectSessionEpoch(store.getState()) === epoch && accountScope(store.getState().auth) === scope) store.dispatch(savedDataStatus({ restoring: false }));
   }
 }
 
 export async function initializeSavedData(store) {
+  markPerformance('hydration:start');
+  const bootEpoch = selectSessionEpoch(store.getState());
+  let markerVerified = false;
   try {
-    await loadOutbox();
-    const logoutPending = await savedStorage.get('identity', 'logoutPending');
+    const logoutPending = readPendingLogoutMarker() || await savedStorage.get('identity', 'logoutPending');
+    markerVerified = true;
+    if (selectSessionEpoch(store.getState()) !== bootEpoch) return;
     if (logoutPending) {
+      writePendingLogoutMarker(true);
       store.dispatch(savedDataStatus({ logoutPending: true }));
       store.dispatch({ ...clearCredentials(), meta: { savedBoot: true } });
-      await restoreScope(store);
-      return;
+    } else {
+      const identity = await savedStorage.get('identity', 'active');
+      if (selectSessionEpoch(store.getState()) !== bootEpoch) return;
+      if (identity?.user && identity.verifiedAt <= Date.now() && Date.now() - identity.verifiedAt < OFFLINE_ACCESS_MS && identity.user.isActive !== false) {
+        // An online browser may hold another account's cookie. Keep public
+        // routes usable, but wait for refresh to establish the sensitive scope.
+        if (!online()) store.dispatch({ ...restoreOfflineIdentity(identity), meta: { savedBoot: true } });
+      } else if (identity) void savedStorage.delete('identity', 'active').catch(() => storageFailure(store.dispatch));
     }
-    const identity = await savedStorage.get('identity', 'active');
-    if (identity?.user && identity.verifiedAt <= Date.now() && Date.now() - identity.verifiedAt < OFFLINE_ACCESS_MS && identity.user.isActive !== false) {
-      store.dispatch({ ...restoreOfflineIdentity(identity), meta: { savedBoot: true } });
-    } else if (identity) await savedStorage.delete('identity', 'active');
-  } catch { storageFailure(store.dispatch); }
-  await restoreScope(store);
+  } catch {
+    storageFailure(store.dispatch);
+    // An older install may have a pending marker only in IndexedDB. If that
+    // read failed, a cookie refresh cannot prove it is safe to restore access.
+    if (!markerVerified) store.dispatch(savedDataStatus({ identityError: true }));
+  }
+  finally {
+    store.dispatch(savedDataStatus({ identityReady: true }));
+    // Neither outbox loading nor snapshot reads hold up public routes or refresh.
+    void loadOutbox().catch(() => storageFailure(store.dispatch));
+    await restoreScope(store);
+    markPerformance('hydration:end');
+  }
 }
 
 // Only visible subscriptions compete for the network. Dormant views keep their

@@ -47,7 +47,7 @@ export default function AuditLogsPage() {
     <div className="space-y-5">
       <div>
         <h1 className="text-xl font-bold text-slate-100">System Audit Logs</h1>
-        <p className="text-slate-500 text-sm mt-0.5">{meta.total ?? 0} entries</p>
+        <p className="text-slate-500 text-sm mt-0.5">{meta.total == null ? 'Entry count unavailable' : `${meta.total} entries`}</p>
       </div>
 
       {/* Filters */}

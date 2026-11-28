@@ -1,6 +1,6 @@
 import Pagination from '../../../components/ui/Pagination';
 import { usePageSize, usePageState } from '../../../hooks/usePagination';
-import { useState } from 'react';
+import { useSavedViewState } from '../../../offline/useSavedViewState';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../../hooks/useAuth';
 import { notificationTarget } from '../../../utils/notificationTarget';
@@ -35,8 +35,8 @@ const ROLE_TABS = [
 
 export default function NotificationsPage() {
   const { user } = useAuth();
-  const [roleFilter, setRoleFilter] = useState('');
-  const [readFilter, setReadFilter] = useState('');
+  const [roleFilter, setRoleFilter] = useSavedViewState('notifications-role', '');
+  const [readFilter, setReadFilter] = useSavedViewState('notifications-read', '');
   const { limit } = usePageSize('rows');
   const [page, setPage] = usePageState(limit);
 
@@ -56,7 +56,7 @@ export default function NotificationsPage() {
       <div className="page-header">
         <div>
           <h1 className="page-title">Notifications</h1>
-          <p className="text-slate-500 text-sm mt-1">{meta.total ?? 0} total</p>
+          <p className="text-slate-500 text-sm mt-1">{meta.total == null ? 'Total unavailable' : `${meta.total} total`}</p>
         </div>
         <button className="btn-secondary flex items-center gap-2" onClick={() => markAllRead()}>
           <CheckCheck size={16} /> Mark All Read
@@ -88,7 +88,7 @@ export default function NotificationsPage() {
       {/* List */}
       <div className="space-y-3">
         {isError ? <LoadError title="Could not load notifications" error={error} retry={refetch} /> : isLoading ? (
-          <div className="py-16 text-center text-slate-500">Loading...</div>
+          <div role="status" aria-label="Loading notifications" className="space-y-3">{[0, 1, 2].map((index) => <div key={index} className="notification-card min-h-20 animate-pulse" aria-hidden="true" />)}</div>
         ) : notifications.length === 0 ? (
           <div className="py-16 text-center">
             <Bell size={36} className="text-slate-600 mx-auto mb-3" />

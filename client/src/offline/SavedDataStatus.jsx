@@ -12,7 +12,10 @@ import toast from 'react-hot-toast';
 
 export function SavedDataGate({ children, fallback = null }) {
   const restoring = useSelector((state) => state.savedData.restoring);
-  return restoring ? fallback : children;
+  const offlineSession = useSelector((state) => state.auth.offlineSession);
+  // Public reads and verified routes mount while storage hydrates. A local-only
+  // workspace waits for its exact scoped snapshot before mounting its page.
+  return restoring && offlineSession && globalThis.navigator?.onLine === false ? fallback : children;
 }
 
 export function SavedScroll() {
@@ -97,7 +100,7 @@ export function WorkspaceSyncStatus({ standalone = false }) {
           : checking ? 'Checking for updates — saved data remains visible.'
           : failed ? 'Updates could not be downloaded — showing saved data.' : 'Showing saved data.';
   if (missing && !throttled.length) message += ' Connect to the internet to download missing data.';
-  if (standalone && !offline && !status.storageError && !status.logoutPending && !intents.length) return null;
+  if (standalone && !offline && !offlineSession && !status.storageError && !status.logoutPending && !intents.length) return null;
   const needsAttention = offline || unreachable || failed || status.storageError || status.logoutPending || intents.length > 0;
   const Icon = offline ? CloudOff : needsAttention ? AlertCircle : Cloud;
   return (

@@ -1,0 +1,208 @@
+[
+  {
+    "role": "store_owner",
+    "scope": "Local disposable data, client route navigation; not hosted capacity or field Web Vitals.",
+    "measurements": [
+      {
+        "route": "/store/dashboard",
+        "visibleMs": 342
+      },
+      {
+        "route": "/store/products",
+        "visibleMs": 99
+      },
+      {
+        "route": "/store/pos",
+        "visibleMs": 99
+      },
+      {
+        "route": "/store/inventory",
+        "visibleMs": 115
+      },
+      {
+        "route": "/store/orders",
+        "visibleMs": 82
+      },
+      {
+        "route": "/store/udhar",
+        "visibleMs": 84
+      },
+      {
+        "route": "/store/daily-closing",
+        "visibleMs": 198
+      },
+      {
+        "route": "/store/reports",
+        "visibleMs": 219
+      },
+      {
+        "route": "/store/sales",
+        "visibleMs": 95
+      },
+      {
+        "route": "/store/orders/payment-queue",
+        "visibleMs": 81
+      },
+      {
+        "route": "/store/packing/work",
+        "visibleMs": 68
+      },
+      {
+        "route": "/store/packing",
+        "visibleMs": 179
+      },
+      {
+        "route": "/store/deliveries",
+        "visibleMs": 66
+      },
+      {
+        "route": "/store/returns",
+        "visibleMs": 83
+      },
+      {
+        "route": "/store/categories",
+        "visibleMs": 66
+      },
+      {
+        "route": "/store/inventory/low-stock",
+        "visibleMs": 82
+      },
+      {
+        "route": "/store/purchases",
+        "visibleMs": 80
+      },
+      {
+        "route": "/store/suppliers",
+        "visibleMs": 86
+      },
+      {
+        "route": "/store/expenses",
+        "visibleMs": 95
+      },
+      {
+        "route": "/store/salary",
+        "visibleMs": 99
+      },
+      {
+        "route": "/store/supplier-payments",
+        "visibleMs": 66
+      },
+      {
+        "route": "/store/profit-loss",
+        "visibleMs": 99
+      },
+      {
+        "route": "/store/staff",
+        "visibleMs": 81
+      },
+      {
+        "route": "/store/staff-activity",
+        "visibleMs": 67
+      },
+      {
+        "route": "/store/coupons",
+        "visibleMs": 64
+      },
+      {
+        "route": "/store/offers",
+        "visibleMs": 66
+      },
+      {
+        "route": "/store/settings",
+        "visibleMs": 86
+      },
+      {
+        "route": "/store/notifications",
+        "visibleMs": 77
+      },
+      {
+        "route": "/store/backup",
+        "visibleMs": 82
+      },
+      {
+        "route": "/store/audit-logs",
+        "visibleMs": 99
+      },
+      {
+        "route": "/store/dashboard",
+        "visibleMs": 82
+      }
+    ]
+  },
+  {
+    "role": "staff",
+    "scope": "Local disposable data, client route navigation; not hosted capacity or field Web Vitals.",
+    "measurements": [
+      {
+        "route": "/staff/dashboard",
+        "visibleMs": 319
+      },
+      {
+        "route": "/staff/orders",
+        "visibleMs": 81
+      },
+      {
+        "route": "/staff/pos",
+        "visibleMs": 99
+      },
+      {
+        "route": "/staff/packing",
+        "visibleMs": 180
+      }
+    ]
+  },
+  {
+    "role": "packer",
+    "scope": "Local disposable data, client route navigation; not hosted capacity or field Web Vitals.",
+    "measurements": [
+      {
+        "route": "/staff/dashboard",
+        "visibleMs": 708
+      },
+      {
+        "route": "/staff/packing",
+        "visibleMs": 182
+      },
+      {
+        "route": "/store/products",
+        "visibleMs": 198
+      }
+    ]
+  },
+  {
+    "role": "delivery",
+    "scope": "Local disposable data, client route navigation; not hosted capacity or field Web Vitals.",
+    "measurements": [
+      {
+        "route": "/staff/dashboard",
+        "visibleMs": 659
+      },
+      {
+        "route": "/staff/deliveries",
+        "visibleMs": 65
+      }
+    ]
+  },
+  {
+    "role": "super_admin",
+    "scope": "Local disposable data, client route navigation; not hosted capacity or field Web Vitals.",
+    "measurements": [
+      {
+        "route": "/super-admin/dashboard",
+        "visibleMs": 297
+      },
+      {
+        "route": "/super-admin/stores",
+        "visibleMs": 83
+      },
+      {
+        "route": "/super-admin/plans",
+        "visibleMs": 65
+      },
+      {
+        "route": "/super-admin/audit-logs",
+        "visibleMs": 84
+      }
+    ]
+  }
+]

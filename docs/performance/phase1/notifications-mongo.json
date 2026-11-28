@@ -1,0 +1,18 @@
+{
+  "notifications": 3000,
+  "pageSize": 20,
+  "results": [
+    {
+      "inbox": "owner",
+      "returned": 20,
+      "documentsExamined": 40,
+      "blockingSort": false
+    },
+    {
+      "inbox": "worker",
+      "returned": 20,
+      "documentsExamined": 20,
+      "blockingSort": false
+    }
+  ]
+}

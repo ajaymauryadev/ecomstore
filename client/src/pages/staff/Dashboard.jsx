@@ -31,13 +31,13 @@ export default function StaffDashboard() {
   const historical = dashboard.businessDate && dashboard.businessDate !== accountingDate(undefined, resolveStoreTimeZone(store?.settings?.timezone));
 
   const metrics = isDelivery ? [
-    { label: 'Assigned', value: stats.assignedOrders || 0, color: 'text-blue-400' },
-    { label: 'Delivered today', value: stats.deliveredToday || 0, color: 'text-emerald-400' },
+    { label: 'Assigned', value: stats.assignedOrders ?? '—', color: 'text-blue-400' },
+    { label: 'Delivered today', value: stats.deliveredToday ?? '—', color: 'text-emerald-400' },
   ] : [
-    { label: 'Sales today', value: formatCurrency(stats.salesToday || 0), color: 'text-gold-400' },
-    { label: 'Orders today', value: stats.ordersToday || 0, color: 'text-blue-400' },
-    { label: 'Items packed', value: stats.itemsPacked || 0, color: 'text-emerald-400' },
-    { label: 'Assigned', value: stats.assignedOrders || 0, color: 'text-purple-400' },
+    { label: 'Sales today', value: stats.salesToday == null ? '—' : formatCurrency(stats.salesToday), color: 'text-gold-400' },
+    { label: 'Orders today', value: stats.ordersToday ?? '—', color: 'text-blue-400' },
+    { label: 'Items packed', value: stats.itemsPacked ?? '—', color: 'text-emerald-400' },
+    { label: 'Assigned', value: stats.assignedOrders ?? '—', color: 'text-purple-400' },
   ];
 
   return (

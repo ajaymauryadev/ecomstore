@@ -1,0 +1,1273 @@
+{
+  "scope": "Vite development only; React production build does not emit Profiler callbacks",
+  "generatedAt": "2026-11-28T09:27:56.664Z",
+  "browser": "chromium",
+  "runs": {
+    "publicCold": [
+      {
+        "usefulMs": 21992.699999999255,
+        "renders": [
+          {
+            "id": "App",
+            "phase": "mount",
+            "ms": 12.2
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 0.7
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 0.2
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 0.1
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 3.9
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 1
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 0
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 11.7
+          },
+          {
+            "id": "App",
+            "phase": "nested-update",
+            "ms": 2.5
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 2.4
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 7.2
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 2.6
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 2.7
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 10.5
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 2.5
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 0.2
+          }
+        ]
+      },
+      {
+        "usefulMs": 611.1000000014901,
+        "renders": [
+          {
+            "id": "App",
+            "phase": "mount",
+            "ms": 11.3
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 0.7
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 0.2
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 0.2
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 3.9
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 0.9
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 0
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 10.8
+          },
+          {
+            "id": "App",
+            "phase": "nested-update",
+            "ms": 2.3
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 2.3
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 7.7
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 3.4
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 3.4
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 10.6
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 1.9
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 0
+          }
+        ]
+      },
+      {
+        "usefulMs": 627.8000000007451,
+        "renders": [
+          {
+            "id": "App",
+            "phase": "mount",
+            "ms": 12.6
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 0.6
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 0.2
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 0.1
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 4.1
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 1
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 0.1
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 10.7
+          },
+          {
+            "id": "App",
+            "phase": "nested-update",
+            "ms": 2.8
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 2.7
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 7.3
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 3.1
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 2.5
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 10.6
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 1.8
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 0.1
+          }
+        ]
+      },
+      {
+        "usefulMs": 620.8000000007451,
+        "renders": [
+          {
+            "id": "App",
+            "phase": "mount",
+            "ms": 11.5
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 0.7
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 0.2
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 0.2
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 4
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 0.9
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 0.2
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 11
+          },
+          {
+            "id": "App",
+            "phase": "nested-update",
+            "ms": 2.5
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 2.4
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 7.2
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 3.1
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 3
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 11.3
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 1.9
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 0.1
+          }
+        ]
+      },
+      {
+        "usefulMs": 644.6999999992549,
+        "renders": [
+          {
+            "id": "App",
+            "phase": "mount",
+            "ms": 16.5
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 0.7
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 0.1
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 0.1
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 3.8
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 1
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 0.1
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 10.9
+          },
+          {
+            "id": "App",
+            "phase": "nested-update",
+            "ms": 2.5
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 2.5
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 7.2
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 2.6
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 2.8
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 10.5
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 2
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 0.1
+          }
+        ]
+      }
+    ],
+    "publicWarm": [
+      {
+        "usefulMs": 223.09999999776483,
+        "renders": [
+          {
+            "id": "App",
+            "phase": "mount",
+            "ms": 4.2
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 0.2
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 0.2
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 0.1
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 2.1
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 0.3
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 0
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 5.5
+          },
+          {
+            "id": "App",
+            "phase": "nested-update",
+            "ms": 1.8
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 1.6
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 4.3
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 2.7
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 2.1
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 1.4
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 1.8
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 0.2
+          }
+        ]
+      },
+      {
+        "usefulMs": 245.39999999850988,
+        "renders": [
+          {
+            "id": "App",
+            "phase": "mount",
+            "ms": 4.3
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 0.4
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 0.3
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 0.1
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 2.1
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 0.5
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 0
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 5.3
+          },
+          {
+            "id": "App",
+            "phase": "nested-update",
+            "ms": 1.8
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 1.6
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 5.3
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 3.6
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 4.4
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 1.4
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 2
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 0
+          }
+        ]
+      },
+      {
+        "usefulMs": 252.19999999925494,
+        "renders": [
+          {
+            "id": "App",
+            "phase": "mount",
+            "ms": 7.1
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 0.3
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 0.2
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 0.1
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 8
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 3.8
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 3.1
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 1.7
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 4.8
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 2.9
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 1.4
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 0.3
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 0.1
+          }
+        ]
+      },
+      {
+        "usefulMs": 244.39999999850988,
+        "renders": [
+          {
+            "id": "App",
+            "phase": "mount",
+            "ms": 4.3
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 0.3
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 0.2
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 0.1
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 3
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 0.4
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 0
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 5.3
+          },
+          {
+            "id": "App",
+            "phase": "nested-update",
+            "ms": 2
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 1.6
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 4.4
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 2.5
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 2.1
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 1.4
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 1.9
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 0.2
+          }
+        ]
+      },
+      {
+        "usefulMs": 225.5,
+        "renders": [
+          {
+            "id": "App",
+            "phase": "mount",
+            "ms": 4.3
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 0.4
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 0.2
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 0.2
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 2.2
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 0.5
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 0
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 5.3
+          },
+          {
+            "id": "App",
+            "phase": "nested-update",
+            "ms": 1.9
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 1.6
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 4.9
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 2.9
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 2.5
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 1.4
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 2.3
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 0.1
+          }
+        ]
+      }
+    ],
+    "ownerCold": [
+      {
+        "usefulMs": 695.1999999992549,
+        "renders": [
+          {
+            "id": "App",
+            "phase": "mount",
+            "ms": 5.2
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 1
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 6.7
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 0.1
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 3
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 10
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 5.9
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 0.2
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 1.7
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 6.9
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 0.5
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 5.2
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 2.5
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 2.8
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 0.3
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 1
+          }
+        ]
+      },
+      {
+        "usefulMs": 628.7999999970198,
+        "renders": [
+          {
+            "id": "App",
+            "phase": "mount",
+            "ms": 5.5
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 1.2
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 6.6
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 0.1
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 3.6
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 10.9
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 5.9
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 0.2
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 9.1
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 0.7
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 0.4
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 3.9
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 3.7
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 2.4
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 0.5
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 0.6
+          }
+        ]
+      },
+      {
+        "usefulMs": 1580.5999999977648,
+        "renders": [
+          {
+            "id": "App",
+            "phase": "mount",
+            "ms": 12.9
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 5.4
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 28.1
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 0.4
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 11.1
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 32.4
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 17.6
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 0.3
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 4
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 21.7
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 1.6
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 13.4
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 8
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 10.5
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 0.8
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 0.7
+          }
+        ]
+      },
+      {
+        "usefulMs": 1648.6000000014901,
+        "renders": [
+          {
+            "id": "App",
+            "phase": "mount",
+            "ms": 14.5
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 4.1
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 18.1
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 0.3
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 8.5
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 36.3
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 17.6
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 0.3
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 3.7
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 2.7
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 22.6
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 11.1
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 10.2
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 10.7
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 0.7
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 1.2
+          }
+        ]
+      },
+      {
+        "usefulMs": 1641.699999999255,
+        "renders": [
+          {
+            "id": "App",
+            "phase": "mount",
+            "ms": 15.4
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 4.1
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 23.5
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 1.1
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 12.1
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 32.9
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 16.4
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 0.5
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 3.5
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 1.7
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 18.8
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 12.2
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 7.3
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 10
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 2.6
+          },
+          {
+            "id": "App",
+            "phase": "update",
+            "ms": 0.7
+          }
+        ]
+      }
+    ]
+  }
+}

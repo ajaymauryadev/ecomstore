@@ -1,10 +1,12 @@
 // Business data deliberately lives outside the service worker's public asset cache.
+import { diagnosticsEnabled, recordDuration } from '../diagnostics/performance';
 const DATABASE = 'smart-kirana-saved-data';
 const VERSION = 2;
 let database;
 
 async function open() {
   if (!globalThis.indexedDB) throw new Error('Offline storage is unavailable in this browser.');
+  const started = diagnosticsEnabled() ? performance.now() : null;
   database ??= new Promise((resolve, reject) => {
     const request = indexedDB.open(DATABASE, VERSION);
     request.onupgradeneeded = () => {
@@ -19,18 +21,21 @@ async function open() {
     request.onerror = () => { database = undefined; reject(request.error); };
     request.onblocked = () => { database = undefined; reject(new Error('Close older app tabs to update offline storage.')); };
   });
-  return database;
+  try { return await database; }
+  finally { if (started !== null) recordDuration('idb.openWait', performance.now() - started); }
 }
 
 export async function storageRequest(store, mode, operation) {
+  const started = diagnosticsEnabled() ? performance.now() : null;
   const db = await open();
-  return new Promise((resolve, reject) => {
+  try { return await new Promise((resolve, reject) => {
     const transaction = db.transaction(store, mode);
     const request = operation(transaction.objectStore(store));
     transaction.oncomplete = () => resolve(request?.result);
     transaction.onerror = () => reject(transaction.error || request?.error);
     transaction.onabort = () => reject(transaction.error || new Error('Saving offline data was interrupted.'));
-  });
+  }); }
+  finally { if (started !== null) recordDuration(`idb.${mode}`, performance.now() - started); }
 }
 
 export const savedStorage = {
@@ -44,6 +49,18 @@ export const SNAPSHOT_SCHEMA = 1;
 export const MAX_SAVED_QUERIES = 240;
 export const MAX_SNAPSHOT_BYTES = 20 * 1024 * 1024;
 export const OFFLINE_ACCESS_MS = 12 * 60 * 60 * 1000;
+
+const LOGOUT_MARKER = 'smart-kirana-pending-logout';
+export function readPendingLogoutMarker() {
+  try { return globalThis.localStorage?.getItem(LOGOUT_MARKER) === '1'; }
+  catch { return false; }
+}
+export function writePendingLogoutMarker(pending) {
+  try {
+    if (pending) globalThis.localStorage?.setItem(LOGOUT_MARKER, '1');
+    else globalThis.localStorage?.removeItem(LOGOUT_MARKER);
+  } catch { /* IndexedDB remains the durable fallback. */ }
+}
 
 export function accountScope(auth) {
   return JSON.stringify([

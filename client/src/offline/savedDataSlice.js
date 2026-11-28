@@ -2,7 +2,7 @@ import { createSlice } from '@reduxjs/toolkit';
 
 const slice = createSlice({
   name: 'savedData',
-  initialState: { restoring: false, storageError: null, serverUnavailable: false, offline: false, shellReady: false, logoutPending: false },
+  initialState: { restoring: false, identityReady: false, identityError: false, storageError: null, serverUnavailable: false, offline: false, shellReady: false, logoutPending: false },
   reducers: { savedDataStatus: (state, { payload }) => Object.assign(state, payload) },
 });
 export const { savedDataStatus } = slice.actions;

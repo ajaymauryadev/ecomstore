@@ -55,7 +55,7 @@ export default function OrderHistory() {
         </Link>
         <div>
           <h1 className="text-xl font-bold text-slate-100">My Orders</h1>
-          <p className="text-xs text-slate-400">{isLoading ? 'Your orders' : `${meta.total ?? 0} total orders`}</p>
+          <p className="text-xs text-slate-400">{meta.total == null ? 'Order count unavailable' : `${meta.total} total orders`}</p>
         </div>
       </div>
 

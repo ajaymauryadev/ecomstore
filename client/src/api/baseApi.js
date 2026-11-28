@@ -2,6 +2,7 @@ import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import { setCredentials, clearCredentials, selectSessionEpoch } from '../features/auth/authSlice';
 import { savedDataStatus, HYDRATE_SAVED_DATA } from '../offline/savedDataSlice';
 import { useQueryReadState } from '../offline/ReadStateContext';
+import { diagnosticsEnabled, recordDuration } from '../diagnostics/performance';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api/v1';
 
@@ -17,6 +18,13 @@ const baseQuery = fetchBaseQuery({
   },
 });
 
+const measuredBaseQuery = async (args, api, extraOptions) => {
+  if (!diagnosticsEnabled()) return baseQuery(args, api, extraOptions);
+  const started = performance.now();
+  try { return await baseQuery(args, api, extraOptions); }
+  finally { recordDuration(`api.${api.endpoint}`, performance.now() - started); }
+};
+
 const sessions = new WeakMap();
 const staleSession = () => ({ error: { status: 'CUSTOM_ERROR', data: { message: 'The session changed. Reopen this view.' } } });
 
@@ -31,7 +39,7 @@ const isBusinessLiveRead = (args, role) => ['super_admin', 'store_owner', 'staff
 const refreshQuery = async (args, api, extraOptions, isCurrent) => {
   let result;
   for (let attempt = 0; attempt < 3; attempt += 1) {
-    result = await baseQuery(args, api, extraOptions);
+    result = await measuredBaseQuery(args, api, extraOptions);
     if (!isCurrent()) return staleSession();
     if (result.error?.status !== 409) break;
     if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 250 * (attempt + 1)));
@@ -85,7 +93,8 @@ const baseQueryWithReauth = async (args, api, extraOptions) => {
     sessions.set(api.getState, session);
   }
   const sessionEndpoint = isSessionEndpoint(args);
-  if (/\/auth\/(login|register)$/.test(requestUrl(args) || '') && api.getState().savedData?.logoutPending) {
+  if (/\/auth\/(login|register)$/.test(requestUrl(args) || '') &&
+      (!api.getState().savedData?.identityReady || api.getState().savedData?.logoutPending)) {
     return { error: { status: 409, data: { message: 'Finishing the previous sign-out. Connect online and try again shortly.' } } };
   }
   if ((typeof navigator !== 'undefined' && navigator.onLine === false) ||
@@ -110,13 +119,13 @@ const baseQueryWithReauth = async (args, api, extraOptions) => {
 
   let result = requestUrl(args) === '/auth/refresh'
     ? await refreshQuery(args, api, extraOptions, isCurrent)
-    : await baseQuery(args, api, extraOptions);
+    : await measuredBaseQuery(args, api, extraOptions);
   if (!isCurrent()) return staleSession();
 
   if (result?.error?.status === 401 && accessToken && !sessionEndpoint) {
     const currentToken = api.getState().auth.accessToken;
     if (currentToken && currentToken !== accessToken) {
-      result = await baseQuery(args, api, extraOptions);
+      result = await measuredBaseQuery(args, api, extraOptions);
     } else {
       const cooldown = session.refreshCooldown;
       if (cooldown?.result.error.data.retryAt > Date.now()) {
@@ -143,7 +152,7 @@ const baseQueryWithReauth = async (args, api, extraOptions) => {
       const refreshResult = await session.refreshPromise;
       if (!isCurrent()) return staleSession();
       if (!refreshResult?.data?.data) return refreshResult;
-      result = await baseQuery(args, api, extraOptions);
+      result = await measuredBaseQuery(args, api, extraOptions);
     }
   }
 

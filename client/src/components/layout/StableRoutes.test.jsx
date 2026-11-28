@@ -56,12 +56,16 @@ test('retaining a slow route never keeps private content after sign-out', async 
   expect(screen.queryByRole('heading', { name: 'Second page' })).not.toBeInTheDocument();
 });
 
-test('restoring an account snapshot keeps the workspace shell mounted', () => {
+test('restoring an account snapshot keeps the current verified page and draft mounted', () => {
   const { store } = mount();
   const shell = screen.getByText('Workspace navigation');
+  const draft = screen.getByRole('textbox', { name: 'Draft' });
+  fireEvent.change(draft, { target: { value: 'Still editing' } });
   act(() => store.dispatch(savedDataStatus({ restoring: true })));
   expect(screen.getByText('Workspace navigation')).toBe(shell);
-  expect(screen.getByRole('status', { name: 'Restoring saved view' })).toBeVisible();
+  expect(screen.getByRole('heading', { name: 'Saved first page' })).toBeVisible();
+  expect(screen.getByRole('textbox', { name: 'Draft' })).toBe(draft);
+  expect(draft).toHaveValue('Still editing');
   act(() => store.dispatch(savedDataStatus({ restoring: false })));
   expect(screen.getByText('Workspace navigation')).toBe(shell);
   expect(screen.getByRole('heading', { name: 'Saved first page' })).toBeVisible();

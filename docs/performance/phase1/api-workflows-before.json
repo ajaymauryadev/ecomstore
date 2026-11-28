@@ -1,0 +1,142 @@
+{
+  "generatedAt": "2026-11-28T09:14:42.134Z",
+  "node": "v24.14.1",
+  "scope": "Disposable local MongoDB, real HTTP/auth API; 10,000 synthetic products, two tenants. Warm reads, max four concurrent users, no production traffic; not a Northflank capacity estimate. Small samples make p99 exploratory.",
+  "rssMiB": 248.21,
+  "results": [
+    {
+      "route": "/inventory/list?limit=5",
+      "concurrency": 1,
+      "samples": 10,
+      "p50Ms": 8.2,
+      "p95Ms": 10.04,
+      "p99Ms": 10.04,
+      "requestsPerSecond": 119.26,
+      "cpuMsPerRequest": 7.8,
+      "queryCommands": 4,
+      "productDocumentsTransferred": 5,
+      "plan": {
+        "documentsExamined": 5,
+        "keysExamined": 5,
+        "returned": 5,
+        "blockingSort": false
+      },
+      "responseBytes": 1502,
+      "total": 5000,
+      "previewNames": [
+        "Product 00000",
+        "Product 00001",
+        "Product 00002",
+        "Product 00003",
+        "Product 00004"
+      ]
+    },
+    {
+      "route": "/inventory/list?limit=5",
+      "concurrency": 4,
+      "samples": 40,
+      "p50Ms": 14.25,
+      "p95Ms": 18.18,
+      "p99Ms": 18.34,
+      "requestsPerSecond": 255.93,
+      "cpuMsPerRequest": 6.25,
+      "queryCommands": 4,
+      "productDocumentsTransferred": 5,
+      "plan": {
+        "documentsExamined": 5,
+        "keysExamined": 5,
+        "returned": 5,
+        "blockingSort": false
+      },
+      "responseBytes": 1502,
+      "total": 5000,
+      "previewNames": [
+        "Product 00000",
+        "Product 00001",
+        "Product 00002",
+        "Product 00003",
+        "Product 00004"
+      ]
+    },
+    {
+      "route": "/inventory/list?limit=5&stockStatus=low_stock",
+      "concurrency": 1,
+      "samples": 10,
+      "p50Ms": 16.76,
+      "p95Ms": 17.52,
+      "p99Ms": 17.52,
+      "requestsPerSecond": 59.07,
+      "cpuMsPerRequest": 1.5,
+      "queryCommands": 4,
+      "productDocumentsTransferred": 5,
+      "plan": {
+        "documentsExamined": 6,
+        "keysExamined": 6,
+        "returned": 5,
+        "blockingSort": false
+      },
+      "responseBytes": 1501,
+      "total": 1250,
+      "previewNames": [
+        "Product 00001",
+        "Product 00002",
+        "Product 00003",
+        "Product 00004",
+        "Product 00005"
+      ]
+    },
+    {
+      "route": "/inventory/list?limit=5&stockStatus=low_stock",
+      "concurrency": 4,
+      "samples": 40,
+      "p50Ms": 23.79,
+      "p95Ms": 25.21,
+      "p99Ms": 28.23,
+      "requestsPerSecond": 160.04,
+      "cpuMsPerRequest": 5.9,
+      "queryCommands": 4,
+      "productDocumentsTransferred": 5,
+      "plan": {
+        "documentsExamined": 6,
+        "keysExamined": 6,
+        "returned": 5,
+        "blockingSort": false
+      },
+      "responseBytes": 1501,
+      "total": 1250,
+      "previewNames": [
+        "Product 00001",
+        "Product 00002",
+        "Product 00003",
+        "Product 00004",
+        "Product 00005"
+      ]
+    },
+    {
+      "route": "/dashboard",
+      "concurrency": 1,
+      "samples": 10,
+      "p50Ms": 26.34,
+      "p95Ms": 27.83,
+      "p99Ms": 27.83,
+      "requestsPerSecond": 37.98,
+      "cpuMsPerRequest": 17.1,
+      "queryCommands": 9,
+      "productDocumentsTransferred": 0,
+      "responseBytes": 4749
+    },
+    {
+      "route": "/dashboard",
+      "concurrency": 4,
+      "samples": 40,
+      "p50Ms": 35.13,
+      "p95Ms": 47.35,
+      "p99Ms": 49.94,
+      "requestsPerSecond": 96.51,
+      "cpuMsPerRequest": 7.83,
+      "queryCommands": 9,
+      "productDocumentsTransferred": 0,
+      "responseBytes": 4749
+    }
+  ]
+}

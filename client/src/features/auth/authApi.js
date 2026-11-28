@@ -1,6 +1,6 @@
 import { baseApi } from '../../api/baseApi';
 import { setCredentials, clearCredentials, selectSessionEpoch, updateUser } from './authSlice';
-import { savedStorage } from '../../offline/storage';
+import { savedStorage, writePendingLogoutMarker } from '../../offline/storage';
 import { savedDataStatus } from '../../offline/savedDataSlice';
 
 export const authApi = baseApi.injectEndpoints({
@@ -37,17 +37,27 @@ export const authApi = baseApi.injectEndpoints({
       query: () => ({ url: '/auth/logout', method: 'POST' }),
       async onQueryStarted({ requireServerConfirmation = false } = {}, { dispatch, getState, queryFulfilled }) {
         const epoch = selectSessionEpoch(getState());
+        writePendingLogoutMarker(true);
         const remembered = savedStorage.put('identity', 'logoutPending', true).catch(() => {
           dispatch(savedDataStatus({ storageError: 'Sign-out could not be saved on this device. Connect online to finish signing out.' }));
         });
         try {
           await queryFulfilled;
           dispatch(savedDataStatus({ logoutPending: false }));
+          writePendingLogoutMarker(false);
           void remembered.then(() => savedStorage.delete('identity', 'logoutPending')).catch(() => {});
-        } catch {
+        } catch (failure) {
           await remembered;
-          dispatch(savedDataStatus({ logoutPending: true }));
-          if (requireServerConfirmation) return;
+          const status = failure?.error?.status ?? failure?.status;
+          if (requireServerConfirmation && [401, 403].includes(status)) {
+            // An expired cookie already has no server session to revoke.
+            dispatch(savedDataStatus({ logoutPending: false }));
+            writePendingLogoutMarker(false);
+            void savedStorage.delete('identity', 'logoutPending').catch(() => {});
+          } else {
+            dispatch(savedDataStatus({ logoutPending: true }));
+            if (requireServerConfirmation) return;
+          }
         }
         if (selectSessionEpoch(getState()) !== epoch) return;
         dispatch(clearCredentials());

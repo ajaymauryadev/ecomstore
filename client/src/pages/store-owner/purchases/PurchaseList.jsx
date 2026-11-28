@@ -40,7 +40,7 @@ export default function PurchaseList() {
       <div className="page-header">
         <div>
           <h1 className="page-title">Purchases</h1>
-          <p className="text-slate-400 text-sm mt-0.5">{meta.total ?? 0} total entries</p>
+          <p className="text-slate-400 text-sm mt-0.5">{meta.total == null ? 'Entry count unavailable' : `${meta.total} total entries`}</p>
         </div>
         <Link to={ROUTES.STORE.PURCHASE_NEW} className="btn btn-primary btn-sm gap-1.5">
           <Plus size={14} /> New Purchase
@@ -51,10 +51,10 @@ export default function PurchaseList() {
       {stats.totalPurchases > 0 && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {[
-            { label: 'Total Purchases', value: meta.total ?? 0, color: 'text-blue-400' },
-            { label: 'Total Amount', value: formatCurrency(stats.totalAmount || 0), color: 'text-gold-400' },
-            { label: 'Total Paid', value: formatCurrency(stats.totalPaid || 0), color: 'text-emerald-400' },
-            { label: 'Pending', value: formatCurrency(stats.totalPending || 0), color: 'text-red-400' },
+            { label: 'Total Purchases', value: meta.total ?? '—', color: 'text-blue-400' },
+            { label: 'Total Amount', value: stats.totalAmount == null ? '—' : formatCurrency(stats.totalAmount), color: 'text-gold-400' },
+            { label: 'Total Paid', value: stats.totalPaid == null ? '—' : formatCurrency(stats.totalPaid), color: 'text-emerald-400' },
+            { label: 'Pending', value: stats.totalPending == null ? '—' : formatCurrency(stats.totalPending), color: 'text-red-400' },
           ].map((s) => (
             <div key={s.label} className="kpi-card py-3">
               <p className="text-xs text-slate-400">{s.label}</p>

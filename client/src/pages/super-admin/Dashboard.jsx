@@ -13,7 +13,7 @@ const PLAN_COLORS = { trial: 'default', basic: 'info', premium: 'gold', enterpri
 
 export default function SuperAdminDashboard() {
   const { user } = useAuth();
-  const { data, isLoading } = useGetSystemStatsQuery(undefined, { pollingInterval: 0 });
+  const { data, isLoading, isError, refetch } = useGetSystemStatsQuery(undefined, { pollingInterval: 0 });
 
   const stats = data?.data;
   const planDist = stats?.planDistribution ?? [];
@@ -28,16 +28,18 @@ export default function SuperAdminDashboard() {
         </p>
       </div>
 
+      {isError && <div role="alert" className="workspace-feedback flex items-center justify-between gap-3"><span>System statistics are unavailable.</span><button type="button" className="btn-secondary" onClick={refetch}>Try again</button></div>}
+
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {isLoading ? (
           [0, 1, 2, 3].map((i) => <SkeletonKPI key={i} />)
         ) : (
           <>
-            <KPICard title="Total Stores" value={stats?.totalStores ?? 0} icon={<Store size={20} />} color="gold" />
-            <KPICard title="Active Stores" value={stats?.activeStores ?? 0} icon={<TrendingUp size={20} />} color="green" />
-            <KPICard title="Total Users" value={stats?.totalUsers ?? 0} icon={<Users size={20} />} color="blue" />
-            <KPICard title="Expiring Soon" value={stats?.expiringThisWeek ?? 0} icon={<AlertTriangle size={20} />} color="purple" />
+            <KPICard title="Total Stores" value={stats?.totalStores ?? '—'} icon={<Store size={20} />} color="gold" />
+            <KPICard title="Active Stores" value={stats?.activeStores ?? '—'} icon={<TrendingUp size={20} />} color="green" />
+            <KPICard title="Total Users" value={stats?.totalUsers ?? '—'} icon={<Users size={20} />} color="blue" />
+            <KPICard title="Expiring Soon" value={stats?.expiringThisWeek ?? '—'} icon={<AlertTriangle size={20} />} color="purple" />
           </>
         )}
       </div>
@@ -69,7 +71,7 @@ export default function SuperAdminDashboard() {
           ) : (
             <div className="divide-y divide-navy-700/40">
               {recentStores.length === 0 ? (
-                <div className="py-10 text-center text-slate-500 text-sm">No stores yet</div>
+                <div className="py-10 text-center text-slate-500 text-sm">{stats ? 'No stores yet' : 'Recent stores unavailable'}</div>
               ) : recentStores.map((store) => (
                 <Link key={store._id} to={`/super-admin/stores/${store._id}`} className="flex items-center gap-4 px-5 py-3.5 hover:bg-navy-700/20 transition-colors">
                   <div className="w-9 h-9 rounded-xl bg-gradient-gold flex items-center justify-center shrink-0">
@@ -99,7 +101,7 @@ export default function SuperAdminDashboard() {
               {[0, 1, 2, 3].map((i) => <div key={i} className="h-24 bg-navy-700/40 rounded-xl animate-pulse" />)}
             </div>
           ) : planDist.length === 0 ? (
-            <p className="text-slate-500 text-sm text-center py-8">No plan data yet</p>
+            <p className="text-slate-500 text-sm text-center py-8">{stats ? 'No plan data yet' : 'Plan data unavailable'}</p>
           ) : (
             <div className="space-y-3">
               {planDist.map((p) => {

@@ -3,9 +3,9 @@ import { Provider } from 'react-redux';
 import { MemoryRouter } from 'react-router-dom';
 import { act, cleanup, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeAll, beforeEach, expect, test, vi } from 'vitest';
-import { accountScope, businessSnapshot, savedStorage } from './storage';
+import { accountScope, businessSnapshot, savedStorage, writePendingLogoutMarker } from './storage';
 
-let baseApi, sessionReducer, sessionCacheMiddleware, savedDataMiddleware, restoreScope, startSavedDataSync, useSavedViewState, setCredentials, clearCredentials;
+let baseApi, sessionReducer, sessionCacheMiddleware, savedDataMiddleware, initializeSavedData, restoreScope, startSavedDataSync, useSavedViewState, setCredentials, clearCredentials;
 const stores = [];
 const NativeRequest = globalThis.Request;
 beforeEach(() => {
@@ -18,7 +18,7 @@ beforeAll(async () => {
   vi.stubEnv('VITE_API_URL', 'https://shop.test/api/v1');
   ({ baseApi } = await import('../api/baseApi'));
   ({ sessionReducer, sessionCacheMiddleware } = await import('../app/store'));
-  ({ savedDataMiddleware, restoreScope, startSavedDataSync } = await import('./savedData'));
+  ({ savedDataMiddleware, initializeSavedData, restoreScope, startSavedDataSync } = await import('./savedData'));
   ({ useSavedViewState } = await import('./useSavedViewState'));
   ({ setCredentials, clearCredentials } = await import('../features/auth/authSlice'));
   baseApi.injectEndpoints({ endpoints: (builder) => ({
@@ -29,6 +29,7 @@ beforeAll(async () => {
 afterEach(() => {
   cleanup();
   for (const store of stores.splice(0)) store.dispatch(clearCredentials());
+  writePendingLogoutMarker(false);
   vi.restoreAllMocks(); vi.unstubAllGlobals();
 });
 const response = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
@@ -41,6 +42,89 @@ async function makeStore(id = crypto.randomUUID()) {
   return store;
 }
 const read = (store, args = {}, options = {}) => store.dispatch(baseApi.endpoints.savedReadProbe.initiate(args, { subscribe: false, ...options }));
+
+function emptyStore() {
+  const store = configureStore({ reducer: sessionReducer, middleware: (getDefault) => getDefault()
+    .concat(sessionCacheMiddleware, savedDataMiddleware, baseApi.middleware) });
+  stores.push(store);
+  return store;
+}
+
+test('delayed or rejected identity storage never blocks the shell state or restores an unverified identity', async () => {
+  const store = emptyStore();
+  let release;
+  vi.spyOn(savedStorage, 'get').mockImplementation((table, key) => table === 'identity' && key === 'logoutPending'
+    ? new Promise((resolve) => { release = resolve; }) : Promise.resolve(null));
+  const boot = initializeSavedData(store);
+  expect(store.getState().savedData.identityReady).toBe(false);
+  expect(store.getState().auth.user).toBeNull();
+  release(false);
+  await boot;
+  expect(store.getState().savedData.identityReady).toBe(true);
+
+  const failed = emptyStore();
+  savedStorage.get.mockRejectedValue(new Error('IndexedDB unavailable'));
+  await initializeSavedData(failed);
+  expect(failed.getState().savedData.identityReady).toBe(true);
+  expect(failed.getState().savedData.identityError).toBe(true);
+  expect(failed.getState().savedData.storageError).toMatch(/Offline data/);
+  expect(failed.getState().auth.user).toBeNull();
+});
+
+test('pending logout is read before identity and prevents restoring saved protected data', async () => {
+  const store = emptyStore();
+  const get = vi.spyOn(savedStorage, 'get').mockImplementation((table, key) =>
+    table === 'identity' && key === 'logoutPending' ? Promise.resolve(true) : Promise.resolve(null));
+  await initializeSavedData(store);
+  expect(store.getState().savedData.logoutPending).toBe(true);
+  expect(store.getState().savedData.identityError).toBe(false);
+  expect(store.getState().auth.user).toBeNull();
+  expect(get).not.toHaveBeenCalledWith('identity', 'active');
+});
+
+test('the pending logout mirror survives an unavailable IndexedDB open', async () => {
+  writePendingLogoutMarker(true);
+  const get = vi.spyOn(savedStorage, 'get').mockRejectedValue(new Error('IndexedDB blocked'));
+  const store = emptyStore();
+  await initializeSavedData(store);
+  expect(store.getState().savedData.logoutPending).toBe(true);
+  expect(store.getState().auth.user).toBeNull();
+  expect(get).not.toHaveBeenCalledWith('identity', 'logoutPending');
+});
+
+test('a valid offline identity restores only when offline', async () => {
+  const identity = { user: { _id: 'offline-owner', role: 'store_owner', tenantId: 'shop' },
+    store: { _id: 'shop' }, verifiedAt: Date.now() };
+  vi.spyOn(savedStorage, 'get').mockImplementation((table, key) => Promise.resolve(
+    table === 'identity' && key === 'active' ? identity : null));
+  const onlineStore = emptyStore();
+  await initializeSavedData(onlineStore);
+  expect(onlineStore.getState().auth.user).toBeNull();
+  vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+  const offlineStore = emptyStore();
+  await initializeSavedData(offlineStore);
+  expect(offlineStore.getState().auth.user._id).toBe('offline-owner');
+  expect(offlineStore.getState().auth.offlineSession).toBe(true);
+});
+
+test('a delayed snapshot from tenant A cannot hydrate after switching to tenant B', async () => {
+  const store = await makeStore('owner-a');
+  vi.stubGlobal('fetch', vi.fn(async () => response({ data: ['Tenant A rice'] })));
+  await read(store);
+  const scopeA = accountScope(store.getState().auth);
+  const snapshotA = businessSnapshot(store.getState());
+  store.dispatch(baseApi.util.resetApiState());
+  let release;
+  vi.spyOn(savedStorage, 'get').mockImplementation((table, key) => table === 'snapshots' && key === scopeA
+    ? new Promise((resolve) => { release = resolve; }) : Promise.resolve(null));
+  const restoring = restoreScope(store);
+  store.dispatch(setCredentials({ user: { _id: 'owner-b', role: 'store_owner', tenantId: 'other-shop' },
+    store: { _id: 'other-shop' }, accessToken: 'tenant-b-token' }));
+  release(snapshotA);
+  await restoring;
+  expect(baseApi.endpoints.savedReadProbe.select({})(store.getState()).data).toBeUndefined();
+  expect(accountScope(store.getState().auth)).not.toBe(scopeA);
+});
 
 test('deduplicates reads and keeps visited data across repeated navigation without time expiry', async () => {
   const store = await makeStore();

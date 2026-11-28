@@ -64,7 +64,7 @@ export default function StoresPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-slate-100">All Stores</h1>
-          <p className="text-slate-500 text-sm mt-0.5">{meta.total ?? 0} stores total</p>
+          <p className="text-slate-500 text-sm mt-0.5">{meta.total == null ? 'Store count unavailable' : `${meta.total} stores total`}</p>
         </div>
         <button className="btn-primary text-sm" onClick={() => setShowCreate(true)}>
           <Plus size={15} /> New Store

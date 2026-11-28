@@ -237,6 +237,7 @@ for (const path of ['login', 'register']) {
 test('short desktop registration scrolls the form panel and keeps the brand fixed', async ({ page }) => {
   await page.setViewportSize({ width: 1366, height: 600 });
   await page.goto('/register');
+  await expect(page.getByRole('heading', { name: 'Create your store' })).toBeVisible();
   const brand = page.getByRole('banner');
   const panel = page.getByRole('main');
   const top = (await brand.boundingBox()).y;

@@ -1,0 +1,12 @@
+{
+  "condition": "Pre-Phase-3 Vite development server, disposable Mongo/API fixture, Chromium 1365x768, one sequential sample per route; first route per role is a cold document load, later routes are client history navigations",
+  "command": "npx playwright test --config playwright.storefront.config.js role-navigation.spec.js performance-loading.spec.js --reporter=line",
+  "result": "7 passed",
+  "rawVisibleMs": {
+    "store_owner": [["/store/dashboard",738],["/store/products",233],["/store/pos",98],["/store/inventory",215],["/store/orders",249],["/store/udhar",216],["/store/daily-closing",198],["/store/reports",268],["/store/sales",214],["/store/orders/payment-queue",100],["/store/packing/work",214],["/store/packing",200],["/store/deliveries",198],["/store/returns",216],["/store/categories",96],["/store/inventory/low-stock",199],["/store/purchases",199],["/store/suppliers",199],["/store/expenses",216],["/store/salary",183],["/store/supplier-payments",83],["/store/profit-loss",218],["/store/staff",197],["/store/staff-activity",198],["/store/coupons",183],["/store/offers",199],["/store/settings",199],["/store/notifications",82],["/store/backup",83],["/store/audit-logs",198],["/store/dashboard",67]],
+    "staff": [["/staff/dashboard",428],["/staff/orders",200],["/staff/pos",114],["/staff/packing",90]],
+    "packer": [["/staff/dashboard",442],["/staff/packing",182],["/store/products",209]],
+    "delivery": [["/staff/dashboard",455],["/staff/deliveries",199]],
+    "super_admin": [["/super-admin/dashboard",602],["/super-admin/stores",182],["/super-admin/plans",83],["/super-admin/audit-logs",99]]
+  }
+}

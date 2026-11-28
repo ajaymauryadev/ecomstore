@@ -18,12 +18,14 @@ import { asyncHandler } from './utils/asyncHandler.js';
 import { PRIVATE_PAYMENT_ROOT, PUBLIC_UPLOADS_ROOT, UPLOADS_ROOT } from './middleware/upload.js';
 import { remoteAsset } from './services/imageStorage.service.js';
 import { trackSavedDataChanges } from './middleware/savedDataSync.js';
+import { performanceDiagnostics } from './middleware/performanceDiagnostics.js';
 
 mkdirSync(PUBLIC_UPLOADS_ROOT, { recursive: true });
 mkdirSync(PRIVATE_PAYMENT_ROOT, { recursive: true, mode: 0o700 });
 
 export const app = express();
 app.set('trust proxy', env.TRUSTED_PROXY_CIDRS);
+app.use('/api', performanceDiagnostics);
 
 app.use(helmet({
   crossOriginEmbedderPolicy: false,
@@ -39,7 +41,7 @@ app.use(cors({
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Order-Access-Token', 'Idempotency-Key'],
-  exposedHeaders: ['Content-Disposition', 'Retry-After'],
+  exposedHeaders: ['Content-Disposition', 'Retry-After', 'X-Request-ID'],
 }));
 
 app.use('/api', (req, res, next) => {
