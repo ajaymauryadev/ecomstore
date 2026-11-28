@@ -46,6 +46,35 @@ const read = (endpoint) => store.dispatch(api.endpoints[endpoint].initiate(undef
   subscribe: false, forceRefetch: true,
 })).unwrap();
 
+test('a forbidden background read or write keeps the login and other authorized views', async () => {
+  createStore('staff');
+  const fetch = vi.fn()
+    .mockResolvedValueOnce(reply(200, { data: 'Authorized orders' }))
+    .mockResolvedValueOnce(reply(403, { message: 'You do not have permission to perform this action.' }))
+    .mockResolvedValueOnce(reply(403, { message: 'You do not have permission to perform this action.' }))
+    .mockResolvedValueOnce(reply(200, { data: 'Still signed in' }));
+  vi.stubGlobal('fetch', fetch);
+  const epoch = store.getState().auth.sessionEpoch;
+
+  await read('queue');
+  await expect(read('unread')).rejects.toMatchObject({ status: 403 });
+  await expect(store.dispatch(api.endpoints.submitBill.initiate()).unwrap()).rejects.toMatchObject({ status: 403 });
+  expect(store.getState().auth).toMatchObject({ user: { _id: 'staff' }, accessToken: 'original', sessionEpoch: epoch });
+  expect(api.endpoints.queue.select()(store.getState()).data).toEqual({ data: 'Authorized orders' });
+  await expect(read('unread')).resolves.toEqual({ data: 'Still signed in' });
+  expect(fetch).toHaveBeenCalledTimes(4);
+});
+
+test.each([401, 403])('an invalid refresh still clears the login: %s', async (status) => {
+  createStore('staff');
+  vi.stubGlobal('fetch', vi.fn()
+    .mockResolvedValueOnce(reply(401, {}))
+    .mockResolvedValueOnce(reply(status, { message: 'Session is no longer valid.' })));
+  await read('queue').catch(() => {});
+  expect(store.getState().auth.user).toBeNull();
+  expect(store.getState().auth.accessToken).toBeNull();
+});
+
 test('backs off background reads across the account and resumes after Retry-After', async () => {
   createStore('owner');
   let now = Date.UTC(2026, 10, 21);

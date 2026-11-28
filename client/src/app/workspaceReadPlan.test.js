@@ -1,6 +1,18 @@
 import { expect, test } from 'vitest';
 import { workspaceReadPlan } from './workspaceReadPlan';
 import { PAGE_SIZE } from '../constants/pagination';
+import { PERMISSIONS } from '../constants/permissions';
+
+test.each([
+  [{ role: 'staff' }, false],
+  [{ role: 'staff', permissions: [PERMISSIONS.RETURNS_PROCESS] }, true],
+  [{ role: 'store_owner' }, true],
+])('warms return statistics only with processing permission: %j', (user, allowed) => {
+  const plan = workspaceReadPlan(user, { slug: 'test' });
+  const queries = plan.find(({ path }) => path === '/store/returns').queries;
+  expect(queries.some(([endpoint]) => endpoint === 'getReturns')).toBe(true);
+  expect(queries.some(([endpoint]) => endpoint === 'getReturnStats')).toBe(allowed);
+});
 
 test('prepares the exact unvisited Supplier Dues query and all owner navigation destinations', () => {
   const plan = workspaceReadPlan({ role: 'store_owner' }, { slug: 'test' });

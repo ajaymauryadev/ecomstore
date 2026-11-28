@@ -34,7 +34,8 @@ export function workspaceReadPlan(user, store) {
   add(P.ACCOUNTING_VIEW, '/store/daily-closing', ['getDailySummary', { date: today }], ['getDailyClosings', page]);
   add(P.ACCOUNTING_VIEW, '/store/expenses', ['getExpenses', { ...page, ...range }], ['getExpenseStats', range]);
   add(P.SALARY_VIEW, '/store/salary', ['getSalaryRecords', { ...month, ...page }], ['getSalaryStats', month], ['getStaffList']);
-  add(P.RETURNS_VIEW, '/store/returns', ['getReturns', { type: 'customer_return', ...page }], ['getReturnStats', {}]);
+  add(P.RETURNS_VIEW, '/store/returns', ['getReturns', { type: 'customer_return', ...page }],
+    ...(hasPermission(user, P.RETURNS_PROCESS) ? [['getReturnStats', {}]] : []));
   add(P.REPORTS_SENSITIVE, '/store/profit-loss', ['getProfitLoss', range]);
   add(P.REPORTS_SENSITIVE, '/store/sales', ['getSalesOverview', { startDate: today, endDate: today, ...page }]);
   add(P.REPORTS_SENSITIVE, '/store/reports', ['getDailySales', { date: today }]);

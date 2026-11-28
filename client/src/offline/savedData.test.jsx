@@ -185,11 +185,13 @@ test('authoritative deletion and permission rejection cannot fall back to an old
   expect(hook.result.current.data).toBeUndefined();
   expect(hook.result.current.isError).toBe(true);
   expect(Object.keys(businessSnapshot(store.getState()).queries)).toHaveLength(0);
-  hook.unmount();
   vi.stubGlobal('fetch', vi.fn(async () => response({ message: 'Permission revoked' }, 403)));
-  await read(store, {}, { forceRefetch: true });
-  expect(store.getState().auth.user).toBeNull();
-  expect(baseApi.endpoints.savedReadProbe.select({})(store.getState()).data).toBeUndefined();
+  await act(async () => { await hook.result.current.refetch(); });
+  expect(store.getState().auth.user).not.toBeNull();
+  expect(hook.result.current.data).toBeUndefined();
+  expect(hook.result.current.isError).toBe(true);
+  expect(Object.keys(businessSnapshot(store.getState()).queries)).toHaveLength(0);
+  hook.unmount();
 });
 
 test('offline authorization expires after twelve hours from actual identity confirmation', async () => {

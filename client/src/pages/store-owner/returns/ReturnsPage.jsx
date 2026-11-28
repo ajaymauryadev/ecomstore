@@ -15,6 +15,7 @@ import {
 import { useGetProductsQuery } from '../../../features/products/productApi';
 import { useGetAdminOrdersQuery } from '../../../features/orders/orderApi';
 import { useAuth } from '../../../hooks/useAuth';
+import { hasPermission, PERMISSIONS } from '../../../constants/permissions';
 import { cn } from '../../../utils/cn';
 import toast from 'react-hot-toast';
 
@@ -363,7 +364,7 @@ function CreateReturnForm({ type, onSuccess, onCancel }) {
 }
 
 /* ── Return list row ── */
-function ReturnRow({ ret }) {
+function ReturnRow({ ret, canProcess }) {
   const [expanded, setExpanded] = useState(false);
   const meta = STATUS_META[ret.status] ?? STATUS_META.pending;
   const [processReturn, { isLoading }] = useProcessReturnMutation();
@@ -405,7 +406,8 @@ function ReturnRow({ ret }) {
             <p className="text-sm font-semibold text-slate-300">{fmt(ret.totalValue)}</p>
           )}
         </div>
-        <button onClick={() => setExpanded(!expanded)} className="text-slate-500 hover:text-slate-300 shrink-0">
+        <button aria-label={`${expanded ? 'Collapse' : 'Expand'} ${ret.returnNumber}`} aria-expanded={expanded}
+          onClick={() => setExpanded(!expanded)} className="text-slate-500 hover:text-slate-300 shrink-0">
           {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
         </button>
       </div>
@@ -434,7 +436,7 @@ function ReturnRow({ ret }) {
           )}
           {ret.notes && <p className="text-xs text-slate-500 italic">&quot;{ret.notes}&quot;</p>}
 
-          {ret.status === 'pending' && (
+          {canProcess && ret.status === 'pending' && (
             <div className="flex gap-2 pt-1">
               <button disabled={isLoading} onClick={() => handleProcess('reject')}
                 className="flex-1 py-2.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 font-semibold text-xs flex items-center justify-center gap-1.5 disabled:opacity-50">
@@ -455,6 +457,9 @@ function ReturnRow({ ret }) {
 
 /* ── Main Page ── */
 export default function ReturnsPage() {
+  const { user } = useAuth();
+  const canCreate = hasPermission(user, PERMISSIONS.RETURNS_CREATE);
+  const canProcess = hasPermission(user, PERMISSIONS.RETURNS_PROCESS);
   const [activeType, setActiveType] = useSavedViewState('ReturnsPage:ReturnsPage:activeType', 'customer_return');
   const [showCreate, setShowCreate] = useState(false);
   const [statusFilter, setStatusFilter] = useSavedViewState('ReturnsPage:ReturnsPage:statusFilter', '');
@@ -465,7 +470,7 @@ export default function ReturnsPage() {
     status: statusFilter || undefined,
     page: paging.page, limit: paging.limit,
   });
-  const { data: statsData } = useGetReturnStatsQuery({});
+  const { data: statsData } = useGetReturnStatsQuery({}, { skip: !canProcess });
   const returns = data?.data ?? [];
   const stats = statsData?.data?.stats ?? [];
 
@@ -479,16 +484,16 @@ export default function ReturnsPage() {
           <h1 className="text-xl font-bold text-slate-100">Returns & Exchange</h1>
           <p className="text-xs text-slate-500 mt-0.5">Customer returns and supplier returns</p>
         </div>
-        <button
+        {canCreate && <button
           onClick={() => setShowCreate(true)}
           className="flex items-center gap-2 px-3 py-2 bg-gold-500 text-navy-950 rounded-xl font-semibold text-sm hover:bg-gold-400"
         >
           <Plus size={15} /> New Return
-        </button>
+        </button>}
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 gap-3">
+      {canProcess && <div className="grid grid-cols-2 gap-3">
         <div className="bg-navy-800 border border-navy-700/60 rounded-xl p-4">
           <p className="text-xs text-slate-500">Customer Returns (processed)</p>
           <p className="text-lg font-bold text-slate-100">{customerStats?.count ?? 0}</p>
@@ -499,7 +504,7 @@ export default function ReturnsPage() {
           <p className="text-lg font-bold text-slate-100">{purchaseStats?.count ?? 0}</p>
           <p className="text-sm text-blue-400 font-medium">{fmt(purchaseStats?.totalValue)}</p>
         </div>
-      </div>
+      </div>}
 
       {/* Type tabs */}
       <div className="flex gap-1 bg-navy-800 border border-navy-700/60 rounded-xl p-1">
@@ -544,14 +549,14 @@ export default function ReturnsPage() {
       ) : (
         <div className="space-y-2">
           {returns.map((ret) => (
-            <ReturnRow key={ret._id} ret={ret} />
+            <ReturnRow key={ret._id} ret={ret} canProcess={canProcess} />
           ))}
         </div>
       )}
 
       <Pagination meta={data?.meta} page={paging.page} onPageChange={paging.setPage} isFetching={isFetching} label="returns" />
       {/* Create form modal */}
-      {showCreate && (
+      {canCreate && showCreate && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm overflow-y-auto">
           <div className="min-h-full flex items-start justify-center p-4 pt-8">
             <div className="w-full max-w-lg bg-navy-900 border border-navy-700/60 rounded-2xl overflow-hidden">

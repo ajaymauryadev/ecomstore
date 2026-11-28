@@ -5,6 +5,7 @@ import { Toaster } from 'react-hot-toast';
 import { selectCurrentUser } from './features/auth/authSlice';
 import AuthInit from './components/shared/AuthInit';
 import ProtectedRoute from './components/shared/ProtectedRoute';
+import UnauthorizedPage from './components/shared/UnauthorizedPage';
 import ErrorBoundary from './components/shared/ErrorBoundary';
 import SocketProvider from './components/shared/SocketProvider';
 import LiveUpdates from './components/shared/LiveUpdates';
@@ -155,7 +156,7 @@ export default function App() {
               <Route path="notifications" element={<Access permission={PERMISSIONS.NOTIFICATIONS_VIEW}><NotificationsPage /></Access>} />
               <Route path="backup" element={<Access permission={PERMISSIONS.BACKUP_EXPORT}><BackupPage /></Access>} />
               <Route path="audit-logs" element={<Access permission={PERMISSIONS.AUDIT_LOGS_VIEW}><AuditLogsStorePage /></Access>} />
-              <Route index element={<Navigate to="dashboard" replace />} />
+              <Route index element={<RoleRedirect />} />
             </Route>
 
             <Route path="/staff" element={<Access roles={staffRoles}><StaffLayout /></Access>}>
@@ -181,7 +182,7 @@ export default function App() {
               <Route path="auth" element={<CustomerAuth />} />
             </Route>
 
-            <Route path={ROUTES.UNAUTHORIZED} element={<div className="min-h-screen bg-navy-950 flex items-center justify-center p-6"><div className="text-center"><p aria-hidden="true" className="text-6xl mb-4">🚫</p><h1 className="text-xl font-bold text-slate-100">Access denied</h1><p className="text-slate-400 text-sm mt-2">You do not have permission to view this page.</p></div></div>} />
+            <Route path={ROUTES.UNAUTHORIZED} element={<UnauthorizedPage />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </Suspense>

@@ -142,8 +142,9 @@ const baseQueryWithReauth = async (args, api, extraOptions) => {
   if (!isCurrent()) return staleSession();
   const normalized = normalizeApiError(result);
   api.dispatch(savedDataStatus({ serverUnavailable: ['FETCH_ERROR', 'TIMEOUT_ERROR', 502, 503, 504].includes(normalized.error?.status) }));
-  // Never keep an authorized snapshot after an explicit access rejection.
-  if ([401, 403].includes(normalized.error?.status) && !sessionEndpoint) {
+  // A permission denial applies to this request, not the user's login. Rejected
+  // snapshots are excluded by the query hooks and offline persistence below.
+  if (normalized.error?.status === 401 && !sessionEndpoint) {
     api.dispatch(clearCredentials());
     return normalized;
   }
