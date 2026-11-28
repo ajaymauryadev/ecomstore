@@ -173,6 +173,8 @@ export const baseApi = createApi({
   refetchOnMountOrArgChange: false,
   refetchOnFocus: false,
   refetchOnReconnect: false,
+  // A slow report must never delay inbox invalidation or another page's write.
+  invalidationBehavior: 'immediately',
   extractRehydrationInfo: (action) => action.type === HYDRATE_SAVED_DATA ? action.payload : undefined,
   tagTypes: [
     'CurrentUser',

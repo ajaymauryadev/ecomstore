@@ -1,11 +1,11 @@
-import { Navigate, useLocation } from 'react-router-dom';
+import { Link, Navigate, useLocation } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import {
   selectCurrentUser,
   selectIsAuthenticated,
   selectIsInitialized,
 } from '../../features/auth/authSlice';
-import { PageLoader } from '../ui/Spinner';
+import StartupShell from '../layout/StartupShell';
 import { ROUTES } from '../../constants/routes';
 import { hasEveryPermission } from '../../constants/permissions';
 
@@ -13,19 +13,24 @@ export default function ProtectedRoute({ children, allowedRoles, requiredPermiss
   const user = useSelector(selectCurrentUser);
   const isAuthenticated = useSelector(selectIsAuthenticated);
   const isInitialized = useSelector(selectIsInitialized);
+  const offlineSession = useSelector((state) => state.auth.offlineSession);
   const location = useLocation();
 
-  if (!isInitialized) return <PageLoader />;
+  if (!isInitialized) return <StartupShell />;
 
   if (!isAuthenticated) {
     return <Navigate to={ROUTES.LOGIN} state={{ from: location.pathname }} replace />;
   }
 
-  if (allowedRoles && !allowedRoles.includes(user.role)) {
-    return <Navigate to={ROUTES.UNAUTHORIZED} replace />;
-  }
-
-  if (requiredPermissions?.length && !hasEveryPermission(user, requiredPermissions)) {
+  const denied = (allowedRoles && !allowedRoles.includes(user.role)) ||
+    (requiredPermissions?.length && !hasEveryPermission(user, requiredPermissions));
+  if (denied) {
+    // A cached identity can belong to the previous login. Keep the requested
+    // route while AuthInit confirms the cookie, without rendering its private UI.
+    if (offlineSession) return <StartupShell>
+      <p role="status">Confirming access to this workspace. Connect to the internet to verify your session.</p>
+      <Link className="btn-secondary mt-4" to={ROUTES.LOGIN} state={{ from: location.pathname }}>Sign in with another account</Link>
+    </StartupShell>;
     return <Navigate to={ROUTES.UNAUTHORIZED} replace />;
   }
 

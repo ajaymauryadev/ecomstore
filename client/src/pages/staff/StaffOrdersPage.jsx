@@ -138,6 +138,16 @@ function OrderCard({ order, onStart, onAccept, starting, packingPath, canPerform
   );
 }
 
+function OrderSection({ title, items, onStart, onAccept, starting, startingId, packingPath, canPerform }) {
+  if (!items.length) return null;
+  return <section>
+    <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 px-1">{title}</h2>
+    <div className="space-y-3">{items.map((order) => <OrderCard key={order._id} order={order}
+      onStart={onStart} onAccept={onAccept} starting={starting && startingId === order._id}
+      packingPath={packingPath} canPerform={canPerform} />)}</div>
+  </section>;
+}
+
 export default function StaffOrdersPage({ packingPath = ROUTES.STAFF.PACKING }) {
   const { user } = useAuth();
   const managesAll = hasPermission(user, PERMISSIONS.PACKING_MANAGE);
@@ -183,48 +193,7 @@ export default function StaffOrdersPage({ packingPath = ROUTES.STAFF.PACKING }) 
   const done = orders.filter((o) => o.status === 'packed');
   const waiting = orders.filter((o) => ['pending', 'payment_pending', 'payment_submitted'].includes(o.status));
 
-  if (isLoading) {
-    return (
-      <div className="space-y-3">
-        {[1, 2, 3].map((i) => (
-          <div key={i} className="h-40 bg-navy-800 rounded-2xl animate-pulse" />
-        ))}
-      </div>
-    );
-  }
-
-  if (isError || allOrders.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20 text-center">
-        <CheckCircle2 size={48} className="text-slate-600 mb-4" />
-        <p className="text-slate-400 font-medium">{isError ? 'Packing orders could not be loaded' : managesAll ? 'No orders to pack' : 'No orders assigned'}</p>
-        <p className="text-slate-600 text-sm mt-1">{isError ? 'Check your connection and try again.' : managesAll ? 'Accepted orders will appear here without needing a staff assignment.' : 'Check back later or contact your manager'}</p>
-        <button onClick={refetch} className="mt-6 flex items-center gap-2 text-gold-400 text-sm font-medium">
-          <RefreshCw size={14} /> Refresh
-        </button>
-      </div>
-    );
-  }
-
-  const Section = ({ title, items }) =>
-    items.length === 0 ? null : (
-      <div>
-        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 px-1">{title}</p>
-        <div className="space-y-3">
-          {items.map((order) => (
-            <OrderCard
-              key={order._id}
-              order={order}
-              onStart={handleStart}
-              onAccept={setAcceptTarget}
-              starting={starting && startingId === order._id}
-              packingPath={packingPath}
-              canPerform={canPerform}
-            />
-          ))}
-        </div>
-      </div>
-    );
+  const sectionProps = { onStart: handleStart, onAccept: setAcceptTarget, starting, startingId, packingPath, canPerform };
 
   return (
     <div className="space-y-5 fulfillment-workspace">
@@ -246,11 +215,19 @@ export default function StaffOrdersPage({ packingPath = ROUTES.STAFF.PACKING }) 
         ))}
       </div>
 
-      <Section title="In Progress" items={active} />
-      <Section title="Ready to Pack" items={ready} />
-      <Section title="Awaiting acceptance or payment" items={waiting} />
-      <Section title="Completed — Awaiting Verify" items={done} />
-      {!orders.length && <div className="card p-8 text-center text-sm text-slate-500">No matching packing orders.</div>}
+      {isLoading ? <div role="status" aria-label="Loading packing orders" className="space-y-3">
+        {[1, 2, 3].map((i) => <div key={i} className="h-40 bg-navy-800 rounded-2xl animate-pulse" />)}
+      </div> : isError || !allOrders.length ? <div className="card p-8 text-center space-y-3">
+        <CheckCircle2 size={36} className="mx-auto text-slate-500" />
+        <p>{isError ? 'Packing orders could not be loaded' : managesAll ? 'No orders to pack' : 'No orders assigned'}</p>
+        <button onClick={refetch} className="text-gold-400">Refresh</button>
+      </div> : <>
+        <OrderSection title="In Progress" items={active} {...sectionProps} />
+        <OrderSection title="Ready to Pack" items={ready} {...sectionProps} />
+        <OrderSection title="Awaiting acceptance or payment" items={waiting} {...sectionProps} />
+        <OrderSection title="Completed — Awaiting Verify" items={done} {...sectionProps} />
+        {!orders.length && <div className="card p-8 text-center text-sm text-slate-500">No matching packing orders.</div>}
+      </>}
       <Modal isOpen={Boolean(acceptTarget)} onClose={() => !accepting && setAcceptTarget(null)} title="Accept order" size="sm">
         <p className="text-sm text-slate-400">Accept <strong className="text-slate-100 break-all">{acceptTarget?.orderNumber}</strong> for fulfillment? Packing will become available.</p>
         <div className="flex gap-3 mt-5"><Button fullWidth variant="secondary" disabled={accepting} onClick={() => setAcceptTarget(null)}>Cancel</Button>

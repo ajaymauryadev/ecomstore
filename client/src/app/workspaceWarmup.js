@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useSelector, useStore } from 'react-redux';
 import { selectSessionEpoch, selectCurrentUser } from '../features/auth/authSlice';
 import { scheduleBackgroundTasks } from './backgroundTasks';
-import { prefetchQuery, queriesSettled } from './queryWarmup';
+import { queriesSettled } from './queryWarmup';
 import { prefetchRoute } from './routePrefetch';
 import { workspaceReadPlan } from './workspaceReadPlan';
 
@@ -23,10 +23,10 @@ export function useWorkspaceWarmup() {
     if (!authenticated || restoring || !['store_owner', 'staff', 'packer', 'delivery'].includes(user?.role)) return;
     let disposed = false;
     const active = () => !disposed && selectSessionEpoch(store.getState()) === epoch;
-    const tasks = workspaceReadPlan(user, workspace).flatMap(({ path, queries }) => [
-      ...queries.map(([endpoint, args]) => () => active() && prefetchQuery(store, endpoint, args)),
-      () => active() && prefetchRoute(path),
-    ]);
+    // Warm a few common screen chunks, not every report and business dataset.
+    // Hover/focus prefetch still downloads the exact destination's data.
+    const tasks = workspaceReadPlan(user, workspace).slice(0, 3)
+      .map(({ path }) => () => active() && prefetchRoute(path));
     const cancel = scheduleBackgroundTasks(tasks, {
       isCurrent: active, isReady: () => queriesSettled(store), delay: 100,
     });

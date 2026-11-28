@@ -310,14 +310,6 @@ export default function PackingVerificationPage() {
   const [selectedId, setSelectedId] = useState(null);
   const sessions = data?.data ?? [];
 
-  if (isLoading) {
-    return (
-      <div className="space-y-3">
-        {[1, 2, 3].map((i) => <div key={i} className="h-24 bg-navy-800 rounded-xl animate-pulse" />)}
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -330,7 +322,9 @@ export default function PackingVerificationPage() {
         </button>
       </div>
 
-      {sessions.length === 0 ? (
+      {isLoading ? <div role="status" aria-label="Loading packing queue" className="space-y-3">
+        {[1, 2, 3].map((i) => <div key={i} className="h-24 bg-navy-800 rounded-xl animate-pulse" />)}
+      </div> : sessions.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-center">
           <CheckCircle2 size={48} className="text-slate-600 mb-4" />
           <p className="text-slate-400 font-medium">All clear</p>

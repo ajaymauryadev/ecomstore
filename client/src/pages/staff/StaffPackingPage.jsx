@@ -1,8 +1,8 @@
 import { useSavedViewState } from '../../offline/useSavedViewState';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSelector, useStore } from 'react-redux';
 import { accountScope } from '../../offline/storage';
-import { enqueuePacking, packingIntents } from '../../offline/packingOutbox';
+import { discardPackingItem, submitPackingAction, packingIntents } from '../../offline/packingOutbox';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Package, AlertTriangle, CheckCircle2, XCircle, ChevronDown,
@@ -85,7 +85,7 @@ function MissingReasonModal({ item, onConfirm, onClose }) {
   );
 }
 
-function PackingItem({ item, onAction, loading }) {
+function PackingItem({ item, onAction, onDiscard, resolving, resolutionBusy, loading }) {
   const [expanded, setExpanded] = useState(false);
   const [showMissingModal, setShowMissingModal] = useState(false);
 
@@ -119,7 +119,7 @@ function PackingItem({ item, onAction, loading }) {
                   <AlertTriangle size={13} className="text-amber-400" />
                 )}
                 <span className={cn('text-[10px] font-semibold px-2 py-0.5 rounded-full capitalize', STATUS_BADGE[item.status])}>
-                  {item.localPending ? `Draft: ${item.status} · pending sync` : item.status}
+                  {item.localConflict ? 'Needs review' : item.localPending ? `Draft: ${item.status} · pending sync` : item.status}
                 </span>
               </div>
             </div>
@@ -145,7 +145,7 @@ function PackingItem({ item, onAction, loading }) {
         )}
 
         {/* Action buttons — only for pending/picked */}
-        {(item.status === 'pending' || item.status === 'picked') && (
+        {!item.localConflict && (item.status === 'pending' || item.status === 'picked') && (
           <div className="px-4 pb-4 flex gap-2">
             {item.status === 'pending' && (
               <button
@@ -175,11 +175,22 @@ function PackingItem({ item, onAction, loading }) {
           </div>
         )}
 
+        {item.localConflict && (
+          <div className="px-4 pb-4 space-y-2" role="status">
+            <p className="text-xs text-amber-400">{item.localConflict.error}</p>
+            <p className="text-xs text-slate-400">Saved on this device: {item.status}. Last confirmed: {item.confirmedStatus}.</p>
+            <button disabled={resolutionBusy} onClick={() => onDiscard(item.localConflict)}
+              className="text-sm text-blue-400 underline disabled:opacity-50">
+              {resolving ? 'Refreshing item…' : 'Use server status and clear this item’s saved changes'}
+            </button>
+          </div>
+        )}
+
         {/* Packed — collapse to show detail */}
         {item.status === 'packed' && (
           <div className="px-4 pb-3 flex items-center gap-2">
             <CheckCircle2 size={15} className="text-emerald-400" />
-            <p className="text-xs text-emerald-400 font-medium flex-1">{item.localPending ? 'Packed locally — pending sync' : 'Packed'}</p>
+            <p className="text-xs text-emerald-400 font-medium flex-1">{item.localConflict ? 'Saved as packed — needs review' : item.localPending ? 'Packed locally — pending sync' : 'Packed'}</p>
             <button
               onClick={() => setExpanded(!expanded)}
               className="text-slate-500 text-xs flex items-center gap-1"
@@ -200,8 +211,10 @@ function PackingItem({ item, onAction, loading }) {
 export default function StaffPackingPage({ packingPath = ROUTES.STAFF.PACKING }) {
   const reduxStore = useStore();
   const account = useSelector((state) => accountScope(state.auth));
-  const [, setOutboxVersion] = useState(0);
+  const [outboxVersion, setOutboxVersion] = useState(0);
   const [queuing, setQueuing] = useState(false);
+  const actionPending = useRef(false);
+  const [resolvingItem, setResolvingItem] = useState(null);
   useEffect(() => {
     const changed = () => setOutboxVersion((value) => value + 1);
     window.addEventListener('saved-outbox-changed', changed);
@@ -220,20 +233,41 @@ export default function StaffPackingPage({ packingPath = ROUTES.STAFF.PACKING })
 
   const session = data?.data?.session;
   const order = data?.data?.order;
-  const localQueue = packingIntents(account, orderId);
+  // The external outbox signals changes through this version counter.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const localQueue = useMemo(() => packingIntents(account, orderId), [account, orderId, outboxVersion]);
+  const { lastByItem, conflictsByItem } = useMemo(() => {
+    const lastByItem = new Map();
+    const conflictsByItem = new Map();
+    for (const intent of localQueue) {
+      lastByItem.set(intent.payload.itemId, intent);
+      if (intent.status === 'conflict' && !conflictsByItem.has(intent.payload.itemId)) conflictsByItem.set(intent.payload.itemId, intent);
+    }
+    return { lastByItem, conflictsByItem };
+  }, [localQueue]);
   const projected = (item) => {
-    const last = localQueue.filter((intent) => intent.payload.itemId === item._id).at(-1);
-    return last ? { ...item, status: { pick: 'picked', pack: 'packed', missing: 'missing' }[last.payload.action], missingReason: last.payload.missingReason, localPending: true } : item;
+    const last = lastByItem.get(item._id);
+    return last ? { ...item, status: { pick: 'picked', pack: 'packed', missing: 'missing' }[last.payload.action], missingReason: last.payload.missingReason,
+      confirmedStatus: item.status, localPending: true, localConflict: conflictsByItem.get(item._id) } : item;
+  };
+
+  const handleDiscard = async (intent) => {
+    setResolvingItem(intent.payload.itemId);
+    try { await discardPackingItem(reduxStore, intent); }
+    catch (error) { toast.error(error?.data?.message || error.message || 'Could not refresh this item. Saved changes have been kept.'); }
+    finally { setResolvingItem(null); }
   };
 
   const handleAction = async (itemId, action, reason) => {
+    if (actionPending.current) return;
+    actionPending.current = true;
     setQueuing(true);
     try {
       const item = session?.items.find((entry) => entry._id === itemId);
-      await enqueuePacking(reduxStore, orderId, projected(item), action, reason);
+      await submitPackingAction(reduxStore, orderId, projected(item), action, reason);
     } catch (err) {
       toast.error(err?.data?.message || 'Could not save this checklist change on this device.');
-    } finally { setQueuing(false); }
+    } finally { actionPending.current = false; setQueuing(false); }
   };
 
   const handleComplete = async () => {
@@ -253,15 +287,7 @@ export default function StaffPackingPage({ packingPath = ROUTES.STAFF.PACKING })
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="space-y-3">
-        {[1, 2, 3].map((i) => <div key={i} className="h-32 bg-navy-800 rounded-2xl animate-pulse" />)}
-      </div>
-    );
-  }
-
-  if (!session) {
+  if (!session && !isLoading) {
     return (
       <div className="text-center py-16">
         <p className="text-slate-400">Session not found</p>
@@ -272,16 +298,16 @@ export default function StaffPackingPage({ packingPath = ROUTES.STAFF.PACKING })
     );
   }
 
-  const items = session.items ?? [];
+  const items = session?.items ?? [];
   const pendingCount = items.filter((i) => !['packed', 'missing'].includes(i.status)).length;
   const packedCount = items.filter((i) => i.status === 'packed').length;
   const missingCount = items.filter((i) => i.status === 'missing').length;
   const highValueMissing = items.filter((i) => i.isHighValue && i.status === 'missing').length;
-  const isCompleted = session.status === 'completed' || session.status === 'verified';
+  const isCompleted = session?.status === 'completed' || session?.status === 'verified';
 
   return (
     <div className="space-y-5">
-      {localQueue.length > 0 && <p role="status" className="workspace-feedback">{localQueue.length} local checklist change(s) pending server confirmation. The progress totals below show confirmed work only. Rejected changes remain saved for review.</p>}
+      {localQueue.length > 0 && <p role="status" className="workspace-feedback">{localQueue.length} saved checklist change(s) awaiting confirmation.{conflictsByItem.size > 0 && ` ${conflictsByItem.size} item(s) need review below.`} Progress totals show server-confirmed work.</p>}
       {/* Header */}
       <div className="flex items-center gap-3">
         <button
@@ -291,14 +317,17 @@ export default function StaffPackingPage({ packingPath = ROUTES.STAFF.PACKING })
           <ArrowLeft size={18} />
         </button>
         <div className="flex-1 min-w-0">
-          <p className="text-xs font-semibold text-gold-400 mb-1">Packing workspace</p><h1 className="text-lg font-bold text-slate-100">Pack order</h1><p className="mt-1 text-sm font-mono text-slate-400 break-all">{order?.orderNumber || session.orderNumber}</p>
-          <p className="text-xs text-slate-500">{items.length} items total</p>
+          <p className="text-xs font-semibold text-gold-400 mb-1">Packing workspace</p><h1 className="text-lg font-bold text-slate-100">Pack order</h1><p className="mt-1 text-sm font-mono text-slate-400 break-all">{order?.orderNumber || session?.orderNumber}</p>
+          <p className="text-xs text-slate-500">{isLoading ? 'Loading saved checklist…' : `${items.length} items total`}</p>
         </div>
         <button onClick={refetch} className="p-2 rounded-xl hover:bg-navy-700 text-slate-400">
           <RefreshCw size={15} />
         </button>
       </div>
 
+      {isLoading ? <div role="status" aria-label="Loading packing checklist" className="space-y-3">
+        {[1, 2, 3].map((i) => <div key={i} className="h-32 bg-navy-800 rounded-2xl animate-pulse" />)}
+      </div> : <>
       {/* Progress summary */}
       <div className="bg-navy-800 border border-navy-700/60 rounded-2xl p-4">
         <div className="grid grid-cols-3 gap-3 text-center">
@@ -348,7 +377,9 @@ export default function StaffPackingPage({ packingPath = ROUTES.STAFF.PACKING })
           ...items.filter((i) => i.status === 'packed'),
           ...items.filter((i) => i.status === 'missing'),
         ].map((item) => (
-          <PackingItem key={item._id} item={projected(item)} onAction={handleAction} loading={queuing || isCompleted || !canPerform} />
+          <PackingItem key={item._id} item={projected(item)} onAction={handleAction} onDiscard={handleDiscard}
+            resolving={resolvingItem === item._id} resolutionBusy={resolvingItem !== null}
+            loading={queuing || resolvingItem !== null || isCompleted || !canPerform} />
         ))}
       </div>
 
@@ -407,6 +438,7 @@ export default function StaffPackingPage({ packingPath = ROUTES.STAFF.PACKING })
           </div>
         </div>
       )}
+      </>}
     </div>
   );
 }

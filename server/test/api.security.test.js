@@ -3459,7 +3459,7 @@ describe('Excel product import', () => {
 
 
 describe('saved-data revision checks', () => {
-  test('replays saved packing work once, preserves recording time, and rejects changed assignments or stale item states', async () => {
+  test('replays saved packing work once, reconciles satisfied states, preserves recording time, and rejects changed assignments', async () => {
     const { product, variant } = await createProduct();
     const placed = await request(app).post('/api/v1/storefront/store-alpha/orders').set(auth(tokens.customerA)).send(orderBody(product, variant)).expect(201);
     const order = placed.body.data.order;
@@ -3480,11 +3480,60 @@ describe('saved-data revision checks', () => {
     expect(logs[0].metadata.recordedAt).toBe(recordedAt);
     expect(Date.parse(logs[0].metadata.confirmedAt)).toBeGreaterThan(Date.parse(recordedAt));
     await request(app).patch(endpoint).set(auth(tokens.packer)).send({ ...saved, action: 'missing' }).expect(409);
-    await request(app).patch(endpoint).set(auth(tokens.packer)).send({ ...saved, operationId: randomUUID() }).expect(409);
+    const stale = await request(app).patch(endpoint).set(auth(tokens.packer)).send({ ...saved, operationId: randomUUID() }).expect(200);
+    expect(stale.body.data.session.items[0].status).toBe('picked');
+    expect(stale.body.data.session).not.toHaveProperty('operationReceipts');
+    expect(await Activity.countDocuments({ orderId: order._id, action: 'item_picked' })).toBe(1);
     await Order.updateOne({ _id: order._id }, { assignedTo: ids.staff });
     await request(app).patch(endpoint).set(auth(tokens.packer)).send({ operationId: randomUUID(), action: 'pack', expectedStatus: 'picked', recordedAt }).expect(409);
     const confirmed = await mongoose.model('PackingSession').findById(started.body.data.session._id);
     expect(confirmed.items[0].status).toBe('picked');
+  });
+  test('reconciles satisfied packing work without regressions, duplicate activity, or weakening quantity and workflow checks', async () => {
+    const { product, variant } = await createProduct();
+    const placed = await request(app).post('/api/v1/storefront/store-alpha/orders').set(auth(tokens.customerA)).send(orderBody(product, variant, { quantity: 2 })).expect(201);
+    const order = placed.body.data.order;
+    const ownerOrder = '/api/v1/storefront/store-alpha/admin/orders/' + order._id;
+    await request(app).patch(ownerOrder + '/status').set(auth(tokens.ownerA)).send({ status: 'accepted' }).expect(200);
+    await request(app).patch(ownerOrder + '/assign').set(auth(tokens.ownerA)).send({ staffId: ids.packer }).expect(200);
+    const packing = '/api/v1/packing/session/' + order._id;
+    const started = await request(app).post(packing + '/start').set(auth(tokens.packer)).expect(201);
+    const endpoint = packing + '/item/' + started.body.data.session.items[0]._id;
+    const recordedAt = new Date(Date.now() - 60000).toISOString();
+    const queued = (action, expectedStatus, rest = {}) => ({ operationId: randomUUID(), action, expectedStatus, recordedAt, ...rest });
+    const send = (body) => request(app).patch(endpoint).set(auth(tokens.packer)).send(body);
+    const Activity = mongoose.model('StaffActivityLog');
+    const picked = await send({ action: 'pick', pickedQty: 1 }).expect(200);
+    const conflict = await send(queued('pick', 'pending')).expect(409);
+    expect(conflict.body.errors).toMatchObject({ code: 'PACKING_ITEM_CHANGED', session: { items: [{ status: 'picked', pickedQty: 1 }] } });
+    expect(conflict.body.errors.session).not.toHaveProperty('operationReceipts');
+    const packed = await send(queued('pack', 'picked')).expect(200);
+    await settleRevisionWrites();
+    const revision = (await request(app).get('/api/v1/sync/revision').set(auth(tokens.packer)).expect(200)).body.data.revision;
+    const stalePick = queued('pick', 'pending', { pickedQty: 1 });
+    const reconciled = await send(stalePick).expect(200);
+    expect(reconciled.body.data.session.items[0]).toMatchObject({
+      status: 'packed', pickedQty: 1,
+      pickedBy: picked.body.data.session.items[0].pickedBy,
+      packedBy: packed.body.data.session.items[0].packedBy,
+      packedAt: packed.body.data.session.items[0].packedAt,
+    });
+    await send(stalePick).expect(200);
+    await send({ ...stalePick, action: 'missing' }).expect(409);
+    await send(queued('pack', 'picked')).expect(200);
+    expect(await Activity.countDocuments({ orderId: order._id, action: { $in: ['item_picked', 'item_packed'] } })).toBe(2);
+    await settleRevisionWrites();
+    expect((await request(app).get('/api/v1/sync/revision').set(auth(tokens.packer)).expect(200)).body.data.revision).toBe(revision);
+    await send(queued('missing', 'picked', { missingReason: 'Damaged' })).expect(409);
+    await send(queued('missing', 'packed', { missingReason: 'Damaged' })).expect(200);
+    const sameMissing = queued('missing', 'picked', { missingReason: 'Damaged' });
+    await send(sameMissing).expect(200);
+    await send(queued('missing', 'picked', { missingReason: 'Out of stock' })).expect(409);
+    expect(await Activity.countDocuments({ orderId: order._id, action: 'item_missing' })).toBe(1);
+    await Order.updateOne({ _id: order._id }, { status: 'packed' });
+    await send(queued('missing', 'picked', { missingReason: 'Damaged' })).expect(409);
+    const current = await mongoose.model('PackingSession').findById(started.body.data.session._id);
+    expect(current.items[0]).toMatchObject({ status: 'missing', missingReason: 'Damaged' });
   });
   test('checks revisions without exposing records and changes only the affected tenant after a confirmed write', async () => {
     await settleRevisionWrites();

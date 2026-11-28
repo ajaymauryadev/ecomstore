@@ -24,9 +24,9 @@ test('unchanged counters fetch no business data and a read receipt refreshes onl
   expect(changedQueryKeys(state, previous, { ...previous, revision: 20 })).toEqual([]);
 });
 
-test('startup, unknown changes and legacy servers safely reconcile saved views', async () => {
+test('startup establishes a baseline without duplicate reads; unknown later changes still reconcile saved views', async () => {
   const state = await setup();
-  expect(changedQueryKeys(state, undefined, { revision: 1, versions: {} })).toHaveLength(3);
+  expect(changedQueryKeys(state, undefined, { revision: 1, versions: {} })).toEqual([]);
   expect(changedQueryKeys(state, { revision: 1 }, { revision: 2 })).toHaveLength(3);
   expect(changedQueryKeys(state, { revision: 1, versions: {} }, { revision: 2, versions: { All: 1 } })).toHaveLength(3);
 });

@@ -33,7 +33,9 @@ export const packingApi = baseApi.injectEndpoints({
         method: 'PATCH',
         body,
       }),
-      invalidatesTags: (result, error, { orderId }) => [{ type: 'Packing', id: orderId }],
+      // The outbox installs the returned session before clearing its draft.
+      // Avoid a redundant GET (and a stale-data gap) for every picked item.
+      invalidatesTags: [],
     }),
 
     suggestReplacement: builder.mutation({
@@ -72,7 +74,10 @@ export const packingApi = baseApi.injectEndpoints({
 
     getAdminPackingSession: builder.query({
       query: ({ sessionId }) => `/packing/admin/session/${sessionId}`,
-      providesTags: (result, error, { sessionId }) => [{ type: 'Packing', id: `session-${sessionId}` }],
+      providesTags: (result, error, { sessionId }) => [
+        { type: 'Packing', id: `session-${sessionId}` },
+        ...(result?.data?.session?.orderId ? [{ type: 'Packing', id: result.data.session.orderId }] : []),
+      ],
     }),
 
     verifyPackingSession: builder.mutation({

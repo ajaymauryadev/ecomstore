@@ -7,6 +7,8 @@ import { accountScope } from './storage';
 import { outboxMemory, removeIntent, saveIntent } from './outbox';
 import { Cloud, CloudOff, AlertCircle } from 'lucide-react';
 import { useRetryCountdown } from '../hooks/useRetryCountdown';
+import { discardPackingItem } from './packingOutbox';
+import toast from 'react-hot-toast';
 
 export function SavedDataGate({ children, fallback = null }) {
   const restoring = useSelector((state) => state.savedData.restoring);
@@ -60,6 +62,15 @@ export function WorkspaceSyncStatus({ standalone = false }) {
   const offlineSession = useSelector((state) => state.auth.offlineSession);
   const account = useSelector((state) => accountScope(state.auth));
   const [, changed] = useState(0);
+  const [resolving, setResolving] = useState(null);
+  const discard = async (intent) => {
+    setResolving(intent.id);
+    try {
+      if (intent.kind === 'packing') await discardPackingItem(store, intent);
+      else await removeIntent(intent.id);
+    } catch (error) { toast.error(error?.data?.message || error.message || 'Could not clear this request.'); }
+    finally { setResolving(null); }
+  };
   useEffect(() => {
     const update = () => changed((value) => value + 1);
     window.addEventListener('saved-outbox-changed', update);
@@ -103,8 +114,8 @@ export function WorkspaceSyncStatus({ standalone = false }) {
           {intents.length > 0 && <details><summary>{intents.length} saved request(s) · {intents.filter((intent) => intent.status === 'syncing').length} syncing · {intents.filter((intent) => intent.status === 'conflict').length} action required</summary>
             <div className="max-h-48 overflow-y-auto space-y-2 pt-2">{intents.map((intent) => <p key={intent.id}>
               {intent.status === 'conflict' ? 'Action required' : intent.status === 'syncing' ? 'Syncing' : 'Pending server confirmation'}: recorded {new Date(intent.createdAt).toLocaleString()}. {intent.error || (intent.kind === 'packing' ? 'Saved checklist will sync when your session is confirmed online.' : 'Return to the original form to confirm online.')}
-              {intent.status === 'conflict' && <button className="underline ml-2" onClick={() => { void removeIntent(intent.id).catch(() => changed((value) => value + 1)); }}>Discard rejected request and edit draft</button>}
-              {intent.kind === 'packing' && intent.status === 'conflict' && <button className="underline ml-2" onClick={() => { void saveIntent({ ...intent, status: 'pending', attempts: 0, retryAt: 0 }).catch(() => changed((value) => value + 1)); }}>Retry original checklist change</button>}
+              {intent.status === 'conflict' && <button disabled={resolving !== null} className="underline ml-2" onClick={() => { void discard(intent); }}>{resolving === intent.id ? 'Refreshing…' : intent.kind === 'packing' ? 'Use server status and clear this item’s saved changes' : 'Discard rejected request and edit draft'}</button>}
+              {intent.kind === 'packing' && intent.status === 'conflict' && intent.errorStatus !== 409 && intent.reconciliationVersion && <button disabled={resolving !== null} className="underline ml-2" onClick={() => { void saveIntent({ ...intent, status: 'pending', attempts: 0, retryAt: 0 }).catch(() => changed((value) => value + 1)); }}>Retry original checklist change</button>}
             </p>)}</div>
           </details>}
         </div>

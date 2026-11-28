@@ -61,6 +61,8 @@ test('six unchanged minutes check tiny counters without re-fetching saved pages;
     : response({ data: ['Rice'] }));
   vi.stubGlobal('fetch', fetch);
   await read(store);
+  const subscription = store.dispatch(baseApi.endpoints.savedReadProbe.initiate({}));
+  await subscription;
   vi.useFakeTimers();
   const stop = startSavedDataSync(store);
   try {
@@ -73,9 +75,9 @@ test('six unchanged minutes check tiny counters without re-fetching saved pages;
     await vi.advanceTimersByTimeAsync(60000);
     expect(fetch.mock.calls.filter(([request]) => request.url.includes('/products'))).toHaveLength(0);
     productVersion++;
-    await vi.advanceTimersByTimeAsync(60000);
+    await vi.advanceTimersByTimeAsync(60200);
     expect(fetch.mock.calls.filter(([request]) => request.url.includes('/products'))).toHaveLength(1);
-  } finally { stop(); vi.useRealTimers(); }
+  } finally { subscription.unsubscribe(); stop(); vi.useRealTimers(); }
 });
 
 test('keeps data and its real timestamp during a slow update and a failed update', async () => {
@@ -113,27 +115,36 @@ test('restores exact saved queries from IndexedDB before any network access, wit
   expect(baseApi.endpoints.savedReadProbe.select({ date: '2026-11-26', page: 2 })(store.getState()).data).toBeUndefined();
 });
 
-test('a mutation refreshes a closed page while retaining its data and unrelated queries', async () => {
+test('a mutation leaves a closed page saved and refreshes it behind the same UI only when opened', async () => {
   const store = await makeStore();
   let version = 1;
   vi.stubGlobal('fetch', vi.fn(async () => response({ data: version })));
   await read(store);
   const before = baseApi.endpoints.savedReadProbe.select({})(store.getState()).data;
   let release;
-  vi.stubGlobal('fetch', vi.fn(async (request) => request.method === 'POST' ? response({ data: 'ok' })
-    : new Promise((resolve) => { release = resolve; })));
+  const fetch = vi.fn(async (request) => request.method === 'POST' ? response({ data: 'ok' })
+    : new Promise((resolve) => { release = resolve; }));
+  vi.stubGlobal('fetch', fetch);
   await store.dispatch(baseApi.endpoints.savedWriteProbe.initiate());
+  await new Promise((resolve) => setTimeout(resolve, 150));
+  expect(fetch).toHaveBeenCalledTimes(1);
+  const wrapper = ({ children }) => <Provider store={store}><MemoryRouter>{children}</MemoryRouter></Provider>;
+  const hook = renderHook(() => baseApi.useSavedReadProbeQuery({}), { wrapper });
+  expect(hook.result.current.data).toBe(before);
   await waitFor(() => expect(release).toBeTypeOf('function'));
   expect(baseApi.endpoints.savedReadProbe.select({})(store.getState()).data).toBe(before);
   version++;
-  release(response({ data: version }));
+  await act(async () => release(response({ data: version })));
   await waitFor(() => expect(baseApi.endpoints.savedReadProbe.select({})(store.getState()).data).toEqual({ data: 2 }));
+  hook.unmount();
 });
 
 test('an older in-flight read cannot overwrite data after a successful mutation', async () => {
   const store = await makeStore();
   vi.stubGlobal('fetch', vi.fn(async () => response({ data: 'before' })));
   await read(store);
+  const subscription = store.dispatch(baseApi.endpoints.savedReadProbe.initiate({}));
+  await subscription;
   let releaseOld;
   vi.stubGlobal('fetch', vi.fn((request) => {
     if (request.method === 'POST') return Promise.resolve(response({ data: 'confirmed write' }));
@@ -147,6 +158,7 @@ test('an older in-flight read cannot overwrite data after a successful mutation'
   releaseOld(response({ data: 'obsolete' }));
   await older;
   expect(baseApi.endpoints.savedReadProbe.select({})(store.getState()).data).toEqual({ data: 'after' });
+  subscription.unsubscribe();
 });
 
 test('offline misses are errors and offline writes cannot be mistaken for confirmed records', async () => {
@@ -230,4 +242,79 @@ test('offline authorization expires after twelve hours from actual identity conf
   expect(selectIsAuthenticated(store.getState())).toBe(false);
   store.dispatch(updateUser({ name: 'Server-confirmed user' }));
   expect(selectIsAuthenticated(store.getState())).toBe(true);
+});
+
+test('a slow unrelated request cannot delay a visible page invalidation', async () => {
+  const store = await makeStore();
+  let finishReport;
+  baseApi.injectEndpoints({ endpoints: (builder) => ({ slowUnrelatedReport: builder.query({
+    queryFn: () => new Promise((resolve) => { finishReport = resolve; }), providesTags: ['Reports'],
+  }) }) });
+  let value = 1;
+  const fetch = vi.fn(async () => response({ data: value }));
+  vi.stubGlobal('fetch', fetch);
+  const visible = store.dispatch(baseApi.endpoints.savedReadProbe.initiate({}));
+  await visible;
+  const slow = store.dispatch(baseApi.endpoints.slowUnrelatedReport.initiate());
+  await waitFor(() => expect(finishReport).toBeTypeOf('function'));
+  value = 2;
+  store.dispatch(baseApi.util.invalidateTags(['Product']));
+  await waitFor(() => expect(baseApi.endpoints.savedReadProbe.select({})(store.getState()).data).toEqual({ data: 2 }));
+  expect(baseApi.endpoints.slowUnrelatedReport.select()(store.getState()).status).toBe('pending');
+  finishReport({ data: 'report' }); await slow;
+  visible.unsubscribe(); slow.unsubscribe();
+});
+
+test('many dormant filters stay cached without creating a read storm after a write', async () => {
+  const store = await makeStore();
+  const fetch = vi.fn(async () => response({ data: ['Saved row'] }));
+  vi.stubGlobal('fetch', fetch);
+  await Promise.all(Array.from({ length: 30 }, (_, page) => read(store, { page })));
+  fetch.mockClear();
+  await store.dispatch(baseApi.endpoints.savedWriteProbe.initiate());
+  await new Promise((resolve) => setTimeout(resolve, 200));
+  expect(fetch).toHaveBeenCalledTimes(1);
+  expect(Object.values(store.getState().api.queries).filter((query) => query.data)).toHaveLength(30);
+  const wrapper = ({ children }) => <Provider store={store}><MemoryRouter>{children}</MemoryRouter></Provider>;
+  const hook = renderHook(() => baseApi.useSavedReadProbeQuery({ page: 15 }), { wrapper });
+  expect(hook.result.current.data).toEqual({ data: ['Saved row'] });
+  await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+  hook.unmount();
+});
+
+test('a pending packing write does not hold up revision reads and inbox recovery', async () => {
+  const store = await makeStore();
+  const { enqueuePacking } = await import('./packingOutbox');
+  await enqueuePacking(store, 'packing-order', { _id: 'item', status: 'pending' }, 'pick');
+  let finishPacking;
+  const fetch = vi.fn(async (request) => request.method === 'PATCH'
+    ? new Promise((resolve) => { finishPacking = resolve; })
+    : response({ data: { revision: 1, versions: {} } }));
+  vi.stubGlobal('fetch', fetch);
+  const stop = startSavedDataSync(store);
+  try {
+    await waitFor(() => expect(finishPacking).toBeTypeOf('function'));
+    await waitFor(() => expect(fetch.mock.calls.some(([request]) => request.url.endsWith('/sync/revision'))).toBe(true));
+    finishPacking(response({ data: { session: { items: [] } } }));
+    const { packingIntents } = await import('./packingOutbox');
+    await waitFor(() => expect(packingIntents(accountScope(store.getState().auth))).toHaveLength(0));
+  } finally { stop(); }
+});
+
+test('a deferred packing retry runs at its deadline rather than waiting for the minute heartbeat', async () => {
+  const store = await makeStore();
+  const { enqueuePacking, packingIntents } = await import('./packingOutbox');
+  const { saveIntent } = await import('./outbox');
+  const account = accountScope(store.getState().auth);
+  await enqueuePacking(store, 'packing-order', { _id: 'item', status: 'pending' }, 'pick');
+  const intent = packingIntents(account)[0];
+  await saveIntent({ ...intent, retryAt: Date.now() + 100 });
+  const fetch = vi.fn(async (request) => response({ data: request.method === 'PATCH'
+    ? { session: { items: [] } } : { revision: 1, versions: {} } }));
+  vi.stubGlobal('fetch', fetch);
+  const stop = startSavedDataSync(store);
+  try {
+    await waitFor(() => expect(packingIntents(account)).toHaveLength(0));
+    expect(fetch.mock.calls.filter(([request]) => request.method === 'PATCH')).toHaveLength(1);
+  } finally { stop(); }
 });

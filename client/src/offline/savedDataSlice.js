@@ -7,4 +7,5 @@ const slice = createSlice({
 });
 export const { savedDataStatus } = slice.actions;
 export const HYDRATE_SAVED_DATA = 'savedData/hydrate';
+export const INVALIDATE_SAVED_QUERIES = 'savedData/invalidateQueries';
 export default slice.reducer;

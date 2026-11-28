@@ -65,6 +65,7 @@ export function canSaveQuery(query, auth) {
 export function businessSnapshot(state) {
   const queries = {};
   let bytes = 0;
+  let count = 0;
   for (const [key, query] of Object.entries(state.api.queries)
     .filter(([, value]) => canSaveQuery(value, state.auth))
     .sort((a, b) => b[1].fulfilledTimeStamp - a[1].fulfilledTimeStamp)) {
@@ -74,8 +75,9 @@ export function businessSnapshot(state) {
       requestId: query.requestId, status: 'fulfilled',
     };
     const size = JSON.stringify(saved).length * 2;
-    if (Object.keys(queries).length >= MAX_SAVED_QUERIES || bytes + size > MAX_SNAPSHOT_BYTES) continue;
+    if (count >= MAX_SAVED_QUERIES || bytes + size > MAX_SNAPSHOT_BYTES) continue;
     queries[key] = saved;
+    count++;
     bytes += size;
   }
   // Retain tag indexes only for retained queries. No mutations, credentials or headers.

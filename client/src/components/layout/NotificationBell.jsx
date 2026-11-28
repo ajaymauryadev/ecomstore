@@ -6,6 +6,7 @@ import toast from 'react-hot-toast';
 import { useGetUnreadCountQuery, useGetNotificationsQuery, useMarkReadMutation, useMarkAllReadMutation } from '../../features/notifications/notificationApi';
 import { selectCurrentUser } from '../../features/auth/authSlice';
 import { notificationTarget } from '../../utils/notificationTarget';
+import { notificationBelongsTo } from '../../utils/notificationAudience';
 import { useSocket } from '../../hooks/useSocket';
 import { cn } from '../../utils/cn';
 import { formatDistanceToNow } from 'date-fns';
@@ -19,6 +20,7 @@ export default function NotificationBell() {
   const triggerRef = useRef(null);
   const seen = useRef(new Set());
   const initialized = useRef(false);
+  const mountedAt = useRef(Date.now());
   const popupIds = useRef([]);
   const user = useSelector(selectCurrentUser);
   const navigate = useNavigate();
@@ -39,12 +41,11 @@ export default function NotificationBell() {
   }, [markRead, navigate, user]);
 
   const alertNotification = useCallback((notification) => {
-    if (!notification?._id || seen.current.has(notification._id)) return;
+    // Guard the client inbox against stale or misrouted events as well.
+    if (!notificationBelongsTo(user, notification) || seen.current.has(notification._id)) return;
     seen.current.add(notification._id);
+    if (seen.current.size > 1000) seen.current.delete(seen.current.values().next().value);
     if (notification.isRead || open) return;
-    // Also guard the client inbox if a stale or misrouted event arrives.
-    if (notification.userId && String(notification.userId) !== String(user?._id)) return;
-    if (!notification.userId && notification.role !== (user?.role === 'store_owner' ? 'admin' : 'staff')) return;
     const popupId = 'notification-' + notification._id;
     popupIds.current.push(popupId);
     while (popupIds.current.length > 3) toast.dismiss(popupIds.current.shift());
@@ -59,20 +60,24 @@ export default function NotificationBell() {
         <button type="button" aria-label="Dismiss notification" className="min-h-9 min-w-9 grid place-items-center shrink-0" onClick={() => toast.dismiss(instance.id)}><X size={16} /></button>
       </div>
     ), { id: popupId, duration: 6000, style: { maxWidth: 'calc(100vw - 2rem)', width: '24rem', overflowWrap: 'anywhere' } });
-  }, [user?._id, user?.role, viewNotification, open]);
+  }, [user, viewNotification, open]);
 
   useEffect(() => {
     popupIds.current.forEach((id) => toast.dismiss(id));
     popupIds.current = [];
     seen.current = new Set();
     initialized.current = false;
+    mountedAt.current = Date.now();
   }, [user?._id]);
 
   useEffect(() => on('notification:new', ({ notification }) => alertNotification(notification)), [on, alertNotification]);
   useEffect(() => {
     if (!notifData) return;
     if (!initialized.current) {
-      for (const notification of notifData.data ?? []) seen.current.add(notification._id);
+      for (const notification of notifData.data ?? []) {
+        if (Date.parse(notification.createdAt) >= mountedAt.current) alertNotification(notification);
+        else seen.current.add(notification._id);
+      }
       initialized.current = true;
       return;
     }

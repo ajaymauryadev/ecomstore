@@ -47,7 +47,7 @@ function Toggle({ value, onChange, label }) {
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useSavedViewState('SettingsPage:SettingsPage:activeTab', 'shop');
-  const { data, isLoading } = useGetMyStoreQuery();
+  const { data } = useGetMyStoreQuery();
   const [updateStore, { isLoading: isSaving }] = useUpdateMyStoreMutation();
   const [uploadPaymentQr, { isLoading: isUploadingQr }] = useUploadPaymentQrMutation();
 
@@ -154,8 +154,16 @@ export default function SettingsPage() {
     set('businessHours', 'closedDays', days.includes(day) ? days.filter((d) => d !== day) : [...days, day]);
   };
 
-  if (isLoading || !form) {
-    return <div className="p-6 text-center text-slate-500">Loading settings...</div>;
+  if (!form) {
+    return <div className="space-y-6">
+      <div className="page-header"><h1 className="page-title">Store Settings</h1><button className="btn-primary" disabled><Save size={16} /> Save Changes</button></div>
+      <div className="flex gap-1 bg-navy-800 p-1 rounded-2xl border border-navy-700 overflow-x-auto">
+        {TABS.map(({ id, label }) => <button key={id} type="button" disabled className="min-h-11 px-4 text-sm whitespace-nowrap">{label}</button>)}
+      </div>
+      <div role="status" aria-label="Loading saved settings" className="card p-5 space-y-4">
+        {[1, 2, 3, 4].map((key) => <div key={key} className="h-11 bg-navy-700 rounded-xl animate-pulse" />)}
+      </div>
+    </div>;
   }
 
   return (

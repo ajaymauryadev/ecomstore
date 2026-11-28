@@ -94,6 +94,25 @@ describe('live query refreshes', () => {
     expect(read).toHaveBeenCalledTimes(tags.length);
   });
 
+  test('checklist changes refresh their session and packing activity without fetching unrelated business views', async () => {
+    const related = [{ type: 'Packing', id: 'one' }, { type: 'Packing', id: 'ACTIVITY' }];
+    await subscribe([...related, { type: 'Packing', id: 'unrelated' }, { type: 'Dashboard', id: 'CURRENT' },
+      { type: 'Reports' }, { type: 'Order', id: 'ADMIN_LIST' }, { type: 'Delivery', id: 'LIST' }]);
+    receive('packing:updated', { orderId: 'one' });
+    await flush();
+    expect(read.mock.calls.map(([tag]) => tag)).toEqual(expect.arrayContaining(related));
+    expect(read).toHaveBeenCalledTimes(related.length);
+  });
+
+  test('a missing-item alert refreshes its inbox and packing views without a full order refresh', async () => {
+    const related = [{ type: 'Packing', id: 'one' }, { type: 'Notification' }];
+    await subscribe([...related, { type: 'Reports' }, { type: 'Dashboard', id: 'CURRENT' }, { type: 'Order', id: 'ADMIN_LIST' }]);
+    receive('notification:new', { notification: { type: 'item_missing', data: { orderId: 'one' } } });
+    await flush();
+    expect(read.mock.calls.map(([tag]) => tag)).toEqual(expect.arrayContaining(related));
+    expect(read).toHaveBeenCalledTimes(related.length);
+  });
+
   test('discards queued work and stale callbacks when the session changes', async () => {
     await subscribe([{ type: 'Dashboard', id: 'CURRENT' }]);
     const staleHandler = handlers.get('order:updated');
@@ -107,7 +126,9 @@ describe('live query refreshes', () => {
   test('cancels pending refreshes when the listener unmounts', async () => {
     await subscribe([{ type: 'Dashboard', id: 'CURRENT' }]);
     receive('order:new', { orderId: 'one' });
+    const staleHandler = handlers.get('order:new');
     view.unmount();
+    act(() => staleHandler({ orderId: 'one' }));
     await flush();
     expect(read).not.toHaveBeenCalled();
   });

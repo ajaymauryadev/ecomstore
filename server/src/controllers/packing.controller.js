@@ -226,7 +226,23 @@ export const updateItemStatus = asyncHandler(async (req, res, next) => {
       if (packing.operationReceipts.length >= 500) throw new AppError('This session has reached its saved-operation limit. Review it online.', 409);
     }
     if (packing.status !== 'in_progress') throw new AppError('The packing session is no longer active. Review your saved work.', 409);
-    if (expectedStatus && item.status !== expectedStatus) throw new AppError('This item changed while you were offline. Review your saved checklist.', 409);
+    if (expectedStatus && item.status !== expectedStatus) {
+      // A stale read or another tab can queue work that is already done. Record
+      // its receipt without changing the item, attribution or activity history.
+      const satisfied = operationId && (
+        (action === 'pick' && ['picked', 'packed'].includes(item.status) && item.pickedQty === (pickedQty == null ? item.requiredQty : Number(pickedQty))) ||
+        (action === 'pack' && item.status === 'packed') ||
+        (action === 'missing' && item.status === 'missing' && item.missingReason === String(missingReason || 'Not available in stock').trim().slice(0, 300))
+      );
+      if (satisfied) {
+        packing.operationReceipts.push({ operationId, payloadHash, userId: req.user._id, recordedAt, confirmedAt: new Date() });
+        await packing.save({ session: mongoSession });
+        return { session: packing, item: item.toObject(), replayed: true };
+      }
+      throw new AppError('The saved checklist differs from the current item. Review this item before continuing.', 409, {
+        code: 'PACKING_ITEM_CHANGED', itemId: String(item._id), session: packing.toJSON(),
+      });
+    }
 
     const now = new Date();
     let activity;
@@ -303,7 +319,8 @@ export const updateItemStatus = asyncHandler(async (req, res, next) => {
     );
   }
 
-  if (!result.replayed) refreshPacking(req);
+  if (result.replayed) req.skipSavedDataChange = true;
+  else refreshPacking(req);
   sendSuccess(res, { session: result.session });
 });
 export const suggestReplacement = asyncHandler(async (req, res) => {

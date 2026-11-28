@@ -2,8 +2,9 @@ import { baseApi } from '../api/baseApi';
 
 export function changedQueryKeys(state, previous, current) {
   const all = () => Object.keys(state.api.queries).filter((key) => state.api.queries[key].endpointName !== 'getSyncRevision');
-  // Once per session, verify saved snapshots whose server version is unknown.
-  if (!previous) return all();
+  // Restored snapshots are already marked stale during hydration. The first
+  // counter response establishes a baseline; it must not fetch fresh reads twice.
+  if (!previous) return [];
   if (!previous.versions || !current?.versions) return previous.revision !== current?.revision ? all() : [];
   const tags = [...new Set([...Object.keys(previous.versions), ...Object.keys(current.versions)])]
     .filter((tag) => (previous.versions[tag] ?? 0) !== (current.versions[tag] ?? 0));
