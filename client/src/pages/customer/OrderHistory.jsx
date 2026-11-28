@@ -5,7 +5,7 @@ import { ShoppingBag, ChevronRight, ArrowLeft } from 'lucide-react';
 import { useGetOrdersQuery } from '../../features/orders/orderApi';
 import { formatCurrency } from '../../utils/formatters';
 import { cn } from '../../utils/cn';
-import Spinner from '../../components/ui/Spinner';
+import { SkeletonCard } from '../../components/ui/Skeleton';
 import LoadError from '../../components/ui/LoadError';
 
 const STATUS_META = {
@@ -45,12 +45,6 @@ export default function OrderHistory() {
   const orders = data?.data || [];
   const meta = data?.meta || {};
 
-  if (isLoading) return (
-    <div className="flex items-center justify-center min-h-[50vh]">
-      <Spinner size="lg" className="text-gold-500" />
-    </div>
-  );
-
   if (isError) return <LoadError title="Orders could not be loaded" error={error} retry={refetch} />;
 
   return (
@@ -61,11 +55,13 @@ export default function OrderHistory() {
         </Link>
         <div>
           <h1 className="text-xl font-bold text-slate-100">My Orders</h1>
-          <p className="text-xs text-slate-400">{meta.total ?? 0} total orders</p>
+          <p className="text-xs text-slate-400">{isLoading ? 'Your orders' : `${meta.total ?? 0} total orders`}</p>
         </div>
       </div>
 
-      {orders.length === 0 ? (
+      {isLoading ? <div className="space-y-3" role="status" aria-label="Loading saved orders">
+        {[0, 1, 2].map((index) => <SkeletonCard key={index} lines={4} />)}
+      </div> : orders.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 gap-4 text-slate-500">
           <ShoppingBag size={56} strokeWidth={1} />
           <p className="font-medium text-slate-400">No orders yet</p>

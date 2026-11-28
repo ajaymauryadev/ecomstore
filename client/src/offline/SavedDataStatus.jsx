@@ -3,14 +3,13 @@ import { useSelector, useStore } from 'react-redux';
 import { useLocation } from 'react-router-dom';
 import { baseApi } from '../api/baseApi';
 import { useSavedViewState } from './useSavedViewState';
-import { PageLoader } from '../components/ui/Spinner';
 import { accountScope } from './storage';
 import { outboxMemory, removeIntent, saveIntent } from './outbox';
 import { Cloud, CloudOff, AlertCircle } from 'lucide-react';
 
-export function SavedDataGate({ children }) {
+export function SavedDataGate({ children, fallback = null }) {
   const restoring = useSelector((state) => state.savedData.restoring);
-  return restoring ? <PageLoader /> : children;
+  return restoring ? fallback : children;
 }
 
 export function SavedScroll() {

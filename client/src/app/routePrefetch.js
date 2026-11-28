@@ -94,6 +94,7 @@ const routes = {
   '/store/audit-logs': pageLoaders.AuditLogsStorePage,
   '/staff/dashboard': pageLoaders.StaffDashboard,
   '/staff/pos': pageLoaders.POSPage,
+  '/staff/orders': () => Promise.all([pageLoaders.OperationalOrdersPage(), pageLoaders.OrdersManagement()]),
   '/staff/packing': pageLoaders.StaffOrdersPage,
   '/staff/deliveries': pageLoaders.DeliveryOrdersPage,
   '/super-admin/dashboard': pageLoaders.SuperAdminDashboard,
@@ -104,6 +105,11 @@ const routes = {
 
 function routeLoader(pathname) {
   if (routes[pathname]) return routes[pathname];
+  if (/^\/store\/products\/[^/]+\/edit$/.test(pathname)) return pageLoaders.ProductForm;
+  if (/^\/store\/purchases\/[^/]+$/.test(pathname)) return pageLoaders.PurchaseForm;
+  if (/^\/(?:staff\/packing|store\/packing\/work)\/[^/]+$/.test(pathname)) return pageLoaders.StaffPackingPage;
+  if (/^\/super-admin\/stores\/[^/]+$/.test(pathname)) return pageLoaders.TenantDetailPage;
+  if (/^\/s\/[^/]+\/orders\/[^/]+$/.test(pathname)) return pageLoaders.OrderTracking;
   if (/^\/s\/[^/]+(?:\/(?:search|categories))?$/.test(pathname)) return pageLoaders.StoreFront;
   if (/^\/s\/[^/]+\/p\/[^/]+$/.test(pathname)) return pageLoaders.ProductDetail;
   const customerPage = pathname.match(/^\/s\/[^/]+\/(cart|checkout|orders|account|auth)$/)?.[1];

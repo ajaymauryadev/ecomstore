@@ -7,18 +7,20 @@ import App from './App';
 import './index.css';
 import './api/registerEndpoints';
 import { initializeSavedData, startSavedDataSync } from './offline/savedData';
-import { SavedDataGate } from './offline/SavedDataStatus';
+import StartupShell from './components/layout/StartupShell';
 import { registerOfflineShell } from './offline/shell';
 
 async function startApp() {
+  const root = ReactDOM.createRoot(document.getElementById('root'));
+  root.render(<StartupShell />);
   await initializeSavedData(store);
   startSavedDataSync(store);
   registerOfflineShell(store);
-  ReactDOM.createRoot(document.getElementById('root')).render(
+  root.render(
     <React.StrictMode>
       <Provider store={store}>
         <BrowserRouter>
-          <SavedDataGate><App /></SavedDataGate>
+          <App />
         </BrowserRouter>
       </Provider>
     </React.StrictMode>

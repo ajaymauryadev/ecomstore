@@ -9,6 +9,7 @@ import Button from '../../../components/ui/Button';
 import Input from '../../../components/ui/Input';
 import Modal from '../../../components/ui/Modal';
 import LoadError from '../../../components/ui/LoadError';
+import { SkeletonCard, SkeletonTable } from '../../../components/ui/Skeleton';
 import RecordSupplierPaymentDialog from '../../../components/purchases/RecordSupplierPaymentDialog';
 import { formatCurrency } from '../../../utils/formatters';
 import { cn } from '../../../utils/cn';
@@ -88,7 +89,10 @@ function PurchaseDetail({ id }) {
   const [payModal, setPayModal] = useState(false);
   const [recordPayment, { isLoading: isPaying }] = useRecordPurchasePaymentMutation();
 
-  if (isLoading) return <div className="flex justify-center py-12"><div className="animate-spin w-8 h-8 rounded-full border-2 border-gold-500 border-t-transparent" /></div>;
+  if (isLoading) return <div className="space-y-5" role="status" aria-label="Loading saved purchase">
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">{[0, 1, 2, 3].map((index) => <SkeletonCard key={index} lines={2} />)}</div>
+    <SkeletonTable />
+  </div>;
 
   const purchase = data?.data?.purchase;
   if (!purchase) return <p className="text-slate-400">Purchase not found.</p>;

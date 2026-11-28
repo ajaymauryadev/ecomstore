@@ -224,11 +224,12 @@ baseApi.injectEndpoints = (options) => {
       const status = result.error?.status;
       const rejected = typeof status === 'number' && status >= 400 && status < 500 && ![408, 429].includes(status);
       const saved = rejected ? undefined : result.currentData;
+      const waitingForDownload = saved === undefined && result.isError && !rejected;
       return {
         ...result, data: saved, currentData: saved,
-        isError: result.isError && saved === undefined,
+        isError: result.isError && saved === undefined && !waitingForDownload,
         // Error details stay available to the persistent status notice/retry UI.
-        isLoading: saved === undefined && (result.isLoading || result.isFetching),
+        isLoading: saved === undefined && (result.isLoading || result.isFetching || waitingForDownload),
       };
     };
     endpoint.useQuery = useSavedQuery;

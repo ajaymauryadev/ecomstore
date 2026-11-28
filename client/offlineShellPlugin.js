@@ -5,7 +5,7 @@ export function offlineShellPlugin() {
     name: 'saved-data-offline-shell',
     apply: 'build',
     generateBundle(_, bundle) {
-      const assets = ['/', '/index.html', '/manifest.json', '/icon.svg', '/icon-192.png', '/icon-512.png',
+      const assets = ['/', '/index.html', '/startup.css', '/manifest.json', '/icon.svg', '/icon-192.png', '/icon-512.png',
         ...Object.keys(bundle).filter((name) => !name.endsWith('.map')).map((name) => `/${name}`)];
       const version = createHash('sha256').update(Object.values(bundle).map((entry) => entry.code || entry.source || '').join('')).digest('hex').slice(0, 16);
       this.emitFile({ type: 'asset', fileName: 'sw.js', source: `

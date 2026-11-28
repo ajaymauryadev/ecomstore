@@ -9,7 +9,7 @@ import {
 import { useGetOrderQuery, useCancelOrderMutation, useSubmitPaymentProofMutation } from '../../features/orders/orderApi';
 import { formatCurrency } from '../../utils/formatters';
 import { cn } from '../../utils/cn';
-import Spinner from '../../components/ui/Spinner';
+import { SkeletonCard } from '../../components/ui/Skeleton';
 import Button from '../../components/ui/Button';
 import { useState, useRef, useEffect } from 'react';
 import toast from 'react-hot-toast';
@@ -275,8 +275,16 @@ export default function OrderTracking() {
   }, [orderId, on]);
 
   if (isLoading) return (
-    <div className="flex items-center justify-center min-h-[50vh]">
-      <Spinner size="lg" className="text-gold-500" />
+    <div className="order-tracking space-y-6 pb-4">
+      <div className="flex items-center gap-3">
+        <Link to={`/s/${storeSlug}/orders`} aria-label="Back to orders" className="workspace-row-action border border-navy-700 bg-navy-900 text-slate-400">
+          <ArrowLeft size={18} />
+        </Link>
+        <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-100">Order Tracking</h1>
+      </div>
+      <div role="status" aria-label="Loading saved order" className="space-y-6">
+        <SkeletonCard lines={4} /><SkeletonCard lines={6} />
+      </div>
     </div>
   );
 

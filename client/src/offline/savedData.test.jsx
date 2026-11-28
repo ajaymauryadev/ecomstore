@@ -148,7 +148,9 @@ test('saved hooks never display the previous filter results and retain a saved r
   expect(result.current.isError).toBe(false);
   rerender({ page: 2 });
   expect(result.current.data).toBeUndefined();
-  await waitFor(() => expect(result.current.isError).toBe(true));
+  await waitFor(() => expect(result.current.error?.status).toBe(503));
+  expect(result.current.isLoading).toBe(true);
+  expect(result.current.isError).toBe(false);
   expect(result.current.error.status).toBe(503);
 });
 

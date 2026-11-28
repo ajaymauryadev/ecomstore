@@ -1,7 +1,8 @@
 import { useNavigationPrefetch } from '../../hooks/useNavigationPrefetch';
 import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { Outlet, useParams, Link, useNavigate, useLocation, useMatch, Navigate } from 'react-router-dom';
-import RouteContent from './RouteContent';
+import RouteContent, { RouteSkeleton } from './RouteContent';
+import StartupShell from './StartupShell';
 import MobileNavigation from './MobileNavigation';
 import { ROUTES } from '../../constants/routes';
 import { WorkspaceTheme } from './WorkspaceTheme';
@@ -19,7 +20,6 @@ import { restoreCartDraft } from '../../features/cart/restoreCartDraft';
 import { selectCurrentUser } from '../../features/auth/authSlice';
 import { useGetStorefrontInfoQuery } from '../../features/storefront/storefrontApi';
 import { formatCurrency } from '../../utils/formatters';
-import { PageLoader } from '../ui/Spinner';
 import Button from '../ui/Button';
 import Modal from '../ui/Modal';
 import StoreSearch from '../products/StoreSearch';
@@ -188,7 +188,7 @@ export default function CustomerLayout() {
     navigate(searchDestination(storeSlug, location, settledSearch), { replace: true });
   }, [settledSearch, searchEdited, search, storeSlug, navigate, location]);
 
-  if (isStoreFetching && !store) return <PageLoader className="workspace-theme" />;
+  if (isStoreFetching && !store) return <StartupShell />;
   if (isStoreError || !store) {
     const unavailable = storeError?.status === 404;
     return (
@@ -205,27 +205,17 @@ export default function CustomerLayout() {
 
   if (isAuth) return <RouteContent><Outlet context={{ store }} /></RouteContent>;
 
-  if (isCheckout && !isCustomer) {
+  if (isCheckout && !isCustomer && sessionInitialized) {
     // The public store may load before the cookie-based session check finishes.
     // Wait for that check before deciding that checkout needs a sign-in.
-    if (!sessionInitialized) return <PageLoader className="workspace-theme" />;
     return <Navigate to={`/s/${storeSlug}/auth`} state={{ checkout: true, buyNow: location.state?.buyNow }} replace />;
   }
 
   // Only cart/checkout require restored cart data. Browsing and order history
   // must not wait for an unrelated product/coupon verification request.
-  if ((isCart || isCheckout) && (scopeKey !== expectedScope || status === 'idle' || status === 'loading')) return <PageLoader className="workspace-theme" />;
-  if ((isCart || isCheckout) && status === 'error') {
-    return (
-      <main className="workspace-theme min-h-screen bg-navy-950 flex items-center justify-center p-6">
-        <div className="card max-w-md p-8 text-center">
-          <h1 className="text-xl font-bold text-slate-100">Cart could not be checked</h1>
-          <p className="text-sm text-slate-400 mt-2">Your draft is saved in this tab. Check your connection and try again.</p>
-          <Button className="mt-5" variant="secondary" onClick={() => setRestoreAttempt((attempt) => attempt + 1)}>Try again</Button>
-        </div>
-      </main>
-    );
-  }
+  const waitingForCart = (isCart || isCheckout) && (scopeKey !== expectedScope || status === 'idle' || status === 'loading');
+  const waitingForSession = isCheckout && !sessionInitialized;
+  const cartError = (isCart || isCheckout) && status === 'error';
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -332,7 +322,14 @@ export default function CustomerLayout() {
                 Cart availability or coupon eligibility changed. Review your cart before checkout.
               </p>
             )}
-            <RouteContent><Outlet context={{ search, store, cartReady }} /></RouteContent>
+            <RouteContent>
+              {cartError ? <section className="card p-6 space-y-3" role="status">
+                <h1 className="text-xl font-bold">Cart could not be checked</h1>
+                <p className="text-sm text-slate-400">Your draft is saved in this tab. Check your connection and try again.</p>
+                <Button variant="secondary" onClick={() => setRestoreAttempt((attempt) => attempt + 1)}>Try again</Button>
+              </section> : waitingForCart || waitingForSession ? <RouteSkeleton label="Preparing your saved cart" />
+                : <Outlet context={{ search, store, cartReady }} />}
+            </RouteContent>
           </main>
         </div>
 

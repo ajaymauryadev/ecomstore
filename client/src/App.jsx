@@ -1,5 +1,5 @@
-import { lazy, Suspense } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { lazy } from 'react';
+import { Route, Navigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { Toaster } from 'react-hot-toast';
 import { selectCurrentUser } from './features/auth/authSlice';
@@ -9,8 +9,8 @@ import UnauthorizedPage from './components/shared/UnauthorizedPage';
 import ErrorBoundary from './components/shared/ErrorBoundary';
 import SocketProvider from './components/shared/SocketProvider';
 import LiveUpdates from './components/shared/LiveUpdates';
-import SavedDataStatus, { SavedScroll } from './offline/SavedDataStatus';
-import { PageLoader } from './components/ui/Spinner';
+import SavedDataStatus from './offline/SavedDataStatus';
+import StableRoutes from './components/layout/StableRoutes';
 import { ROLES } from './constants/roles';
 import { PERMISSIONS, hasAnyPermission } from './constants/permissions';
 import { dashboardRouteForRole, ROUTES } from './constants/routes';
@@ -103,9 +103,7 @@ export default function App() {
         <SocketProvider>
         <LiveUpdates />
         <SavedDataStatus />
-        <SavedScroll />
-        <Suspense fallback={<PageLoader />}>
-          <Routes>
+        <StableRoutes>
             <Route path={ROUTES.LOGIN} element={<Login />} />
             <Route path={ROUTES.REGISTER} element={<Register />} />
             <Route path="/" element={<RoleRedirect />} />
@@ -184,8 +182,7 @@ export default function App() {
 
             <Route path={ROUTES.UNAUTHORIZED} element={<UnauthorizedPage />} />
             <Route path="*" element={<NotFound />} />
-          </Routes>
-        </Suspense>
+        </StableRoutes>
 
         <Toaster position="top-right" containerStyle={{ top: 'calc(4.5rem + env(safe-area-inset-top))' }} gutter={8} toastOptions={{
           duration: 3500,

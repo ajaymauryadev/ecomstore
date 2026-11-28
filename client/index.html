@@ -12,9 +12,15 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" media="print" onload="this.media='all'" />
     <noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" /></noscript>
     <title>Smart Kirana</title>
+    <link rel="stylesheet" href="/startup.css" />
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div class="startup-shell" aria-busy="true" aria-label="Opening Smart Kirana">
+        <aside class="startup-sidebar" aria-hidden="true"><p class="startup-brand"><span class="startup-mark">S</span>Smart Kirana</p><div class="startup-line"></div><div class="startup-line"></div><div class="startup-line"></div><div class="startup-line"></div><div class="startup-line"></div></aside>
+        <div class="startup-body"><header class="startup-header"><p class="startup-brand">Smart Kirana</p></header><main class="startup-content"><div aria-hidden="true"><div class="startup-line startup-title"></div><div class="startup-toolbar"></div><div class="startup-card"><div class="startup-line"></div><div class="startup-line"></div><div class="startup-line"></div><div class="startup-line"></div><div class="startup-line"></div><div class="startup-line"></div></div></div></main></div>
+      </div>
+    </div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

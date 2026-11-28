@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector, useStore } from 'react-redux';
 import { setCredentials, clearCredentials, setInitialized } from '../../features/auth/authSlice';
 import { useRefreshTokenMutation, useLogoutMutation } from '../../features/auth/authApi';
-import { PageLoader } from '../ui/Spinner';
+import StartupShell from '../layout/StartupShell';
 import Button from '../ui/Button';
 
 export default function AuthInit({ children }) {
@@ -61,15 +61,16 @@ export default function AuthInit({ children }) {
     };
   }, [attempt, dispatch, store, isInitialized, refresh, logout, logoutPending]);
 
-  if (isInitialized || offlineSession || window.location.pathname.startsWith('/s/')) return children;
-  if (!recovering) return <PageLoader />;
+  const publicPage = /^\/(?:login|register|unauthorized)\/?$/.test(window.location.pathname) || window.location.pathname.startsWith('/s/');
+  if (isInitialized || offlineSession || publicPage) return children;
+  if (!recovering) return <StartupShell />;
   return (
-    <main className="workspace-theme min-h-screen bg-navy-950 flex items-center justify-center p-6">
-      <div className="card max-w-md p-8 text-center" role="status">
+    <StartupShell>
+      <div role="status">
         <h1 className="text-xl font-bold text-slate-100">Connection interrupted</h1>
         <p className="text-sm text-slate-400 mt-2">Your session could not be checked. Retrying automatically.</p>
         <Button className="mt-5" isLoading={retrying} onClick={() => setAttempt((value) => value + 1)}>Try again</Button>
       </div>
-    </main>
+    </StartupShell>
   );
 }

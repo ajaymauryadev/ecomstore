@@ -11,7 +11,7 @@ import { selectCurrentUser } from '../../features/auth/authSlice';
 import { useCart } from '../../hooks/useCart';
 import { formatCurrency } from '../../utils/formatters';
 import { cn } from '../../utils/cn';
-import Spinner from '../../components/ui/Spinner';
+import Skeleton from '../../components/ui/Skeleton';
 
 const API_BASE = import.meta.env.VITE_API_URL?.replace('/api/v1', '') || '';
 function imgSrc(url) {
@@ -137,8 +137,13 @@ export default function ProductDetail() {
   const variant = activeVariants.find((v) => v._id === selectedVariant?._id) ?? activeVariants.find((v) => v.stock > 0) ?? activeVariants[0];
 
   if (isLoading) return (
-    <div className="flex items-center justify-center min-h-[50vh]">
-      <Spinner size="lg" className="text-gold-500" />
+    <div className="space-y-5" role="status" aria-label="Loading saved product">
+      <Link to={`/s/${storeSlug}`} className="text-xs text-slate-500">Home</Link>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6" aria-hidden="true">
+        <Skeleton className="aspect-square w-full rounded-2xl" />
+        <div className="space-y-5"><Skeleton className="h-8 w-3/4" /><Skeleton className="h-6 w-1/3" />
+          <Skeleton className="h-16 w-full" /><Skeleton className="h-12 w-full" /></div>
+      </div>
     </div>
   );
 

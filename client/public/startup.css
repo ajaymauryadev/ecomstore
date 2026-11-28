@@ -1,0 +1,15 @@
+.startup-shell{min-height:100dvh;display:flex;background:#f4f6fa;color:#12233e;font-family:Inter,system-ui,sans-serif;box-sizing:border-box}
+.startup-shell *{box-sizing:border-box}
+.startup-sidebar{width:17.5rem;flex-shrink:0;background:#fff;border-right:1px solid #dbe4f1;padding:1.5rem}
+.startup-brand{display:flex;align-items:center;gap:.75rem;font-size:1.1rem;font-weight:750;margin:0}
+.startup-mark{display:grid;place-items:center;width:2.5rem;height:2.5rem;border-radius:.875rem;background:#174cd0;color:#fff;font-size:1rem}
+.startup-body{min-width:0;flex:1}
+.startup-header{height:5rem;background:#fff;border-bottom:1px solid #dbe4f1;display:flex;align-items:center;padding:1.5rem}
+.startup-content{padding:clamp(1rem,2.6vw,2.5rem);max-width:90rem;margin:auto}
+.startup-line{height:.875rem;border-radius:.5rem;background:#e8edf5;margin:1rem 0;width:70%;max-width:28rem}
+.startup-title{height:2rem;width:12rem;margin:0 0 1.5rem}
+.startup-toolbar{height:3rem;width:100%;max-width:none;background:#fff;border:1px solid #dbe4f1;border-radius:.875rem}
+.startup-card{background:#fff;border:1px solid #dbe4f1;border-radius:1rem;min-height:20rem;margin-top:1.5rem;padding:1.5rem}
+.startup-message{margin-bottom:1.5rem;font-size:.875rem;line-height:1.5}
+body:has(.startup-shell){margin:0;background:#f4f6fa}
+@media(max-width:1023px){.startup-sidebar{display:none}.startup-header{height:4.5rem}.startup-card{min-height:18rem}}

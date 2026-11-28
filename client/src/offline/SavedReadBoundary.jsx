@@ -12,11 +12,11 @@ export default function SavedReadBoundary({ children }) {
   }), []);
   const first = Object.values(failures)[0];
   return <ReadStateContext.Provider value={register}>
-    {first && <section role="status" className="card p-6 space-y-3">
+    <div>{children}</div>
+    {first && <section role="status" className="card mt-4 p-6 space-y-3">
       <h2 className="font-semibold">This view is waiting for its first download</h2>
       <p className="text-sm text-slate-400">Connect once to save this data on your device. Downloaded views remain available offline.</p>
       <button type="button" className="btn-secondary" onClick={() => Object.values(failures).forEach((failure) => failure.retry?.())}>Try again</button>
     </section>}
-    <div hidden={Boolean(first)}>{children}</div>
   </ReadStateContext.Provider>;
 }
