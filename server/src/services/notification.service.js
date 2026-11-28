@@ -4,16 +4,37 @@ import { emitToTenantRoles, emitToUser } from '../config/socket.js';
 import User from '../models/User.js';
 import { hasPermission, PERMISSIONS } from '../constants/permissions.js';
 
+export function publishNotification(notification) {
+  const { tenantId, userId, role } = notification;
+  const payload = { notification };
+  try {
+    if (userId) emitToUser(userId.toString(), 'notification:new', payload);
+    else {
+      const roles = role === 'admin' ? ['store_owner'] : role === 'staff' ? ['staff', 'packer', 'delivery'] : ['customer'];
+      emitToTenantRoles(tenantId.toString(), roles, 'notification:new', payload);
+    }
+  } catch { /* The persisted inbox and revision check recover missed socket delivery. */ }
+}
+
+// Called inside checkout's existing transaction: an acknowledged new order has
+// its owner/team inbox records, even if the process exits before socket delivery.
+export async function saveNewOrderNotifications(order, session) {
+  const recipients = await User.find({ tenantId: order.tenantId, isActive: true,
+    role: { $in: ['staff', 'packer', 'delivery'] } }).select('_id').session(session).lean();
+  const values = {
+    tenantId: order.tenantId, type: 'new_order', title: 'New Order Received',
+    body: `Order #${order.orderNumber} received`, data: { orderId: order._id, orderNumber: order.orderNumber },
+  };
+  return Notification.insertMany([
+    { ...values, role: 'admin' },
+    ...recipients.map(({ _id }) => ({ ...values, userId: _id, role: 'staff' })),
+  ], { session, ordered: true });
+}
+
 export const notify = async ({ tenantId, userId, role, type, title, body = '', data = {} }) => {
   try {
     const notification = await Notification.create({ tenantId, userId, role, type, title, body, data });
-    const payload = { notification };
-    if (userId) {
-      try { emitToUser(userId.toString(), 'notification:new', payload); } catch {}
-    } else {
-      const roles = role === 'admin' ? ['store_owner'] : role === 'staff' ? ['staff', 'packer', 'delivery'] : ['customer'];
-      try { emitToTenantRoles(tenantId.toString(), roles, 'notification:new', payload); } catch {}
-    }
+    publishNotification(notification);
     return notification;
   } catch (err) {
     logger.error(`Notification write failed: ${err.message}`);
@@ -48,10 +69,3 @@ export const notifyStaff = (tenantId, userId, type, title, body = '', data = {})
 
 export const notifyCustomer = (tenantId, userId, type, title, body = '', data = {}) =>
   notify({ tenantId, userId, role: 'customer', type, title, body, data });
-
-export const notifyTeam = async (tenantId, type, title, body = '', data = {}) => {
-  try {
-    const recipients = await User.find({ tenantId, isActive: true, role: { $in: ['staff', 'packer', 'delivery'] } }).select('_id').lean();
-    await Promise.all(recipients.map(({ _id }) => notifyStaff(tenantId, _id, type, title, body, data)));
-  } catch (err) { logger.error(`Team notification failed: ${err.message}`); }
-};

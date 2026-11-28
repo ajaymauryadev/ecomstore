@@ -55,7 +55,7 @@ export function accountScope(auth) {
 }
 
 export function canSaveQuery(query, auth) {
-  if (query.data === undefined || !query.fulfilledTimeStamp || query.endpointName === 'getMe') return false;
+  if (query.data === undefined || !query.fulfilledTimeStamp || ['getMe', 'getSyncRevision'].includes(query.endpointName)) return false;
   // Guest tracking is authorized by a tab-scoped secret; never persist it as public catalog data.
   if (!auth.user && !['getStorefrontInfo', 'getPublicProducts', 'getPublicProduct', 'getPublicCategories', 'getCartProducts'].includes(query.endpointName)) return false;
   const status = query.error?.status;

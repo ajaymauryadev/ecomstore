@@ -6,6 +6,7 @@ import { useSavedViewState } from './useSavedViewState';
 import { accountScope } from './storage';
 import { outboxMemory, removeIntent, saveIntent } from './outbox';
 import { Cloud, CloudOff, AlertCircle } from 'lucide-react';
+import { useRetryCountdown } from '../hooks/useRetryCountdown';
 
 export function SavedDataGate({ children, fallback = null }) {
   const restoring = useSelector((state) => state.savedData.restoring);
@@ -73,14 +74,18 @@ export function WorkspaceSyncStatus({ standalone = false }) {
   const checking = active.some((query) => query.status === 'pending');
   const missing = active.some((query) => query.data === undefined && query.status === 'rejected');
   const failed = active.some((query) => query.status === 'rejected');
+  const throttled = active.filter((query) => query.error?.status === 429);
+  const retryAt = Math.max(0, ...throttled.map((query) => query.error.data?.retryAt || 0));
+  const retrySeconds = useRetryCountdown(retryAt);
   const offline = status.offline || globalThis.navigator?.onLine === false;
   const unreachable = status.serverUnavailable || active.some((query) => ['FETCH_ERROR', 'TIMEOUT_ERROR', 502, 503, 504].includes(query.error?.status));
   let message = offline ? 'Offline — showing last synced data. Connect to the internet for current, accurate information.'
     : offlineSession ? 'Showing saved data — checking your session. Server confirmation is required for changes.'
       : unreachable ? 'Server unavailable — showing saved data. Changes need server confirmation.'
-        : checking ? 'Checking for updates — saved data remains visible.'
+        : throttled.length ? `Updates temporarily paused by the server request limit. ${retrySeconds > 0 ? `Retrying in ${retrySeconds} seconds.` : 'Retrying automatically.'} Saved data remains visible.`
+          : checking ? 'Checking for updates — saved data remains visible.'
           : failed ? 'Updates could not be downloaded — showing saved data.' : 'Showing saved data.';
-  if (missing) message += ' Connect to the internet to download missing data.';
+  if (missing && !throttled.length) message += ' Connect to the internet to download missing data.';
   if (standalone && !offline && !status.storageError && !status.logoutPending && !intents.length) return null;
   const needsAttention = offline || unreachable || failed || status.storageError || status.logoutPending || intents.length > 0;
   const Icon = offline ? CloudOff : needsAttention ? AlertCircle : Cloud;

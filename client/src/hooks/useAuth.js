@@ -22,8 +22,8 @@ export const useAuth = () => {
   const [logoutMutation, { isLoading: isLoggingOut }] = useLogoutMutation();
   useGetMeQuery(undefined, {
     skip: !accessToken,
-    pollingInterval: 60000, skipPollingIfUnfocused: true,
-    refetchOnFocus: true, refetchOnReconnect: true,
+    // Initial verification, permission events and revision recovery keep this
+    // current; ordinary focus changes need not refetch the identity every time.
   });
 
   const logout = async () => {

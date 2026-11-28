@@ -52,6 +52,34 @@ async function ownerPatch(request, storefront, fixture, order, action, data) {
   expect(response.status(), await response.text()).toBe(200);
 }
 
+test('owner receives a new order while page reads are throttled and dashboard/POS recover without reloading', async ({ page, request, storefront }) => {
+  test.setTimeout(60000);
+  const fixture = await setup(storefront, 'owner-retry', 'staff');
+  let retryUntil = 0;
+  await page.route('**/api/v1/dashboard', async (route) => {
+    retryUntil ||= Date.now() + 6000;
+    if (Date.now() < retryUntil) await route.fulfill({ status: 429,
+      headers: { 'Retry-After': String(Math.max(1, Math.ceil((retryUntil - Date.now()) / 1000))) },
+      json: { message: 'Account request limit reached.', rateLimitScope: 'business' },
+    });
+    else await route.continue();
+  });
+  await openSession(page, storefront, fixture.ownerSession, '/store/dashboard');
+  await expect(page.getByText('Updates temporarily paused', { exact: true })).toBeVisible();
+  const order = await place(request, storefront, fixture);
+  await expect(page.getByTestId('notification-popup').filter({ hasText: 'New Order Received' })).toBeVisible();
+  await expect(page.getByTestId('notification-unread-count')).toHaveText('1');
+  await page.getByRole('button', { name: 'Notifications', exact: true }).click();
+  await expect(page.getByRole('region', { name: 'Notification inbox' }).getByText('Order #' + order.orderNumber + ' received')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByText('Updates temporarily paused', { exact: true })).toHaveCount(0, { timeout: 15000 });
+  await expect(page.getByRole('main').getByText(order.orderNumber)).toBeVisible();
+  await page.evaluate(() => { history.pushState({}, '', '/store/pos'); dispatchEvent(new PopStateEvent('popstate')); });
+  await expect(page.getByRole('heading', { name: 'Point of sale', exact: true })).toBeVisible();
+  await expect(page.getByText(fixture.product.name, { exact: true }).first()).toBeVisible();
+  expect(await page.evaluate(() => window.realtimeDocumentMarker)).toBe('same-document');
+});
+
 for (const role of ['packer', 'staff']) {
   test(`${role} receives live popups and pending packing work without refreshing`, async ({ page, request, storefront }) => {
     test.setTimeout(60000);

@@ -4,5 +4,6 @@ import mongoose from 'mongoose';
 const schema = new mongoose.Schema({
   _id: String,
   revision: { type: Number, default: 0 },
+  versions: { type: Map, of: Number, default: {} },
 }, { versionKey: false });
 export default mongoose.model('SyncRevision', schema);

@@ -51,8 +51,11 @@ export default function LiveUpdates() {
       dispatch(updateUser(user));
       if (selectSessionEpoch(store.getState()) !== epoch) dispatch(baseApi.util.resetApiState());
     }));
-    cleanups.push(on('data:changed', () => {
-      invalidate(Object.keys(store.getState().api.provided.tags).map((type) => ({ type })));
+    cleanups.push(on('data:changed', (payload) => {
+      const provided = Object.keys(store.getState().api.provided.tags);
+      const types = Array.isArray(payload?.tags) && !payload.tags.includes('All')
+        ? provided.filter((type) => payload.tags.includes(type)) : provided;
+      invalidate(types.map((type) => ({ type })));
     }));
     cleanups.push(on('notification:new', (payload) => {
       invalidate(notifications);

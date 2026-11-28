@@ -19,6 +19,7 @@ import Category from '../src/models/Category.js';
 import Expense from '../src/models/Expense.js';
 import DailyClosing from '../src/models/DailyClosing.js';
 import AuditLog from '../src/models/AuditLog.js';
+import Notification from '../src/models/Notification.js';
 import { hashGuestOrderToken } from '../src/utils/orderAccessToken.js';
 import { accountingDay } from '../src/utils/accountingDay.js';
 import { parseTrustedProxies } from '../src/config/trustedProxies.js';
@@ -496,12 +497,46 @@ describe('API request budgets', () => {
 
   test('an account cap survives token rotation and leaves another account on the same IP available', async () => {
     const accountRead = (token) => request(app).get('/api/unmatched').set(auth(token));
-    for (let i = 0; i < 450; i += 1) expect((await accountRead(tokens.staff)).status).toBe(404);
+    for (let i = 0; i < 240; i += 1) expect((await accountRead(tokens.staff)).status).toBe(404);
     const rotated = generateTokens(await User.findById(ids.staff).select('+tokenVersion')).accessToken;
     const denied = await accountRead(rotated);
     expect(denied.status).toBe(429);
     expect(denied.body.rateLimitScope).toBe('business');
     expect((await read('/pos/orders', tokens.ownerA)).status).toBe(200);
+  }, 15000);
+
+  test('an exhausted owner page budget keeps session, revision and new order inbox reads available', async () => {
+    const { product, variant } = await createProduct();
+    for (let i = 0; i < 240; i += 1) {
+      expect((await request(app).get('/api/unmatched').set(auth(tokens.ownerA))).status).toBe(404);
+    }
+    const denied = await read('/dashboard', tokens.ownerA);
+    expect(denied.status).toBe(429);
+    expect(Number(denied.headers['retry-after'])).toBeLessThanOrEqual(60);
+    const placed = await request(app).post('/api/v1/storefront/store-alpha/orders')
+      .set(auth(tokens.customerA)).send(orderBody(product, variant)).expect(201);
+    const orderId = placed.body.data.order._id;
+    const inbox = await read('/notifications?limit=20', tokens.ownerA);
+    expect(inbox.status).toBe(200);
+    expect(inbox.body.data).toEqual(expect.arrayContaining([
+      expect.objectContaining({ role: 'admin', type: 'new_order', isRead: false,
+        data: expect.objectContaining({ orderId }) }),
+    ]));
+    expect((await read('/notifications/unread-count', tokens.ownerA)).body.data.count).toBe(1);
+    expect((await read('/auth/me', tokens.ownerA)).status).toBe(200);
+    expect((await read('/sync/revision', tokens.ownerA)).status).toBe(200);
+    expect((await read('/notifications', tokens.ownerB)).body.data).toEqual([]);
+  }, 15000);
+
+  test('live reads have a bounded account budget and cannot be used to bypass anonymous limits', async () => {
+    for (let i = 0; i < 120; i += 1) expect((await read('/notifications/unread-count', tokens.ownerA)).status).toBe(200);
+    const denied = await read('/sync/revision', tokens.ownerA);
+    expect(denied.status).toBe(429);
+    expect(denied.body.rateLimitScope).toBe('business-live');
+    expect((await read('/dashboard', tokens.ownerA)).status).toBe(200);
+    expect((await read('/notifications/unread-count', tokens.staff)).status).toBe(200);
+    for (let i = 0; i < 200; i += 1) expect((await read('/sync/revision')).status).toBe(401);
+    expect((await read('/auth/me')).status).toBe(429);
   }, 15000);
 
   test('validates trusted proxy CIDRs and uses the nearest untrusted hop for sensitive IP budgets', async () => {
@@ -1984,6 +2019,10 @@ describe('durable order submission idempotency', () => {
     expect(order).not.toHaveProperty('orderSubmission');
     expect(second.body.data.order).not.toHaveProperty('guestAccessTokenHash');
     expect(await Order.countDocuments()).toBe(1);
+    const notices = await Notification.find({ 'data.orderId': new mongoose.Types.ObjectId(order._id) }).lean();
+    expect(notices.filter((notice) => notice.role === 'admin')).toHaveLength(1);
+    expect(notices.filter((notice) => notice.role === 'staff')).toHaveLength(4);
+    expect(new Set(notices.filter((notice) => notice.userId).map((notice) => String(notice.userId))).size).toBe(4);
     expect((await Coupon.findById(coupon._id)).usedCount).toBe(1);
     expect(await CouponUsage.find({ couponId: coupon._id }).lean()).toMatchObject([{ count: 1 }]);
     await expectSingleMovement(product, variant, order._id, 'ORDER_RESERVED');
@@ -2005,6 +2044,26 @@ describe('durable order submission idempotency', () => {
     expect(independent.map((result) => result.status)).toEqual([201, 201]);
     expect(new Set(independent.map((result) => result.body.data.order._id)).size).toBe(2);
     expect((await Product.findById(product._id)).variants.id(variant._id).stock).toBe(97);
+  });
+
+  test('a failed inbox write rolls checkout and stock back, and retry saves one order with its notifications', async () => {
+    const { product, variant } = await createProduct({ stock: 100 });
+    const body = orderBody(product, variant);
+    const key = randomUUID();
+    const insert = vi.spyOn(Notification, 'insertMany').mockRejectedValueOnce(new Error('Simulated inbox write failure'));
+    try {
+      await submitCustomer(app, key, body).expect(500);
+      expect(await Order.countDocuments()).toBe(0);
+      expect(await Notification.countDocuments()).toBe(0);
+      expect(await StockLedger.countDocuments()).toBe(0);
+      expect((await Product.findById(product._id)).variants.id(variant._id).stock).toBe(100);
+    } finally { insert.mockRestore(); }
+    const placed = await submitCustomer(app, key, body).expect(201);
+    await submitCustomer(app, key, body).expect(200);
+    await expectSingleMovement(product, variant, placed.body.data.order._id, 'ORDER_RESERVED');
+    expect(await Notification.countDocuments({ type: 'new_order', role: 'admin' })).toBe(1);
+    const revision = (await request(app).get('/api/v1/sync/revision').set(auth(tokens.ownerA)).expect(200)).body.data;
+    expect(revision.versions).toMatchObject({ Order: 1, Notification: 1, Product: 1 });
   });
 
   test('replays committed POS and customer orders through a fresh API process', async () => {
@@ -3438,10 +3497,50 @@ describe('saved-data revision checks', () => {
     expect(await revision(tokens.ownerA)).toBeGreaterThan(beforeA);
     expect(await revision(tokens.ownerB)).toBe(beforeB);
     const publicCheck = await request(app).get('/api/v1/storefront/store-alpha/sync-revision').expect(200);
-    expect(Object.keys(publicCheck.body.data)).toEqual(['revision']);
+    expect(Object.keys(publicCheck.body.data)).toEqual(['revision', 'versions']);
+    expect(publicCheck.body.data.versions).toMatchObject({ Store: 1, Product: 1 });
+    expect(publicCheck.body.data.versions).not.toHaveProperty('CurrentUser');
     const committed = await revision(tokens.ownerA);
     await request(app).patch('/api/v1/stores/mine').set(auth(tokens.ownerA)).send({ paymentSettings: { upiId: 'bad' } }).expect(400);
     await settleRevisionWrites();
     expect(await revision(tokens.ownerA)).toBe(committed);
+  });
+
+  test('inbox read changes affect only the recipient revision and expense changes exclude catalog counters', async () => {
+    const getRevision = async (token) => (await request(app).get('/api/v1/sync/revision').set(auth(token)).expect(200)).body.data;
+    const { notifyAdmin } = await import('../src/services/notification.service.js');
+    await notifyAdmin(ids.storeA, 'new_order', 'Test inbox');
+    const staffBefore = await getRevision(tokens.staff);
+    await request(app).post('/api/v1/notifications/mark-all-read').set(auth(tokens.ownerA)).expect(200);
+    await settleRevisionWrites();
+    expect((await getRevision(tokens.ownerA)).versions).toEqual({ Notification: 1 });
+    expect(await getRevision(tokens.staff)).toEqual(staffBefore);
+    await request(app).post('/api/v1/expenses').set(auth(tokens.ownerA))
+      .send({ description: 'Shop power', category: 'electricity', amount: 10, date: '2026-11-28', method: 'cash' }).expect(201);
+    await settleRevisionWrites();
+    const after = await getRevision(tokens.ownerA);
+    expect(after.versions).toMatchObject({ Notification: 1, Expense: 1, Reports: 1 });
+    expect(after.versions).not.toHaveProperty('Product');
+  });
+
+  test('owner COD handover publishes changes for cached Day Close and receipt screens', async () => {
+    const { product, variant } = await createProduct();
+    const placed = await request(app).post('/api/v1/storefront/store-alpha/orders')
+      .set(auth(tokens.customerA)).send(orderBody(product, variant)).expect(201);
+    const order = placed.body.data.order;
+    const endpoint = '/api/v1/storefront/store-alpha/admin/orders/' + order._id + '/status';
+    for (const status of ['accepted', 'packing', 'packed', 'out_for_delivery']) {
+      await request(app).patch(endpoint).set(auth(tokens.ownerA)).send({ status }).expect(200);
+    }
+    await settleRevisionWrites();
+    const counters = async () => (await request(app).get('/api/v1/sync/revision').set(auth(tokens.ownerA)).expect(200)).body.data.versions;
+    const before = await counters();
+    await request(app).patch(endpoint).set(auth(tokens.ownerA)).send({ status: 'delivered' }).expect(200);
+    await settleRevisionWrites();
+    const after = await counters();
+    expect(after.DailyClosing ?? 0).toBe((before.DailyClosing ?? 0) + 1);
+    expect(after.Transaction ?? 0).toBe((before.Transaction ?? 0) + 1);
+    expect(after.POS ?? 0).toBe((before.POS ?? 0) + 1);
+    expect((await Order.findById(order._id)).paymentStatus).toBe('paid');
   });
 });

@@ -3,6 +3,8 @@ import http from 'http';
 import mongoose from 'mongoose';
 import { app } from './src/app.js';
 import Order from './src/models/Order.js';
+import Notification from './src/models/Notification.js';
+import SyncRevision from './src/models/SyncRevision.js';
 import { connectDB } from './src/config/db.js';
 import { initSocket } from './src/config/socket.js';
 import { logger } from './src/config/logger.js';
@@ -10,6 +12,7 @@ import { env } from './src/config/env.js';
 import { startUploadCleanupScheduler } from './src/services/uploadCleanup.service.js';
 import { UPLOADS_ROOT } from './src/middleware/upload.js';
 import { assertRestoreReady } from './src/services/backupRestore.js';
+import { settleRevisionWrites } from './src/middleware/savedDataSync.js';
 
 const server = http.createServer(app);
 const io = initSocket(server);
@@ -17,7 +20,7 @@ const io = initSocket(server);
 const start = async () => {
   await connectDB();
   await assertRestoreReady(mongoose.connection.db, UPLOADS_ROOT);
-  await Order.init();
+  await Promise.all([Order.init(), Notification.init(), SyncRevision.init()]);
   startUploadCleanupScheduler();
   server.listen(env.PORT, () => {
     logger.info(`Server running on port ${env.PORT} in ${env.NODE_ENV} mode`);
@@ -34,7 +37,8 @@ process.once('SIGTERM', async () => {
   const deadline = setTimeout(() => process.exit(1), 20_000);
   deadline.unref();
   try {
-    await io.close();
+    await new Promise((resolve) => io.close(resolve));
+    await settleRevisionWrites();
     await mongoose.disconnect();
     process.exit(0);
   } catch (error) {

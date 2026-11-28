@@ -32,12 +32,12 @@ afterEach(() => {
 });
 afterAll(() => vi.unstubAllEnvs());
 
-const createStore = (id) => {
+const createStore = (id, role) => {
   store = configureStore({
     reducer: sessionReducer,
     middleware: (middleware) => middleware().concat(sessionCacheMiddleware, api.middleware),
   });
-  store.dispatch(setCredentials({ accessToken: 'original', user: { _id: id }, store: { _id: 'alpha' } }));
+  store.dispatch(setCredentials({ accessToken: 'original', user: { _id: id, ...(role && { role }) }, store: { _id: 'alpha' } }));
   return store;
 };
 const reply = (status, body, headers = {}) =>
@@ -88,12 +88,41 @@ test('backs off background reads across the account and resumes after Retry-Afte
     status: 429, data: { message: expect.stringContaining('45 seconds'), retryAt: now + 45000 },
   });
   now += 30000;
-  await expect(read('unread')).rejects.toMatchObject({ status: 429, data: { message: expect.stringContaining('15 seconds') } });
+  await expect(read('queue')).rejects.toMatchObject({ status: 429, data: { message: expect.stringContaining('15 seconds') } });
   expect(fetch).toHaveBeenCalledTimes(1);
 
   now += 15000;
   await expect(read('unread')).resolves.toEqual({ data: { count: 2 } });
   expect(fetch).toHaveBeenCalledTimes(2);
+});
+
+test('page throttling does not suppress owner inbox, session and sync recovery reads', async () => {
+  createStore('owner', 'store_owner');
+  vi.stubGlobal('fetch', vi.fn(async (request) => request.url.endsWith('/packing/admin/queue')
+    ? reply(429, { message: 'Account request limit reached.', rateLimitScope: 'business' }, { 'Retry-After': '60' })
+    : reply(200, { data: { count: 1 } })));
+  await expect(read('queue')).rejects.toMatchObject({ status: 429 });
+  await expect(read('unread')).resolves.toMatchObject({ data: { count: 1 } });
+  await expect(read('getMe')).resolves.toMatchObject({ data: { count: 1 } });
+  await expect(read('getSyncRevision')).resolves.toMatchObject({ data: { count: 1 } });
+  expect(fetch).toHaveBeenCalledTimes(4);
+});
+
+test('a live-read cooldown leaves page reads available while public cooldowns still cover every read', async () => {
+  createStore('owner', 'store_owner');
+  const fetch = vi.fn()
+    .mockResolvedValueOnce(reply(429, { rateLimitScope: 'business-live' }, { 'Retry-After': '60' }))
+    .mockResolvedValueOnce(reply(200, { data: 'Page available' }));
+  vi.stubGlobal('fetch', fetch);
+  await expect(read('unread')).rejects.toMatchObject({ status: 429 });
+  await expect(read('getMe')).rejects.toMatchObject({ status: 429 });
+  await expect(read('queue')).resolves.toEqual({ data: 'Page available' });
+  expect(fetch).toHaveBeenCalledTimes(2);
+  createStore('other-owner', 'store_owner');
+  fetch.mockResolvedValueOnce(reply(429, { rateLimitScope: 'public' }, { 'Retry-After': '60' }));
+  await expect(read('queue')).rejects.toMatchObject({ status: 429 });
+  await expect(read('unread')).rejects.toMatchObject({ status: 429 });
+  expect(fetch).toHaveBeenCalledTimes(3);
 });
 
 test('keeps the POS session when refresh is throttled and can retry with a renewed access token', async () => {

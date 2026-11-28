@@ -4,6 +4,7 @@ import { accountScope, businessSnapshot, savedStorage, SNAPSHOT_SCHEMA, MAX_SAVE
 import { HYDRATE_SAVED_DATA, savedDataStatus } from './savedDataSlice';
 import { loadOutbox } from './outbox';
 import { syncPackingOutbox } from './packingOutbox';
+import { changedQueryKeys, retryableRead } from './revisionChanges';
 
 export const viewMemory = new Map();
 let sessionChannel;
@@ -50,21 +51,45 @@ export async function initializeSavedData(store) {
 // Serial, deduplicated background reads also include closed pages; navigation is not a refresh signal.
 export async function refreshSavedQueries(store, keys) {
   const epoch = selectSessionEpoch(store.getState());
-  const entries = Object.entries(store.getState().api.queries).filter(([key]) => !keys || keys.includes(key));
-  for (const [, saved] of entries) {
+  const subscriptions = store.dispatch(baseApi.internalActions.internal_getRTKQSubscriptions());
+  const entries = Object.entries(store.getState().api.queries).filter(([key]) => !keys || keys.includes(key))
+    .sort(([a], [b]) => Number(subscriptions.getSubscriptionCount(b) > 0) - Number(subscriptions.getSubscriptionCount(a) > 0));
+  for (const [key, saved] of entries) {
     const state = store.getState();
     if (selectSessionEpoch(state) !== epoch || !online() || (state.auth.user && !state.auth.accessToken)) return false;
     const endpoint = baseApi.endpoints[saved.endpointName];
-    if (!endpoint || saved.status === 'pending' || saved.endpointName === 'getSyncRevision') continue;
+    const current = state.api.queries[key];
+    if (!endpoint || !current || saved.endpointName === 'getSyncRevision') continue;
+    // A read already in flight may predate the detected write. Do not advance
+    // the revision checkpoint until it can be reconciled on the next pass.
+    if (current.status === 'pending') return false;
+    if (current.fulfilledTimeStamp !== saved.fulfilledTimeStamp && current.status === 'fulfilled') continue;
     const result = await store.dispatch(endpoint.initiate(saved.originalArgs, { subscribe: false, forceRefetch: true }));
     // A busy/unavailable server gets a quiet interval before the next background pass.
-    if (result.error && ![400, 404, 409, 410, 422].includes(result.error.status)) return false;
+    if (result.error && retryableRead({ status: 'rejected', error: result.error })) return false;
   }
   return true;
 }
 
 export const savedDataMiddleware = (store) => {
   let saveTimer;
+  let refreshTimer;
+  let refreshing = false;
+  const invalidated = new Set();
+  const scheduleRefresh = () => {
+    if (refreshing || refreshTimer !== undefined) return;
+    refreshTimer = setTimeout(async () => {
+      refreshTimer = undefined;
+      refreshing = true;
+      const keys = [...invalidated];
+      invalidated.clear();
+      try { await refreshSavedQueries(store, keys); }
+      finally {
+        refreshing = false;
+        if (invalidated.size) scheduleRefresh();
+      }
+    }, 100);
+  };
   let chain = Promise.resolve();
   const persist = () => {
     clearTimeout(saveTimer);
@@ -100,7 +125,8 @@ export const savedDataMiddleware = (store) => {
     if (action.type === baseApi.internalActions.removeQueryResult.type && !action.meta?.allowSavedRemoval) {
       const query = store.getState().api.queries[action.payload.queryCacheKey];
       if (query?.data !== undefined) {
-        void refreshSavedQueries(store, [action.payload.queryCacheKey]);
+        invalidated.add(action.payload.queryCacheKey);
+        scheduleRefresh();
         return action;
       }
     }
@@ -109,6 +135,9 @@ export const savedDataMiddleware = (store) => {
     const state = store.getState();
     if (selectSessionEpoch(previous) !== selectSessionEpoch(state)) {
       clearTimeout(saveTimer);
+      clearTimeout(refreshTimer);
+      refreshTimer = undefined;
+      invalidated.clear();
       if (!action.meta?.remoteSession && !action.meta?.savedBoot) sessionChannel?.postMessage({ previousScope: accountScope(previous.auth), scope: accountScope(state.auth), logout: action.type === clearCredentials.type });
       // Credentials never enter IndexedDB. Only a time-limited identity unlocks
       // this device's snapshots, and it cannot authorize server-side writes.
@@ -162,7 +191,6 @@ export function startSavedDataSync(store) {
   }
   let running = false;
   let lastCheck = 0;
-  let lastFullCheck = 0;
   const revisions = new Map();
   const checkRevision = async () => {
     const state = store.getState();
@@ -172,20 +200,21 @@ export function startSavedDataSync(store) {
     const slugs = new Set(Object.values(state.api.queries)
       .filter((query) => query.endpointName === 'getStorefrontInfo').map((query) => query.originalArgs));
     if (state.auth.accessToken) slugs.add(undefined);
-    // Periodic full reconciliation also covers maintenance scripts and a failed
-    // revision publication; it never clears the displayed snapshots.
-    let changed = !revisions.has(scope) || Date.now() - lastFullCheck >= 300000;
+    // The minute heartbeat downloads counters only. Business data is fetched
+    // only for changed domains or failed reads, never on a five-minute timer.
     const checked = new Map();
+    const keys = new Set();
     for (const slug of slugs) {
       const result = await store.dispatch(baseApi.endpoints.getSyncRevision.initiate(slug, { subscribe: false, forceRefetch: true }));
       if (selectSessionEpoch(store.getState()) !== epoch || result.error) return;
-      checked.set(slug, result.data?.data?.revision);
-      if (revisions.get(scope)?.get(slug) !== checked.get(slug)) changed = true;
+      checked.set(slug, result.data?.data);
+      for (const key of changedQueryKeys(store.getState(), revisions.get(scope)?.get(slug), result.data?.data)) keys.add(key);
     }
     // Retry unsuccessful reads even if the revision did not change.
-    const failed = Object.values(store.getState().api.queries).some((query) => query.status === 'rejected' && ![400, 404, 409, 410, 422].includes(query.error?.status));
-    if (!changed && !failed) revisions.set(scope, checked);
-    else if (await refreshSavedQueries(store)) { revisions.set(scope, checked); lastFullCheck = Date.now(); }
+    for (const [key, query] of Object.entries(store.getState().api.queries)) if (retryableRead(query)) keys.add(key);
+    if ((!keys.size || await refreshSavedQueries(store, [...keys])) && selectSessionEpoch(store.getState()) === epoch) {
+      revisions.set(scope, checked);
+    }
   };
   const check = async (force = false) => {
     if (running || !online() || document.visibilityState === 'hidden' || (!force && Date.now() - lastCheck < 60000)) return;

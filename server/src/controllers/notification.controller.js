@@ -21,7 +21,7 @@ export const getNotifications = asyncHandler(async (req, res) => {
 
 
   const [notifications, total] = await Promise.all([
-    Notification.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+    Notification.find(filter).sort({ createdAt: -1, _id: -1 }).skip(skip).limit(limit).lean(),
     Notification.countDocuments(filter),
   ]);
 

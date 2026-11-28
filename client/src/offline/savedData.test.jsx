@@ -5,7 +5,7 @@ import { act, cleanup, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeAll, beforeEach, expect, test, vi } from 'vitest';
 import { accountScope, businessSnapshot, savedStorage } from './storage';
 
-let baseApi, sessionReducer, sessionCacheMiddleware, savedDataMiddleware, restoreScope, useSavedViewState, setCredentials, clearCredentials;
+let baseApi, sessionReducer, sessionCacheMiddleware, savedDataMiddleware, restoreScope, startSavedDataSync, useSavedViewState, setCredentials, clearCredentials;
 const stores = [];
 const NativeRequest = globalThis.Request;
 beforeEach(() => {
@@ -18,7 +18,7 @@ beforeAll(async () => {
   vi.stubEnv('VITE_API_URL', 'https://shop.test/api/v1');
   ({ baseApi } = await import('../api/baseApi'));
   ({ sessionReducer, sessionCacheMiddleware } = await import('../app/store'));
-  ({ savedDataMiddleware, restoreScope } = await import('./savedData'));
+  ({ savedDataMiddleware, restoreScope, startSavedDataSync } = await import('./savedData'));
   ({ useSavedViewState } = await import('./useSavedViewState'));
   ({ setCredentials, clearCredentials } = await import('../features/auth/authSlice'));
   baseApi.injectEndpoints({ endpoints: (builder) => ({
@@ -50,6 +50,32 @@ test('deduplicates reads and keeps visited data across repeated navigation witho
   await read(store); await read(store);
   expect(fetch).toHaveBeenCalledTimes(1);
   expect(baseApi.endpoints.savedReadProbe.select({})(store.getState()).data).toBe(first);
+});
+
+test('six unchanged minutes check tiny counters without re-fetching saved pages; a product change refreshes its page', async () => {
+  const store = await makeStore();
+  let productVersion = 1;
+  let expenseVersion = 1;
+  const fetch = vi.fn(async (request) => request.url.endsWith('/sync/revision')
+    ? response({ data: { revision: productVersion + expenseVersion, versions: { Product: productVersion, Expense: expenseVersion } } })
+    : response({ data: ['Rice'] }));
+  vi.stubGlobal('fetch', fetch);
+  await read(store);
+  vi.useFakeTimers();
+  const stop = startSavedDataSync(store);
+  try {
+    await vi.advanceTimersByTimeAsync(1000);
+    fetch.mockClear();
+    await vi.advanceTimersByTimeAsync(360000);
+    expect(fetch.mock.calls.filter(([request]) => request.url.includes('/products'))).toHaveLength(0);
+    expect(fetch.mock.calls.filter(([request]) => request.url.endsWith('/sync/revision'))).toHaveLength(6);
+    expenseVersion++;
+    await vi.advanceTimersByTimeAsync(60000);
+    expect(fetch.mock.calls.filter(([request]) => request.url.includes('/products'))).toHaveLength(0);
+    productVersion++;
+    await vi.advanceTimersByTimeAsync(60000);
+    expect(fetch.mock.calls.filter(([request]) => request.url.includes('/products'))).toHaveLength(1);
+  } finally { stop(); vi.useRealTimers(); }
 });
 
 test('keeps data and its real timestamp during a slow update and a failed update', async () => {

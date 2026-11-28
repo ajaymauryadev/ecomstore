@@ -22,6 +22,9 @@ const staleSession = () => ({ error: { status: 'CUSTOM_ERROR', data: { message: 
 
 const requestUrl = (args) => typeof args === 'string' ? args : args?.url;
 const isSessionEndpoint = (args) => /^\/auth\/(login|register|refresh|logout)$/.test(requestUrl(args) || '');
+const isBusinessLiveRead = (args, role) => ['super_admin', 'store_owner', 'staff', 'packer', 'delivery'].includes(role) &&
+  (typeof args === 'string' || ['GET', 'HEAD'].includes(args?.method ?? 'GET')) &&
+  /^\/(?:auth\/me|sync\/revision|notifications(?:\/unread-count)?)(?:\?|\/?$)/.test(requestUrl(args) || '');
 
 // Another tab may have rotated the shared cookie while this request was in flight.
 // Retry only refresh, after the winning response has had time to set its cookie.
@@ -91,9 +94,14 @@ const baseQueryWithReauth = async (args, api, extraOptions) => {
       ? 'An online connection and server confirmation are required. Your draft has not been submitted.'
       : 'Connect to the internet to download this data.' } } };
   }
-  const { trafficCooldown, refreshCooldown } = session;
-  if (!sessionEndpoint && trafficCooldown?.error.data.retryAt > Date.now()) {
+  const liveRead = isBusinessLiveRead(args, api.getState().auth.user?.role);
+  const { trafficCooldown, liveCooldown, refreshCooldown } = session;
+  if (!sessionEndpoint && trafficCooldown?.error.data.retryAt > Date.now() &&
+      !(liveRead && trafficCooldown.error.data.rateLimitScope === 'business')) {
     return rateLimitError(trafficCooldown, trafficCooldown.error.data.retryAt);
+  }
+  if (liveRead && liveCooldown?.error.data.retryAt > Date.now()) {
+    return rateLimitError(liveCooldown, liveCooldown.error.data.retryAt);
   }
   if (!sessionEndpoint && refreshCooldown && refreshCooldown.token === accessToken &&
       refreshCooldown.result.error.data.retryAt > Date.now()) {
@@ -151,6 +159,9 @@ const baseQueryWithReauth = async (args, api, extraOptions) => {
   const { rateLimitScope, retryAt } = normalized.error?.data ?? {};
   if (normalized.error?.status === 429 && retryAt && ['public', 'business'].includes(rateLimitScope)) {
     session.trafficCooldown = normalized;
+  }
+  if (normalized.error?.status === 429 && retryAt && rateLimitScope === 'business-live') {
+    session.liveCooldown = normalized;
   }
   return normalized;
 };

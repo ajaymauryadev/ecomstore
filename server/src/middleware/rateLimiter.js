@@ -18,10 +18,18 @@ const createLimiter = (windowMinutes, max, message, { scope, ...options } = {}) 
   });
 
 export const apiLimiter = createLimiter(15, 200, 'Public request limit reached.', { scope: 'public' });
-const businessLimiter = createLimiter(15, 450, 'Account request limit reached.', {
+// Workspace warmup and saved views can legitimately read dozens of endpoints.
+// Bound bursts without locking a working shop out for a whole fifteen minutes.
+const businessLimiter = createLimiter(1, 240, 'Account request limit reached.', {
   scope: 'business',
   keyGenerator: (req) => accessClaims(req).userId,
 });
+const businessLiveLimiter = createLimiter(1, 120, 'Live update request limit reached.', {
+  scope: 'business-live',
+  keyGenerator: (req) => accessClaims(req).userId,
+});
+const isLiveRead = (req) => ['GET', 'HEAD'].includes(req.method) &&
+  /^\/v1\/(?:auth\/me|sync\/revision|notifications(?:\/unread-count)?)\/?$/i.test(req.path);
 const businessRoles = new Set(['super_admin', 'store_owner', 'staff', 'packer', 'delivery']);
 
 export function apiTrafficLimiter(req, res, next) {
@@ -35,7 +43,7 @@ export function apiTrafficLimiter(req, res, next) {
   }
   const limiter = businessRoles.has(claims?.role) &&
     typeof claims.userId === 'string' && /^[a-f\d]{24}$/i.test(claims.userId)
-    ? businessLimiter
+    ? (isLiveRead(req) ? businessLiveLimiter : businessLimiter)
     : apiLimiter;
   return limiter(req, res, next);
 }

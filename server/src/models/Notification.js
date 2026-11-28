@@ -23,5 +23,11 @@ const notificationSchema = new mongoose.Schema({
 
 notificationSchema.index({ tenantId: 1, role: 1, createdAt: -1 });
 notificationSchema.index({ userId: 1, isRead: 1 });
+// Match the two owner inbox branches and personal team inboxes, including sort.
+notificationSchema.index({ tenantId: 1, userId: 1, createdAt: -1, _id: -1 });
+notificationSchema.index({ tenantId: 1, role: 1, userId: 1, createdAt: -1, _id: -1, isRead: 1 });
+// Owner inboxes also include legacy role records whose userId is absent/null.
+// A tenant timeline can satisfy their stable sort without sorting the full OR.
+notificationSchema.index({ tenantId: 1, createdAt: -1, _id: -1 });
 
 export default mongoose.model('Notification', notificationSchema);

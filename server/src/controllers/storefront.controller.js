@@ -15,7 +15,7 @@ import {
   generateTokens, hashToken, setRefreshCookie, getTokenExpiry,
 } from '../utils/jwt.js';
 import { emitToTenant, emitToUser, emitToWorkers } from '../config/socket.js';
-import { notifyAdmin, notifyCustomer, notifyStaff, notifyTeam } from '../services/notification.service.js';
+import { notifyAdmin, notifyCustomer, notifyStaff, saveNewOrderNotifications, publishNotification } from '../services/notification.service.js';
 import { logAudit } from '../services/audit.service.js';
 import { calculateOrderQuote } from '../services/checkout.service.js';
 import {
@@ -39,6 +39,8 @@ import { fromMinorUnits, percentOf, toMinorUnits } from '../utils/money.js';
 import { hasPermission, PERMISSIONS } from '../constants/permissions.js';
 import StaffActivityLog from '../models/StaffActivityLog.js';
 import { actorSnapshot, recordOrderAction } from '../utils/orderAttribution.js';
+import { recordTenantChange } from '../services/syncRevision.service.js';
+import { changeTags } from '../utils/changeTags.js';
 
 /* ─── Safe socket emit (no-op if socket not ready) ───── */
 const safeEmitTenant = (tenantId, event, data) => {
@@ -479,6 +481,7 @@ export const createOrder = asyncHandler(async (req, res, next) => {
       pincode: String(customerInfo.address.pincode || '').trim().slice(0, 10),
     } : undefined,
   };
+  let orderNotifications = [];
   const { order, replayed } = await submitOrder({
     req, tenantId: store._id, operation: 'storefront',
   }, async (session, { orderSubmission }) => {
@@ -533,8 +536,13 @@ export const createOrder = asyncHandler(async (req, res, next) => {
       actorId: req.user?._id || store.ownerId,
       session,
     });
+    orderNotifications = await saveNewOrderNotifications(createdOrder, session);
+    await recordTenantChange(store._id, changeTags(req.originalUrl.split('?')[0]), session);
     return createdOrder;
   });
+
+  req.tenantRevisionRecorded = !replayed;
+  req.skipSavedDataChange = replayed;
 
   if (!replayed) {
     safeEmitTenant(store._id, 'order:new', {
@@ -545,10 +553,7 @@ export const createOrder = asyncHandler(async (req, res, next) => {
       paymentMethod,
       status: order.status,
     });
-    await notifyAdmin(store._id, 'new_order', 'New Order Received',
-      `Order #${order.orderNumber} received`, { orderId: order._id, orderNumber: order.orderNumber });
-    await notifyTeam(store._id, 'new_order', 'New Order Received',
-      `Order #${order.orderNumber} received`, { orderId: order._id, orderNumber: order.orderNumber });
+    orderNotifications.forEach(publishNotification);
     await logAudit({
       tenantId: store._id,
       action: 'order_created',

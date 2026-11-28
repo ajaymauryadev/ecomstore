@@ -11,7 +11,7 @@ import { cn } from '../../utils/cn';
 import { formatDistanceToNow } from 'date-fns';
 
 const TYPE_ICON = { new_order: ShoppingCart, payment_submitted: CreditCard, order_cancelled: X, low_stock: AlertTriangle, item_missing: Package, stock_mismatch: AlertTriangle, order_assigned: User, payment_verified: Check };
-const refreshOptions = { pollingInterval: 0, skipPollingIfUnfocused: true, refetchOnFocus: true, refetchOnReconnect: true };
+const refreshOptions = { pollingInterval: 0 };
 
 export default function NotificationBell() {
   const [open, setOpen] = useState(false);

@@ -54,6 +54,16 @@ const receive = (event, payload) => act(() => handlers.get(event)?.(payload));
 const flush = () => act(() => vi.advanceTimersByTimeAsync(75));
 
 describe('live query refreshes', () => {
+  test('an inbox read update refreshes notifications without redownloading all saved business views', async () => {
+    await subscribe([{ type: 'Notification' }, { type: 'Dashboard', id: 'CURRENT' }, { type: 'Reports' }]);
+    receive('data:changed', { tags: ['Notification'] });
+    await flush();
+    expect(read.mock.calls.map(([tag]) => tag)).toEqual([{ type: 'Notification' }]);
+    read.mockClear();
+    receive('data:changed', {});
+    await flush();
+    expect(read).toHaveBeenCalledTimes(3);
+  });
   test('refreshes each affected subscription once for an order and notification burst', async () => {
     const affected = [
       { type: 'Order', id: 'admin-one' },
